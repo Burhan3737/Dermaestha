@@ -1,0 +1,32 @@
+Already made apps
+ Ola doc,
+ Al marham
+
+Only for derma niche industry (dermastha)
+
+Virtual dermatology
+
+Moduels Most important for mvp phases? and building in incremental phases
+
+Loop (workflow)
+Patient will come from social media handles
+They will come to website and a landing page and description of product
+Knowledge of they can consult and book, doctors info, derma diseases information
+book a consultation, doctors can be online and can book a meeting at spot but a queue, 
+what if the customer does not get an appointment
+or offline
+They want to stream their own video calling to improve customer experience
+Once the patient convo ends, exit notes by doctor added, eprescription generated
+When eprescript generated, it should be forwarded to user dashboard or to a pharmacy online and the price would be calculated and shown to the user, they can purchase from a local store
+If they purchase from our app (cash on delivery (lapid for tracking id and or book from lapid only the tracking id would be shown) or online payment
+
+
+
+
+
+
+
+
+
+
+ 
