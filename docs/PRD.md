@@ -126,6 +126,15 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 - Doctor view shows both account holder name and actual patient name distinctly
 - The prescription PDF is issued in the actual patient's name (account holder name when "Myself"; the captured name + age + relation when "Someone else"). See §3.4 for the rendering rule; the doctor's prescription builder does not re-enter this — it is auto-pulled from the appointment record.
 
+**P9. View upcoming appointments**
+> *As a patient, I want to see my confirmed upcoming appointments in one place so I can prepare and join the call on time.*
+
+- Patient dashboard has an "Upcoming" section listing all appointments in `confirmed` or `in_progress` state, sorted by slot time ascending
+- Each row shows: doctor name + photo, slot date/time in `Asia/Karachi`, "for: [actual patient]" line if booked-for-someone-else (per P8), consultation fee paid, "Join Call" button (per P5), and a "Cancel" link (per P6)
+- "Join Call" button is disabled until 10 minutes before slot start, matching the activation rule in P5 and D2
+- After slot completion, the appointment moves out of "Upcoming" into the "Past appointments" view referenced in P7 (visible there with its terminal state — `completed`, `prescription_issued`, `patient_no_show`, etc.)
+- Empty state shows "No upcoming appointments — Browse doctors" with the link routing to the public doctor listing (P1)
+
 #### Dermatologist stories
 
 **D1. Set weekly availability**
@@ -209,6 +218,35 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 - Each alert links to the relevant appointment/payment record
 - Admin can manually re-trigger emails and refunds
 
+**A4. Edit, deactivate, and reactivate a doctor**
+> *As an admin, I want to edit a doctor's profile and toggle their active status so I can keep listings current and offboard cleanly when needed.*
+
+- Doctor edit page exposes the same fields as A1's add form **except** PMC number and email, which are immutable post-creation
+- Editable: full name, phone, profile photo (same JPEG/PNG/WebP, max 2 MB constraints as A1), bio, specialization, consultation fee, weekly availability template
+- **Consultation-fee changes never affect existing appointments.** The `feeAtBooking` snapshot rule from §3.2 #6 governs; the edit page shows a one-line note confirming this
+- Renaming a doctor never alters historical appointments or prescriptions per §3.2 #3
+- Deactivate action triggers the §4.4 row 39 cascade: doctor removed from public listing immediately; all `confirmed` future appointments auto-cancelled via the `doctor_cancelled` flow (refund net of gateway fee + apology email per policy #5); doctor's photo + bio remain visible in past-appointment views for patients with prescription history under that doctor
+- Deactivate confirmation modal shows the count of future appointments that will be cancelled and the total refund amount before commit
+- Reactivate restores the doctor to the public listing using their saved availability template; does not retroactively restore the cancelled appointments
+
+**A5. Search appointments and payments**
+> *As an admin, I want to look up appointments and payments by patient, doctor, or reference number so I can resolve support cases.*
+
+- Admin panel "Appointments" page supports search by: patient email or phone, doctor name, appointment ID, payment reference number, or date range
+- Result row shows: appointment ID, slot date/time, patient name (and "for: [actual patient]" if applicable), doctor name, current state, amount paid, payment reference, refund reference (if any)
+- Clicking a row opens an appointment detail view showing the full state-transition history (sourced from the §3.5 audit log) and any linked prescriptions
+- From the detail view, admin can manually re-trigger emails and refunds (per A3) and mark an appointment as `disputed` (per §4.4 #10)
+- Search itself is read-only with respect to the appointment record; mutations (re-trigger, mark disputed) are recorded as admin-actor entries in the audit log
+
+**A6. View audit log**
+> *As an admin, I want to read the audit log filtered by appointment or user so I can answer support questions with a reliable record of what happened.*
+
+- Admin panel "Audit Log" page accepts filters: appointment ID, user (patient or doctor) ID or email, event type, actor type (`patient` | `doctor` | `admin` | `system`), and date range
+- Each entry shows: timestamp in `Asia/Karachi`, event type, actor type, actor identity, target record reference, and optional reason
+- Event coverage matches §3.5 (appointment state transitions, auth events, payment events, refund events)
+- View is **read-only** — consistent with §3.5's append-only convention; no update or delete UI is exposed
+- Route is reachable only by the admin role per DA6; no patient or doctor surface exposes audit-log access
+
 #### Doctor and admin authentication (v1 — minimal, shared login)
 
 **DA1. Doctor account creation by admin.** When admin creates a doctor via A1, the admin sets an initial password in the same form. The admin shares the password with the doctor out-of-band (WhatsApp, phone, or in person). v1 has no email-token "set your password" flow for doctors.
@@ -271,6 +309,8 @@ These invariants are non-negotiable regardless of the chosen storage technology.
 5. **Medicine name and dosage are snapshotted on the prescription at issue-time.** Later renames or deactivations in the catalogue do not change what an existing prescription shows.
 6. **Consultation fee is snapshotted on the appointment at confirmation.** `feeAtBooking` is captured when the appointment moves to `confirmed`; later changes to the doctor's `consultationFee` never affect the existing appointment's billed amount, refund amount, or revenue accounting.
 7. **Payment-intent creation is idempotent** on `(patient, slot)` so double-submits or retries cannot produce two parallel payment intents for the same booking attempt.
+8. **Doctor PMC number and email are immutable post-creation.** Once a doctor record is created via A1, neither field can be updated through any API — admin, doctor, or internal. Other doctor fields (name, phone, photo, bio, specialization, fee, availability) remain editable per A4.
+9. **Deactivation cascade is recoverable.** When admin deactivates a doctor (A4), the system attempts to cancel every `confirmed` future appointment for that doctor via the `doctor_cancelled` flow and initiate the corresponding refunds (net of gateway fee, per policy #5). The cascade is **not required to be atomic** — refund-API failures for individual appointments must not roll back successful cancellations. Each per-appointment failure surfaces to the admin alert feed (§A3) and is retryable from the alert. The doctor's `active=false` flag is set only after all cancellation attempts complete (success or surfaced failure); the doctor cannot enter a half-deactivated state where new bookings are blocked but existing appointments are still confirmed without a cancellation attempt.
 
 ### 3.3 Integration responsibilities
 
@@ -295,12 +335,13 @@ The platform integrates with three external services. The PRD specifies what eac
 - **HTTPS everywhere.**
 - **Authentication:** session cookies must be HTTP-only, Secure, and at minimum SameSite=Lax. Passwords are hashed; plaintext storage is forbidden.
 - **Authorization (single mechanism):**
-  - Patient PII (name, email, phone, prescription content) is accessible only to the patient account owner, the doctor assigned to the relevant appointment, and admin.
+  - Patient PII (name, email, phone, prescription content) is accessible only to the patient account owner, the doctor assigned to the relevant appointment, and admin. A patient can list their own `confirmed` and `in_progress` appointments (P9) and read details of any appointment where they are the account holder; the assigned doctor can read the appointments scheduled to them (D2); admin can read any appointment (A5).
   - Doctor schedule and contact info is accessible only to that doctor and admin.
   - Admin-only routes and doctor-scoped routes are enforced server-side through the role middleware described in DA6 — not duplicated in individual route handlers, and not enforced only on the frontend.
 - **Payment data isolation:** the platform never sees card numbers or wallet credentials. All sensitive payment data is handled by the payment aggregator's hosted checkout.
 - **Video access:** participant tokens are appointment-scoped and time-bound (slot-start − 10 min through slot-end + 5 min).
-- **Audit log:** every appointment state transition (`confirmed`, `cancelled_refunded`, `cancelled_no_refund`, `doctor_cancelled`, `completed`, `prescription_issued`, `patient_no_show`, `doctor_no_show`) is logged with timestamp, actor type (patient/doctor/admin/system), actor identity, and an optional reason. Auth events (successful login, password change, password reset by admin), payment events (intent created, success, failure), and refund events (initiated, settled, failed) flow through the same log. Retention in v1: indefinite. Access: admin-only. Append-only by application convention — no update or delete path is exposed. Schema is an architecture decision.
+- **Audit log:** every appointment state transition (`confirmed`, `cancelled_refunded`, `cancelled_no_refund`, `doctor_cancelled`, `completed`, `prescription_issued`, `patient_no_show`, `doctor_no_show`) is logged with timestamp, actor type (patient/doctor/admin/system), actor identity, and an optional reason. Auth events (successful login, password change, password reset by admin), payment events (intent created, success, failure), refund events (initiated, settled, failed), and admin operational actions (doctor edits and deactivate/reactivate via A4; manual email re-trigger and refund re-trigger via A3/A5; `disputed` flag set/clear via A5) flow through the same log. Retention in v1: indefinite. Access: admin-only. Append-only by application convention — no update or delete path is exposed. A filtered query API (filters: appointment ID, user ID/email, event type, actor type, date range) exposes entries to the admin role per DA6 to back A6; no write or delete API is exposed. Schema is an architecture decision.
+- **Disputed marker:** an appointment can be flagged `disputed=true` by admin via A5 when a chargeback (§4.4 #10) or unresolved patient claim (§4.4 #28) is recorded. This is a **flag on the appointment record, not a state transition** — the §4.3 state machine is unchanged, and a `disputed` flag can attach to any terminal state (`completed`, `prescription_issued`, `patient_no_show`, `cancelled_refunded`, etc.). Setting and clearing the flag are admin-only actions, audit-logged per the audit-log bullet above. No automated behavior is triggered by the flag in v1; it exists solely as a support-workflow marker.
 - **Patient PII retention and deletion:** v1 retains all patient PII and prescription content indefinitely. There is no in-app account-deletion flow in v1 (deferred to v1.1, see §5.1). Privacy and regulatory implications are flagged in §5.2.
 - **Consent at sign-up:** per P2, a mandatory acceptance of Terms of Service and Privacy Policy is recorded at sign-up with timestamp. The `/legal/terms` and `/legal/privacy` page contents are M4 deliverables. Versioning and re-prompt-on-update are deferred to v1.1.
 - **Webhook authentication:** every inbound payment webhook is signature-verified; missing or invalid-signature payloads are rejected and logged to the admin alert feed.
@@ -377,6 +418,8 @@ in_progress  (video room active; grace window = slot-start + 15min)
 
 Refund amounts on `cancelled_refunded`, `doctor_cancelled`, and `doctor_no_show` are net of the payment-gateway transaction fee per policy #5.
 
+Note: a `disputed` boolean flag (set via A5) is orthogonal to this state machine — it can attach to any terminal state and does not alter transitions. See the Disputed-marker bullet in §3.5.
+
 ### 4.4 Edge Case Catalogue
 
 40 edge cases catalogued across 7 categories. Each is tagged:
@@ -404,7 +447,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 | 7 | Payment fails — patient retries inside lock window | A | Same locked slot held; patient retries; second attempt triggers a fresh payment intent. |
 | 8 | Patient closes browser during payment redirect | A | The verified webhook is the source of truth — if it fires success, booking is confirmed and email sent regardless of browser state. |
 | 9 | Patient pays twice (e.g., refreshes success page) | A | Idempotency at intent + aggregator duplicate detection. |
-| 10 | Chargeback weeks later | K | Admin tool marks appointment as `disputed`. No automated handling in v1. |
+| 10 | Chargeback weeks later | K | Admin tool marks appointment as `disputed` via A5 detail view. No automated handling in v1. |
 
 #### Pre-consultation (after confirmed, before call)
 
@@ -428,7 +471,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 | 21 | Doctor absent at slot+15 | P | Marked `doctor_no_show`; refund initiated (net of gateway fee) + apology (policy #7). |
 | 22 | Call drops mid-consultation (network issue) | A | Video session persists for slot duration + 5 min; either party can rejoin the same room. |
 | 23 | Consultation runs over slot end | A | Hard cutoff at slot-end + 5 min; soft warning to doctor at 5 min remaining. |
-| 24 | Audio/video doesn't work for one party | K | Manual support fallback. No automated recovery in v1. |
+| 24 | Audio/video doesn't work for one party | K | Manual support fallback (admin uses A5 lookup + A6 audit log). No automated recovery in v1. |
 | 25 | Patient and doctor join different rooms by accident | A | Impossible — room identity is appointment-scoped and access-gated (§3.3). |
 
 #### Post-consultation
@@ -437,7 +480,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 |---|---|---|---|
 | 26 | Doctor doesn't submit prescription within 12 hours | A | Admin alert; appointment status `awaiting_prescription`; doctor reminded via dashboard. |
 | 27 | Doctor wants to edit prescription after submit | P | Issues a new prescription; original immutable; patient sees both (policy #9). |
-| 28 | Patient claims consultation didn't happen | K | Manual support resolution. No automated dispute flow in v1. |
+| 28 | Patient claims consultation didn't happen | K | Manual support resolution; admin investigates via A5 + A6. No automated dispute flow in v1. |
 | 29 | Patient loses prescription PDF | A | Always re-downloadable from dashboard; PDF rendered on demand from stored data. |
 
 #### Refunds
@@ -463,7 +506,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 |---|---|---|---|
 | 37 | Booking for someone else (parent for child, child for parent) | P | "Who is this consultation for?" field captures actual patient name (policy #10). Prescription auto-pulls the actual patient name onto the PDF (§3.4). |
 | 38 | Patient is a minor | K | Doctor uses clinical judgment; no platform enforcement in v1. |
-| 39 | Doctor's PMC license revoked / admin deactivates a doctor | A | Past appointments untouched. All `confirmed` future appointments are automatically cancelled via the `doctor_cancelled` flow (refund net of gateway fee + apology email). Future bookings blocked. Doctor's photo + bio remain visible in past-appointment views for patients with prescription history under that doctor; doctor is removed from the public listing. |
+| 39 | Doctor's PMC license revoked / admin deactivates a doctor | A | Past appointments untouched. All `confirmed` future appointments are automatically cancelled via the `doctor_cancelled` flow (refund net of gateway fee + apology email). Future bookings blocked. Doctor's photo + bio remain visible in past-appointment views for patients with prescription history under that doctor; doctor is removed from the public listing. Triggered from A4. |
 | 40 | Patient under another patient's account | A | Account-level auth; no cross-account access. |
 
 ---
@@ -532,3 +575,4 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 | **Immutable prescription** | A submitted prescription cannot be edited; corrections require issuing a new linked prescription |
 | **`feeAtBooking`** | Snapshot of the doctor's consultation fee taken at the moment the appointment is confirmed; never changes for that appointment thereafter |
 | **`mustChangePassword`** | Flag on a user record (doctor or admin) requiring a password change before the next protected route is reached; set on creation and on admin reset, cleared on successful change |
+| **`disputed`** | A boolean flag on an appointment record, set by admin via A5 when a chargeback or unresolved patient claim is recorded. Orthogonal to the §4.3 state machine. |
