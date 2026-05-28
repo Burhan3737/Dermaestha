@@ -124,7 +124,7 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 - During booking, a "Who is this consultation for?" field is shown with options: `Myself` (default) | `Someone else`
 - If `Someone else` selected: form expands to capture patient name, age, relation
 - Doctor view shows both account holder name and actual patient name distinctly
-- The prescription PDF is issued in the actual patient's name (account holder name when "Myself"; the captured name + age + relation when "Someone else"). See §3.4 for the rendering rule; the doctor's prescription builder does not re-enter this — it is auto-pulled from the appointment record.
+- The prescription PDF is issued in the actual patient's name (account holder name when "Myself"; the captured name + age + relation when "Someone else"). See §3.5 for the rendering rule; the doctor's prescription builder does not re-enter this — it is auto-pulled from the appointment record.
 
 **P9. View upcoming appointments**
 > *As a patient, I want to see my confirmed upcoming appointments in one place so I can prepare and join the call on time.*
@@ -214,7 +214,7 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
   - Refund API failures
   - Transactional-email send failures (after retry exhaustion)
   - Appointments in `awaiting_prescription` state >12 hours
-  - Unhandled application exceptions (sourced from the error-tracking tool named in §3.5)
+  - Unhandled application exceptions (sourced from the error-tracking tool named in §3.6)
 - Each alert links to the relevant appointment/payment record
 - Admin can manually re-trigger emails and refunds
 
@@ -223,8 +223,8 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 
 - Doctor edit page exposes the same fields as A1's add form **except** PMC number and email, which are immutable post-creation
 - Editable: full name, phone, profile photo (same JPEG/PNG/WebP, max 2 MB constraints as A1), bio, specialization, consultation fee, weekly availability template
-- **Consultation-fee changes never affect existing appointments.** The `feeAtBooking` snapshot rule from §3.2 #6 governs; the edit page shows a one-line note confirming this
-- Renaming a doctor never alters historical appointments or prescriptions per §3.2 #3
+- **Consultation-fee changes never affect existing appointments.** The `feeAtBooking` snapshot rule from §3.3 #6 governs; the edit page shows a one-line note confirming this
+- Renaming a doctor never alters historical appointments or prescriptions per §3.3 #3
 - Deactivate action triggers the §4.4 row 39 cascade: doctor removed from public listing immediately; all `confirmed` future appointments auto-cancelled via the `doctor_cancelled` flow (refund net of gateway fee + apology email per policy #5); doctor's photo + bio remain visible in past-appointment views for patients with prescription history under that doctor
 - Deactivate confirmation modal shows the count of future appointments that will be cancelled and the total refund amount before commit
 - Reactivate restores the doctor to the public listing using their saved availability template; does not retroactively restore the cancelled appointments
@@ -234,7 +234,7 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 
 - Admin panel "Appointments" page supports search by: patient email or phone, doctor name, appointment ID, payment reference number, or date range
 - Result row shows: appointment ID, slot date/time, patient name (and "for: [actual patient]" if applicable), doctor name, current state, amount paid, payment reference, refund reference (if any)
-- Clicking a row opens an appointment detail view showing the full state-transition history (sourced from the §3.5 audit log) and any linked prescriptions
+- Clicking a row opens an appointment detail view showing the full state-transition history (sourced from the §3.6 audit log) and any linked prescriptions
 - From the detail view, admin can manually re-trigger emails and refunds (per A3) and mark an appointment as `disputed` (per §4.4 #10)
 - Search itself is read-only with respect to the appointment record; mutations (re-trigger, mark disputed) are recorded as admin-actor entries in the audit log
 
@@ -243,8 +243,8 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 
 - Admin panel "Audit Log" page accepts filters: appointment ID, user (patient or doctor) ID or email, event type, actor type (`patient` | `doctor` | `admin` | `system`), and date range
 - Each entry shows: timestamp in `Asia/Karachi`, event type, actor type, actor identity, target record reference, and optional reason
-- Event coverage matches §3.5 (appointment state transitions, auth events, payment events, refund events)
-- View is **read-only** — consistent with §3.5's append-only convention; no update or delete UI is exposed
+- Event coverage matches §3.6 (appointment state transitions, auth events, payment events, refund events)
+- View is **read-only** — consistent with §3.6's append-only convention; no update or delete UI is exposed
 - Route is reachable only by the admin role per DA6; no patient or doctor surface exposes audit-log access
 
 #### Doctor and admin authentication (v1 — minimal, shared login)
@@ -259,7 +259,7 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 
 **DA5. Doctor password recovery (manual).** No self-service reset for doctors in v1. If a doctor forgets the password, the doctor contacts the admin out-of-band; the admin resets the password from the doctor edit page (A1 panel) and shares the new password out-of-band. After reset, `mustChangePassword` is set to true so the doctor changes it on next login.
 
-**DA6. Role-based authorization.** Every authenticated server route checks the session's `role` and rejects requests outside the allowed roles. The §3.5 authorization rules (patient PII access, doctor schedule access, admin-only routes) are enforced through this single mechanism, not duplicated in route bodies.
+**DA6. Role-based authorization.** Every authenticated server route checks the session's `role` and rejects requests outside the allowed roles. The §3.6 authorization rules (patient PII access, doctor schedule access, admin-only routes) are enforced through this single mechanism, not duplicated in route bodies.
 
 ### 2.3 Non-Goals (explicitly NOT in v1)
 
@@ -287,7 +287,36 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 
 This section describes what the platform must do, the data invariants it must preserve, the responsibilities of each external integration, and the security/privacy posture. It does **not** prescribe the technology stack, deployment topology, schema design, or module layout — those are the architecture skill's outputs.
 
-### 3.1 Platform constraints
+### 3.1 Architecture Overview (logical)
+
+This is a stack-agnostic component-and-flow sketch. The `architecture` skill is responsible for technology selection, deployment topology, schema design, and module layout (see §3 preamble).
+
+**Logical components**
+
+- **Patient surface** — mobile-browser web app: discovery, booking, payment redirect handoff, video join, dashboard (upcoming + past appointments), prescription download.
+- **Doctor surface** — desktop-first web app: availability grid, today's appointments, video join, prescription builder, cancellation.
+- **Admin surface** — desktop web app: doctor onboarding (A1) + edit/deactivate (A4), medicine catalogue (A2), alert feed (A3), appointment & payment search (A5), audit-log viewer (A6).
+- **Application core** — owns the appointment state machine (§4.3), the data integrity invariants (§3.3), idempotent payment-intent creation, slot-lock lifecycle, refund orchestration, prescription immutability, role-based authorization (DA6), and the append-only audit log.
+- **External integrations** — payment aggregator (hosted checkout + signed webhooks + refund API + reconciliation query), video provider (per-appointment isolated rooms + time-bound participant tokens), transactional email provider (six trigger types).
+- **Reconciliation worker** — hourly job that queries the aggregator for unconfirmed payments over the last 24h and reconciles missed webhooks (§4.4 #6).
+- **Notification worker** — schedules and dispatches the six email trigger types with exponential-backoff retry and admin alert on final failure (§3.4 row 3).
+
+**Primary data flows**
+
+1. **Booking → payment → confirmation.** Patient picks slot → app core locks slot for 10 min → redirect to aggregator hosted checkout → patient pays → signed `payment.success` webhook → app core verifies signature → appointment + payment record commit atomically (§3.3 #2) → confirmation email enqueued.
+2. **Reconciliation safety net.** Hourly worker → aggregator reconciliation query → for each unconfirmed payment with a successful aggregator status, app core completes the same atomic commit as the webhook path → admin alert on mismatch.
+3. **Consultation → prescription.** Slot start − 10 min → patient/doctor `Join Call` activates → video provider issues time-bound participant tokens scoped to the slot window → call completes → doctor opens prescription builder → submit creates immutable prescription record linked to the appointment (§3.3 #4) → "prescription ready" email enqueued → patient downloads PDF rendered client-side from stored JSON (§3.5).
+4. **Cancellation → refund.** Patient or doctor cancels → app core determines refund eligibility and amount (net of gateway fee, policy #5) → refund-API call to aggregator → reference number stored on the appointment → patient dashboard shows status → on API failure, admin alert raised and manually retryable from A3.
+5. **Deactivation cascade.** Admin deactivates doctor (A4) → app core iterates `confirmed` future appointments → each transitions via the `doctor_cancelled` flow with its own refund attempt (cascade is non-atomic per §3.3 #9) → per-appointment failures surface to the admin alert feed; the doctor's `active=false` flag is set only after the iteration completes.
+
+**Cross-cutting concerns**
+
+- **Authorization** — a single role-based middleware (DA6) gates every authenticated route; frontend role-routing is convenience only and the server is the enforcement boundary.
+- **Audit log** — every state transition and operational action flows through the same append-only log (§3.6); an admin-only query API backs A6.
+- **Timezone** — all UI in `Asia/Karachi`; storage in UTC; Pakistan does not observe DST.
+- **Same-origin** — patient, doctor, and admin surfaces share one domain; frontend and backend are same-origin (§3.2).
+
+### 3.2 Platform constraints
 
 The platform must satisfy the following constraints. Architecture decisions are bounded by these.
 
@@ -298,7 +327,7 @@ The platform must satisfy the following constraints. Architecture decisions are 
 - **Single domain.** Patient, doctor, and admin surfaces all live on the same domain. The frontend and backend are same-origin (no CORS).
 - **Solo-dev MVP economics:** keep total monthly infrastructure cost at launch under roughly USD 50 at the planned 100 consultations/week scale. This rules out per-component multi-region setups, dedicated databases, or per-environment paid tiers.
 
-### 3.2 Data integrity requirements
+### 3.3 Data integrity requirements
 
 These invariants are non-negotiable regardless of the chosen storage technology. Architecture picks the mechanism (uniqueness constraints, transactions, schema validation, snapshotting).
 
@@ -312,7 +341,7 @@ These invariants are non-negotiable regardless of the chosen storage technology.
 8. **Doctor PMC number and email are immutable post-creation.** Once a doctor record is created via A1, neither field can be updated through any API — admin, doctor, or internal. Other doctor fields (name, phone, photo, bio, specialization, fee, availability) remain editable per A4.
 9. **Deactivation cascade is recoverable.** When admin deactivates a doctor (A4), the system attempts to cancel every `confirmed` future appointment for that doctor via the `doctor_cancelled` flow and initiate the corresponding refunds (net of gateway fee, per policy #5). The cascade is **not required to be atomic** — refund-API failures for individual appointments must not roll back successful cancellations. Each per-appointment failure surfaces to the admin alert feed (§A3) and is retryable from the alert. The doctor's `active=false` flag is set only after all cancellation attempts complete (success or surfaced failure); the doctor cannot enter a half-deactivated state where new bookings are blocked but existing appointments are still confirmed without a cancellation attempt.
 
-### 3.3 Integration responsibilities
+### 3.4 Integration responsibilities
 
 The platform integrates with three external services. The PRD specifies what each integration must do; architecture picks the vendor and the endpoint shapes.
 
@@ -322,7 +351,7 @@ The platform integrates with three external services. The PRD specifies what eac
 | **Video provider** | Per-appointment isolated rooms (room identity tied to the appointment so participants cannot join the wrong call). Time-bound participant access tokens scoped to the slot window (valid from slot-start − 10 min to slot-end + 5 min). Hard cutoff at slot-end + 5 min. Browser-only join. |
 | **Transactional email** | Six trigger types: booking confirmation, 24-hour reminder, 1-hour reminder, prescription-ready notification, refund confirmation, cancellation apology (doctor-initiated cancel). Retry with exponential backoff on transient failure, admin alert on final failure. **No PDF attachments in v1** — the prescription-ready email contains a link to the dashboard. |
 
-### 3.4 Prescription handling
+### 3.5 Prescription handling
 
 - **Source of truth:** structured prescription data, keyed to the appointment, containing the medicine list, per-medicine dosage and instructions, optional general notes, optional follow-up date, doctor metadata at issue-time, and the patient identification snapshot (see below).
 - **API:** the platform exposes a read endpoint returning this structured prescription as JSON; updates and deletes are not exposed.
@@ -330,7 +359,7 @@ The platform integrates with three external services. The PRD specifies what eac
 - **Rendering in v1:** the patient's browser renders a PDF from the JSON when the patient clicks Download. The "prescription ready" email contains a dashboard link, not a PDF attachment.
 - **Architectural seam:** rendering must remain isolated behind a single replaceable boundary so the future move to server-side rendering (v1.2+) does not require changes to the prescription data model, the read API contract, or any business logic.
 
-### 3.5 Security & Privacy
+### 3.6 Security & Privacy
 
 - **HTTPS everywhere.**
 - **Authentication:** session cookies must be HTTP-only, Secure, and at minimum SameSite=Lax. Passwords are hashed; plaintext storage is forbidden.
@@ -418,12 +447,12 @@ in_progress  (video room active; grace window = slot-start + 15min)
 
 Refund amounts on `cancelled_refunded`, `doctor_cancelled`, and `doctor_no_show` are net of the payment-gateway transaction fee per policy #5.
 
-Note: a `disputed` boolean flag (set via A5) is orthogonal to this state machine — it can attach to any terminal state and does not alter transitions. See the Disputed-marker bullet in §3.5.
+Note: a `disputed` boolean flag (set via A5) is orthogonal to this state machine — it can attach to any terminal state and does not alter transitions. See the Disputed-marker bullet in §3.6.
 
 ### 4.4 Edge Case Catalogue
 
 40 edge cases catalogued across 7 categories. Each is tagged:
-- **(A)** Architecturally handled — covered by design or invariant in §3.2
+- **(A)** Architecturally handled — covered by design or invariant in §3.3
 - **(P)** Policy-handled — covered by one of the 10 locked policies in §4.1
 - **(K)** Known gap, manual handling in v1 — documented but not automated
 
@@ -433,7 +462,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 
 | # | Edge case | Tag | v1 handling |
 |---|---|---|---|
-| 1 | Two patients click "book" on the same slot simultaneously | A | Storage-layer uniqueness on slot identity (§3.2 #1). Second click fails fast with "slot just taken" error. |
+| 1 | Two patients click "book" on the same slot simultaneously | A | Storage-layer uniqueness on slot identity (§3.3 #1). Second click fails fast with "slot just taken" error. |
 | 2 | Patient starts booking, abandons mid-flow | P | Slot lock expires after 10 min (policy #2) and is released. |
 | 3 | Patient on slow 3G — slot expires before payment completes | P | Same as #2. 10-min lock chosen to accommodate this. |
 | 4 | Doctor adds a new slot while patient is browsing | A | Frontend refreshes on focus; stale-data shows brief "slot no longer available" error. Acceptable friction. |
@@ -442,7 +471,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 
 | # | Edge case | Tag | v1 handling |
 |---|---|---|---|
-| 5 | Patient double-clicks "Pay" — two payment attempts | A | Idempotent payment-intent creation on `(patient, slot)` (§3.2 #7); aggregator also handles duplicate detection. |
+| 5 | Patient double-clicks "Pay" — two payment attempts | A | Idempotent payment-intent creation on `(patient, slot)` (§3.3 #7); aggregator also handles duplicate detection. |
 | 6 | Payment succeeds but webhook never reaches server | A | Hourly reconciliation query against the aggregator for unconfirmed payments in the past 24h; reconciles state and alerts admin on mismatch. |
 | 7 | Payment fails — patient retries inside lock window | A | Same locked slot held; patient retries; second attempt triggers a fresh payment intent. |
 | 8 | Patient closes browser during payment redirect | A | The verified webhook is the source of truth — if it fires success, booking is confirmed and email sent regardless of browser state. |
@@ -472,7 +501,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 | 22 | Call drops mid-consultation (network issue) | A | Video session persists for slot duration + 5 min; either party can rejoin the same room. |
 | 23 | Consultation runs over slot end | A | Hard cutoff at slot-end + 5 min; soft warning to doctor at 5 min remaining. |
 | 24 | Audio/video doesn't work for one party | K | Manual support fallback (admin uses A5 lookup + A6 audit log). No automated recovery in v1. |
-| 25 | Patient and doctor join different rooms by accident | A | Impossible — room identity is appointment-scoped and access-gated (§3.3). |
+| 25 | Patient and doctor join different rooms by accident | A | Impossible — room identity is appointment-scoped and access-gated (§3.4). |
 
 #### Post-consultation
 
@@ -504,7 +533,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 
 | # | Edge case | Tag | v1 handling |
 |---|---|---|---|
-| 37 | Booking for someone else (parent for child, child for parent) | P | "Who is this consultation for?" field captures actual patient name (policy #10). Prescription auto-pulls the actual patient name onto the PDF (§3.4). |
+| 37 | Booking for someone else (parent for child, child for parent) | P | "Who is this consultation for?" field captures actual patient name (policy #10). Prescription auto-pulls the actual patient name onto the PDF (§3.5). |
 | 38 | Patient is a minor | K | Doctor uses clinical judgment; no platform enforcement in v1. |
 | 39 | Doctor's PMC license revoked / admin deactivates a doctor | A | Past appointments untouched. All `confirmed` future appointments are automatically cancelled via the `doctor_cancelled` flow (refund net of gateway fee + apology email). Future bookings blocked. Doctor's photo + bio remain visible in past-appointment views for patients with prescription history under that doctor; doctor is removed from the public listing. Triggered from A4. |
 | 40 | Patient under another patient's account | A | Account-level auth; no cross-account access. |
@@ -529,7 +558,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 - **SMS / WhatsApp notifications** (same triggers as email, additional channel via SMS/WhatsApp Business API)
 - **Live queue / spot booking** — doctors go "online", patients see online doctors and join a real-time queue without pre-booking. Removes the 2-hour booking cutoff from v1.
 - **Pre-consultation skin photo upload** — patient uploads 1–3 photos before call; doctor sees them in dashboard
-- **Patient account deletion / data-export flow** — closes the v1 gap (P7, §3.5) of indefinite PII retention with no opt-out
+- **Patient account deletion / data-export flow** — closes the v1 gap (P7, §3.6) of indefinite PII retention with no opt-out
 - **ToS / Privacy versioning + re-prompt on update** — policy version bumps re-prompt users on next login
 - **Doctor self-service password reset** (via email token) — closes the v1 manual-reset gap (DA5)
 
