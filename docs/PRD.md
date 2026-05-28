@@ -30,6 +30,8 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 | 7 | Refund initiation latency (eligible cancellations) | ≤1 hour | Cancellation timestamp → refund-API call timestamp |
 | 8 | First-page Time-to-First-Byte (Karachi mobile, 3G) | ≤2s | Lighthouse + real-user metrics post-launch |
 
+**Measurement instrumentation.** KPIs #1 (landing→booking conversion) and #3 (video-join success by network type) require funnel and video-join telemetry that is not part of the three core integrations (§3.4). v1 scope must include a lightweight analytics capability that records, at minimum: landing-page visit, booking-started, booking-confirmed, and video-join-attempt/success events (the last tagged with network type where the browser exposes it). Storage and tooling are an architecture decision; the requirement is that every KPI in this table maps to a component that emits the data it needs. KPIs #4 and #6 are derived from existing payment and audit-log records and need no new instrumentation.
+
 
 ---
 
@@ -112,7 +114,7 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 **P7. View and download prescription**
 > *As a patient, I want to see my prescription after the consultation and download it as a PDF.*
 
-- Patient dashboard shows all past appointments with status (`completed`, `no_show`, `cancelled`)
+- Patient dashboard shows all past appointments with their terminal state, surfaced via patient-facing labels: `completed`/`prescription_issued` → "Completed" (with Download Prescription where applicable); `patient_no_show` → "Missed (no-show)"; `doctor_no_show`/`doctor_cancelled` → "Cancelled by doctor — refund issued"; `cancelled_refunded` → "Cancelled — refunded"; `cancelled_no_refund` → "Cancelled — no refund". The underlying state is the source of truth for which refund/rebook affordances appear
 - For appointments in `prescription_issued` state, a "Download Prescription" button is shown
 - Click renders a PDF client-side from stored prescription JSON; triggers browser download
 - The PDF is itemised: each catalogue medicine shows its admin-configured price and the prescription shows a computed total. Free-text medicines not in the catalogue are shown as "not priced" and excluded from the total, with an "N item(s) not priced" note. The patient can use this to source the medicines and pay independently, or order them in-app via the Medicine Ordering Module (§6, separate scope)
@@ -131,7 +133,7 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 > *As a patient, I want to see my confirmed upcoming appointments in one place so I can prepare and join the call on time.*
 
 - Patient dashboard has an "Upcoming" section listing all appointments in `confirmed` or `in_progress` state, sorted by slot time ascending
-- Each row shows: doctor name + photo, slot date/time in `Asia/Karachi`, "for: [actual patient]" line if booked-for-someone-else (per P8), consultation fee paid, "Join Call" button (per P5), and a "Cancel" link (per P6)
+- Each row shows: doctor name + photo, slot date/time in `Asia/Karachi`, "for: [actual patient]" line if booked-for-someone-else (per P8), consultation fee paid, "Join Call" button (per P5), and, **for `confirmed` appointments only**, a "Cancel" link (per P6). Once an appointment is `in_progress`, the Cancel link is not shown — there is no cancellation path from `in_progress` in §4.3
 - "Join Call" button is disabled until 10 minutes before slot start, matching the activation rule in P5 and D2
 - After slot completion, the appointment moves out of "Upcoming" into the "Past appointments" view referenced in P7 (visible there with its terminal state — `completed`, `prescription_issued`, `patient_no_show`, etc.)
 - Empty state shows "No upcoming appointments — Browse doctors" with the link routing to the public doctor listing (P1)
@@ -246,6 +248,14 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 - The view is **read-only** with respect to records — consistent with §3.6's append-only convention; no update or delete UI is exposed. Mutations (email re-trigger, mark disputed) are themselves recorded as admin-actor entries in the audit log
 - Route is reachable only by the admin role per DA6; no patient or doctor surface exposes this view
 
+**A6. Configure platform settings**
+> *As an admin, I want to set platform-wide booking parameters so I can tune the booking experience without a code change.*
+
+- Admin "Settings" page (admin role only, per DA6) exposes the **minimum booking lead time**: an editable value with a default of 1 hour and an allowed range down to 30 minutes (per §4.1 #3)
+- Changes apply to future booking attempts only; existing `confirmed` appointments are unaffected
+- Each change is recorded in the audit log as an admin-actor entry (§3.6)
+- The displayed bounds and default match §4.1 #3 and the glossary entry "Minimum booking lead time"
+
 #### Doctor and admin authentication (v1 — minimal, shared login)
 
 **DA1. Doctor account creation by admin.** When admin creates a doctor via A1, the admin sets an initial password in the same form. The admin shares the password with the doctor out-of-band (WhatsApp, phone, or in person). v1 has no email-token "set your password" flow for doctors.
@@ -280,6 +290,7 @@ A purpose-built specialty-boutique telederm platform for Pakistan. v1 ships a si
 | ToS / Privacy versioning and re-prompt-on-update | v1 records a single sign-up acceptance only. Re-prompting users on policy version bumps is a v1.1 deferred feature. |
 | Doctor email-verified password setup, doctor self-service reset | Out-of-band admin-mediated flow is sufficient for 3–5 launch doctors. |
 | In-app medicine ordering, payment & delivery | Specified as a separate module (§6), scoped/costed/timelined separately from the v1 build. v1 ships only medicine prices + prescription total + self-pay PDF. |
+| Formal accessibility (WCAG) conformance | No WCAG conformance target or accessibility acceptance criteria in v1, given solo-dev MVP economics (§3.2) and the hypothesis-validation focus. The patient surface still targets mobile-browser usability on Chrome/Safari over 3G (§3.2); a WCAG 2.1 AA baseline for the core booking/payment/join flow is a candidate for a fast-follow once the launch hypothesis is validated. Accessibility risk is acknowledged for a low-tech-literacy, mobile-first audience. |
 
 ---
 
@@ -301,6 +312,7 @@ This is a stack-agnostic component-and-flow sketch. The `architecture` skill is 
 
 - **Reconciliation worker** — hourly job that queries the aggregator for unconfirmed payments over the last 24h and reconciles missed webhooks (§4.4 #6).
 - **Notification worker** — schedules and dispatches the six email trigger types with exponential-backoff retry and admin alert on final failure (§3.4 row 3).
+- **Appointment-evaluation worker** — time-based job that advances appointments through their non-payment transitions (§4.3): begins `in_progress` at slot-start, resolves `completed`, and evaluates the slot-start + 15 min grace window to mark `patient_no_show` / `doctor_no_show`. Its audit-log actor type is `system`.
 
 
 **Primary data flows**
@@ -341,7 +353,7 @@ These invariants are non-negotiable regardless of the chosen storage technology.
 6. **Consultation fee is snapshotted on the appointment at confirmation.** `feeAtBooking` is captured when the appointment moves to `confirmed`; later changes to the doctor's `consultationFee` never affect the existing appointment's billed amount, refund amount, or revenue accounting.
 7. **Payment-intent creation is idempotent** on `(patient, slot)` so double-submits or retries cannot produce two parallel payment intents for the same booking attempt.
 8. **Doctor PMC number and email are immutable post-creation.** Once a doctor record is created via A1, neither field can be updated through any API — admin, doctor, or internal. Other doctor fields (name, phone, photo, bio, specialization, fee, availability) remain editable per A4.
-9. **Deactivation preserves existing appointments.** When admin deactivates a doctor (A4), the system sets the doctor's `active=false` flag — which removes them from the public listing and blocks all new bookings — and **leaves every existing `confirmed` appointment untouched and honored**. Deactivation performs no cancellation and no refund orchestration; there is no cascade, and therefore no half-deactivated state to recover from. A doctor who genuinely cannot serve is offboarded by the admin cancelling each affected appointment individually via the `doctor_cancelled` flow (D5), each refund net of gateway fee per policy #5.
+9. **Deactivation preserves existing appointments.** When admin deactivates a doctor (A4), the system sets the doctor's `active=false` flag — which removes them from the public listing and blocks all new bookings — and **leaves every existing `confirmed` appointment untouched and honored**. Deactivation performs no cancellation and no refund orchestration; there is no cascade, and therefore no half-deactivated state to recover from. A doctor who genuinely cannot serve is offboarded by the admin cancelling each affected appointment individually via the `doctor_cancelled` flow (D5), each refund net of gateway fee per policy #5. Deactivation does **not** revoke the doctor's authentication or panel access. A deactivated doctor can still log in, view their remaining `confirmed` appointments (D2), join those calls (D3), and submit prescriptions (D4) — this is required for the "honored appointments" policy to function. The `active` flag gates only public-listing visibility and new-booking eligibility, never login. The role middleware (DA6) authorizes deactivated doctors normally for routes scoped to appointments already assigned to them.
 10. **Refund initiation is idempotent.** Each appointment carries a single refund idempotency key, so an automatic retry, the reconciliation path, or a manual refund issued by an admin in the gateway dashboard can never produce a second settlement for the same refund.
 
 ### 3.4 Integration responsibilities
@@ -352,7 +364,7 @@ The platform integrates with three external services. The PRD specifies what eac
 |---|---|
 | **Payment aggregator** | Accept payments via cards + JazzCash + Easypaisa + bank transfer through a hosted checkout. Deliver signed webhooks on `payment.success` and `payment.failed`; the platform must reject any webhook whose signature is missing, invalid, or expired. Support refund initiation via API with the response containing a reference number returned to the patient dashboard; refund calls are idempotency-keyed and retried with exponential backoff on transient failure, with an admin alert raised after retries are exhausted (see §3.3 #10, §A3, edge case #30). Support a reconciliation query that lists unconfirmed payments over the last 24 hours; the platform runs this hourly to catch missed webhooks. |
 | **Video provider** | Per-appointment isolated rooms (room identity tied to the appointment so participants cannot join the wrong call). Time-bound participant access tokens scoped to the slot window (valid from slot-start − 10 min to slot-end + 5 min). Hard cutoff at slot-end + 5 min. Browser-only join. |
-| **Transactional email** | Six trigger types: booking confirmation, 24-hour reminder, 1-hour reminder, prescription-ready notification, refund confirmation, cancellation apology (doctor-initiated cancel). Retry with exponential backoff on transient failure, admin alert on final failure. **No PDF attachments in v1** — the prescription-ready email contains a link to the dashboard. |
+| **Transactional email** | Six trigger types: booking confirmation, 24-hour reminder, 1-hour reminder, prescription-ready notification, refund confirmation, cancellation apology (doctor-initiated cancel). Retry with exponential backoff on transient failure, admin alert on final failure. **No PDF attachments in v1** — the prescription-ready email contains a link to the dashboard. **Reminder invalidation:** when an appointment leaves `confirmed` (any cancellation or terminal no-show state), any 24-hour and 1-hour reminders that have not yet been dispatched must be suppressed. A reminder must never be delivered for an appointment that is no longer in `confirmed`/`in_progress` at send time; the notification worker re-checks appointment state immediately before dispatch. |
 
 ### 3.5 Prescription handling
 
@@ -393,7 +405,7 @@ The appointment loop is the single most load-bearing module in v1. All policies 
 | 2 | **Slot lock during payment** | 10 minutes. Slot reserved while patient is in the payment flow; released if no success webhook within the window. | Accommodates JazzCash/Easypaisa OTP flows on 3G. Tighter risks legitimate failures; looser causes visible "unavailable" gaps. |
 | 3 | **Booking minimum lead time** | Platform-configurable (admin-set; default 1 hour, supported down to 30 minutes). The live-queue flow that removes lead time entirely is still v1.1. | Flexibility requested for v1; gives the doctor some prep time without forcing a long wait. When the configured lead time is under 1 hour, the 1-hour reminder is simply skipped (P4 short-lead rule). Client expects a live-booking pattern long-term — already on roadmap. |
 | 4 | **Cancellation policy** | Free cancel ≥2 hours before slot start. No refund inside the 2-hour window. Slot stays blocked on `cancelled_no_refund` (doctor's calendar remains committed). | Matches Marham and Practo exactly. Stricter (24hr) too punishing for Pakistani audience; looser (Ola Doc's 1hr) hard to refill. Keeping the slot blocked is what gives the policy its bite. |
-| 5 | **Refund destination and amount** | Original payment method via the payment aggregator's refund API. Processing 5–7 working days. Status visible in dashboard. **Refund amount = amount paid at booking minus the payment-gateway transaction fee** — the patient does not receive the gateway fee back. This is shown explicitly in the cancellation modal and the refund-status view. | Matches Practo, Teladoc, MDLive, Apostrophe on flow. The "net of gateway fee" choice keeps unit economics intact at the cost of a small patient-facing explanation. Wallet considered v1.2+. |
+| 5 | **Refund destination and amount** | Original payment method via the payment aggregator's refund API. Processing 5–7 working days. Status visible in dashboard. **Refund amount = amount paid at booking minus the payment-gateway transaction fee** — the patient does not receive the gateway fee back. This is shown explicitly in the cancellation modal and the refund-status view. | Matches Practo, Teladoc, MDLive, Apostrophe on flow. The "net of gateway fee" choice keeps unit economics intact at the cost of a small patient-facing explanation. Wallet considered v1.2+. **Fee source:** the gateway transaction fee used in the refund calculation is taken from the fee/net-settlement figure the aggregator reports for the original payment (captured on the payment record at confirmation time). If the aggregator does not report a per-transaction fee, the platform applies an admin-configured fee model (per the Settings surface, A6). The same captured fee figure drives the refund amount, the cancellation-modal estimate, and the dashboard refund breakdown (P6) — all three must display the same number. |
 | 6 | **Reschedule** | Cancel and rebook (Practo model). No separate reschedule flow in v1. | Simplest to build, simplest to explain. Eliminates edge cases around cross-doctor reschedules, partial refunds, etc. |
 | 7 | **No-show grace** | 15 minutes after slot start. Patient absent at slot+15 → `patient_no_show` (no refund). Doctor absent at slot+15 → `doctor_no_show` (full refund minus gateway fee + apology email). | Industry standard in telemedicine. |
 | 8 | **Pre-consultation photo upload** | Deferred to v1.1+. v1 satisfies "visual examination" via good-lighting prompts + live video. | Image storage + PII handling adds ~3–5 days dev; not load-bearing for hypothesis validation. |
@@ -448,9 +460,17 @@ in_progress  (video room active; grace window = slot-start + 15min)
     └─ doctor absent at slot+15 ──► doctor_no_show  (refund initiated, apology email)
 ```
 
+**Transition triggers.** Each non-payment transition in this machine has a defined trigger and owning component:
+- `confirmed → in_progress`: at slot-start time, set by a scheduled appointment-evaluation job (the same component that owns the grace-window check below).
+- `in_progress → completed`: set when the consultation ends — either both parties have left the room **or** slot-end + 5 min is reached after both joined. Join/leave facts are sourced from the video provider's participant events (§3.4). The doctor never manually marks completion in v1.
+- `in_progress → patient_no_show` / `doctor_no_show`: at slot-start + 15 min, the appointment-evaluation job inspects recorded join events: if the patient never joined → `patient_no_show`; if the doctor never joined → `doctor_no_show`. If both joined, the no-show path is not taken.
+- The appointment-evaluation job is a new system component (alongside the reconciliation and notification workers in §3.1); its actor type in the audit log is `system`. Cadence and mechanism are an architecture decision; the requirement is that no appointment can remain in `in_progress` past slot-end + 5 min without resolving to a terminal state.
+
 Refund amounts on `cancelled_refunded`, `doctor_cancelled`, and `doctor_no_show` are net of the payment-gateway transaction fee per policy #5.
 
 Note: a `disputed` boolean flag (set via A5) is orthogonal to this state machine — it can attach to any terminal state and does not alter transitions. See the Disputed-marker bullet in §3.6.
+
+Note: `awaiting_prescription` is **not** a distinct appointment state — it is a derived condition: an appointment in `completed` with no linked prescription and more than 12 hours elapsed since completion. It drives the A3 alert and dashboard reminder but does not appear as a state transition in the audit log; the underlying appointment remains in `completed` until a prescription is submitted (`prescription_issued`).
 
 ### 4.4 Edge Case Catalogue
 
@@ -593,6 +613,7 @@ Resolution language describes the *outcome* and the *constraint to be enforced*,
 | Single-service deploy = no redundancy | Medium | Medium | Acceptable at v1 scale (~100/week); platform auto-restarts on crash; revisited when traffic justifies |
 | Admin password / bootstrap compromise | Low | Critical | Bootstrap script is run once on first deploy; admin password is rotated immediately after bootstrap; admin account does not have an email-based password reset path in v1 |
 | Out-of-band initial-password sharing for doctors leaks credentials | Medium | Medium | Forced password change on first login (DA3) limits exposure window to the doctor's first session |
+| Video free-tier minutes insufficient at launch scale | Medium | Medium — breaks the "<USD 50/month" §3.2 constraint | ~100 consults/week × 30 min × 2 participants ≈ 26k participant-min/month likely exceeds a 10k-minute free tier. Architecture must confirm the chosen provider's billing unit (room-minutes vs participant-minutes) and paid-tier cost against the §3.2 budget before selection. |
 
 ---
 
