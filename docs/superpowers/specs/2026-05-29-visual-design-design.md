@@ -59,15 +59,7 @@ Tokens are framework-agnostic name→value pairs. They map directly onto a Tailw
 | `color.feature-bg` | `#0F3A2A` | Deep green section background |
 | `color.on-dark` | `#DCE9E2` | Body text on green |
 | `color.on-dark-muted` | `#AFC6BA` | Secondary text on green |
-| `color.on-dark-accent` | `#9BE3B8` | Mint highlight on green (eyebrows, accents); also the video "live" indicator |
-
-**Dark / immersive chrome** (video stage + waiting-room camera preview). Spruce-derived (NOT neutral black) so dark surfaces stay on-brand and feel part of Dermestha.
-| Token | Value | Use |
-|---|---|---|
-| `color.dark-bg` | `#0A2C20` | Video stage / camera-preview background (deep spruce) |
-| `color.dark-surface` | `#0E3328` | Self-tile / inset surface on dark |
-| `color.dark-border` | `#1F5440` | Hairline on dark surfaces |
-| `color.dark-deep` | `#072018` | Full-bleed immersive page background (video consultation screen) |
+| `color.on-dark-accent` | `#9BE3B8` | Mint highlight on green (eyebrows, accents) |
 
 **Semantic / status** (text color / background tint)
 | Token | Text | Background | Use |
@@ -195,23 +187,13 @@ The "light" approach: ~16 hand-built components, all token-driven. Each is indep
 ### 3.18 Empty state
 - Centered icon + short message + primary CTA. E.g., "No upcoming appointments — Browse doctors" (P9), empty listing, empty search.
 
-### 3.19 Signature layout patterns (anti-generic)
-To keep screens feeling finished and on-brand rather than generic, these composition patterns are standard:
-- **Split-auth** (`.auth-split`): sign-up and login are a two-pane layout — a full-height spruce brand panel (wordmark + value props + trust line) beside the form (max ~400px). Collapses to a single column with a compact centered brand lockup below 860px. Avoids the "small form adrift on white" look.
-- **Document "paper"** (`.rx-paper`): the prescription renders as a centered ~920px document card with a 3px brass top accent and a clinic-lockup header (mark + "PRESCRIPTION" + date) — reads like a real medical Rx, not a generic list.
-- **Centered status card**: payment handoff/return states are centered, constrained (~520px) finished cards (icon circle + title + body + single action), not bare alert bars. Return-state variants live under a labelled "Return states" divider.
-- **Real centered modals**: cancellation/confirmation modals render centered on a dimmed backdrop (never left-aligned in a content column).
-- **Consistent chrome, immersive content**: the **top nav is always the standard white app nav** on every screen (including the video consultation) — chrome never changes color per page. Only the *content* of the video screen goes immersive: a brand-spruce page/stage with the participant tiles. (The video page background uses `color.feature-bg`; the stage is darker via `color.dark-bg`.)
-- **Sidebar content fills the width**: on the doctor/admin sidebar layout, page content **fills the content column** (`width:100%`, no max-width cap, not centered) — the sidebar already frames the page, so an extra cap would reintroduce a lopsided right gap. Lists, tables, filter bars, grids, and forms all span the full content area. The only fixed-width element is a modal, centered on a full-width dimmed backdrop.
-- **Constraint over whitespace**: standalone (non-sidebar) content is constrained to intentional reading widths and centered/composed; full-bleed brand surfaces (spruce panels/bands) fill space rather than leaving large empty margins. The top nav is full-width (logo at the left edge, links at the right edge).
-
 ---
 
 ## 4. Navigation & layout per surface
 
 - **Patient (responsive):** Public/landing uses the top nav + a deep-green hero band. Logged-in: bottom tabs on mobile, top nav on desktop (same routes). Functional pages sit on the porcelain canvas; landing hero and footer use the feature-dark band.
-- **Doctor (desktop-first):** left sidebar (Today, Availability, History) with a content header showing the page title + today's date. Content fills the content column (per §3.19). Built for between-clinic-hours desktop use; on mobile the sidebar collapses to an off-canvas drawer (hamburger toggle).
-- **Admin (desktop):** left sidebar (Doctors, Medicines, Alerts, Records & Audit, Settings) + data-dense, full-width content. On mobile the sidebar collapses to a drawer and tables scroll horizontally; admin is desktop-first by design.
+- **Doctor (desktop-first):** left sidebar (Today, Availability, History) + top bar showing today's date and doctor name. Built for between-clinic-hours desktop use; mobile is a usable fallback (drawer nav).
+- **Admin (desktop):** left sidebar (Doctors, Medicines, Alerts, Records & Audit, Settings) + data-dense content. Not optimized for mobile.
 
 ---
 
