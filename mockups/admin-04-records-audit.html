@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Records &amp; audit log</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform var(--ease);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-overlay);
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        padding: 12px var(--sp-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-1);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .mobile-topbar .brand__word { font-size: var(--fs-h3); }
+      .content { padding-top: var(--sp-3); }
+    }
+    @media (min-width: 861px) {
+      .mobile-topbar { display: none; }
+    }
+
+    .content-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--sp-5);
+      gap: var(--sp-4);
+      flex-wrap: wrap;
+    }
+
+    .sidebar-identity {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-3) var(--sp-2);
+      border-top: var(--border-1);
+      margin-top: auto;
+      padding-top: var(--sp-4);
+    }
+    .sidebar-identity__info { min-width: 0; }
+    .sidebar-identity__name {
+      font-weight: 700;
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-strong);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sidebar-identity__logout {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      text-decoration: none;
+    }
+    .sidebar-identity__logout:hover { color: var(--color-danger); }
+
+    .sidebar-caption {
+      font-family: var(--font-head);
+      font-size: var(--fs-label);
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      padding: 0;
+      margin: 4px 0 var(--sp-1);
+    }
+
+    .table-wrap { overflow-x: auto; width: 100%; }
+
+    .tbl-action {
+      color: var(--color-primary);
+      font-size: var(--fs-body-sm);
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .tbl-action:hover { text-decoration: underline; }
+
+    /* Filters bar: allow wrapping, full width */
+    .filters-bar {
+      background: var(--color-surface);
+      border: var(--border-1);
+      border-radius: var(--r-md);
+      padding: var(--sp-4);
+      margin-bottom: var(--sp-5);
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--sp-3) var(--sp-4);
+      align-items: end;
+    }
+    .filters-bar .field { max-width: none; }
+    .filters-bar .field--full { grid-column: 1 / -1; }
+
+    /* Audit timeline */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline-entry {
+      display: flex;
+      gap: var(--sp-4);
+      position: relative;
+      padding-bottom: var(--sp-4);
+    }
+    .timeline-entry:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      left: 15px;
+      top: 32px;
+      bottom: 0;
+      width: 2px;
+      background: var(--color-border);
+    }
+    .timeline-dot {
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--color-surface-sunken);
+      border: 2px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 2px;
+    }
+    .timeline-dot--success { background: var(--color-success-bg); border-color: var(--color-success); }
+    .timeline-dot--warning { background: var(--color-warning-bg); border-color: var(--color-warning); }
+    .timeline-dot--danger  { background: var(--color-danger-bg);  border-color: var(--color-danger); }
+    .timeline-dot--info    { background: var(--color-info-bg);    border-color: var(--color-info); }
+    .timeline-content { flex: 1; min-width: 0; }
+    .timeline-event {
+      font-weight: 700;
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-strong);
+    }
+    .timeline-meta {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      margin: var(--sp-1) 0 0;
+    }
+    .timeline-reason {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      font-style: italic;
+      margin: var(--sp-1) 0 0;
+    }
+
+    /* Selected row highlight */
+    .row-selected td { background: var(--color-primary-tint) !important; }
+
+    /* Actor badge */
+    .actor-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-head);
+      letter-spacing: .3px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: var(--r-sm);
+    }
+    .actor-badge--patient  { background: var(--color-info-bg);    color: var(--color-info); }
+    .actor-badge--doctor   { background: var(--color-primary-tint); color: var(--color-primary); }
+    .actor-badge--admin    { background: var(--color-warning-bg);  color: var(--color-warning); }
+    .actor-badge--system   { background: var(--color-neutral-bg);  color: var(--color-neutral); }
+  </style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar only-mobile">
+  <button class="btn btn--ghost btn--sm" data-drawer style="padding:8px;color:var(--color-text-muted)">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h14M3 10h14M3 15h14"/>
+    </svg>
+  </button>
+  <a class="brand" href="#">
+    <span class="brand__mark"></span>
+    <span class="brand__word">Dermestha</span>
+  </a>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div style="margin-bottom:var(--sp-5)">
+      <a class="brand" href="#" style="text-decoration:none;display:inline-flex;margin-bottom:var(--sp-1)">
+        <span class="brand__mark"></span>
+        <span class="brand__word" style="margin-left:var(--sp-2)">Dermestha</span>
+      </a>
+      <p class="sidebar-caption">Admin panel</p>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:var(--sp-1)">
+      <a href="admin-01-doctors.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><circle cx="6" cy="5" r="3"/><path d="M1 14c0-3 2-5 5-5h0c1 0 1.8.3 2.5.8"/><path d="M11 10v5M8.5 12.5h5"/></svg>
+        &nbsp;&nbsp;Doctors
+      </a>
+      <a href="admin-02-medicines.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><rect x="5" y="1" width="6" height="3" rx="1"/><path d="M3 4h10l1 10H2L3 4z"/><path d="M6 8h4"/></svg>
+        &nbsp;&nbsp;Medicines
+      </a>
+      <a href="admin-03-alerts.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><path d="M8 2a5 5 0 015 5v3l1 2H2l1-2V7a5 5 0 015-5z"/><path d="M6.5 13a1.5 1.5 0 003 0"/></svg>
+        &nbsp;&nbsp;Alerts
+      </a>
+      <a href="admin-04-records-audit.html" class="sidebar__link active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+        &nbsp;&nbsp;Records &amp; Audit
+      </a>
+      <a href="admin-05-settings.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><circle cx="8" cy="8" r="2"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1M4 4l.7.7M11.3 11.3l.7.7M4 12l.7-.7M11.3 4.7l.7-.7"/></svg>
+        &nbsp;&nbsp;Settings
+      </a>
+    </nav>
+    <div class="sidebar-identity">
+      <span class="avatar avatar--md" style="flex:0 0 auto">AD</span>
+      <div class="sidebar-identity__info">
+        <p class="sidebar-identity__name">Admin</p>
+        <a href="#" class="sidebar-identity__logout">Log out</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+    <div style="width:100%">
+
+      <!-- Content header -->
+      <div class="content-header">
+        <h1 class="h1">Records &amp; audit log</h1>
+      </div>
+
+      <!-- Filters bar -->
+      <div class="filters-bar">
+        <div class="field">
+          <label for="f-patient">Patient email / phone</label>
+          <input id="f-patient" class="input" type="text" placeholder="patient@email.com or +92…">
+        </div>
+        <div class="field">
+          <label for="f-doctor">Doctor</label>
+          <select id="f-doctor" class="input">
+            <option value="">All doctors</option>
+            <option>Dr. Ayesha Khan</option>
+            <option>Dr. Bilal Siddiqui</option>
+            <option>Dr. Kamran Rashid</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-apptid">Appointment ID</label>
+          <input id="f-apptid" class="input" type="text" placeholder="APT-YYYYMMDD-XXXXX">
+        </div>
+        <div class="field">
+          <label for="f-payref">Payment reference</label>
+          <input id="f-payref" class="input" type="text" placeholder="PAY-…">
+        </div>
+        <div class="field">
+          <label for="f-userid">User ID / email</label>
+          <input id="f-userid" class="input" type="text" placeholder="user@email.com or UUID">
+        </div>
+        <div class="field">
+          <label for="f-evtype">Event type</label>
+          <select id="f-evtype" class="input">
+            <option value="">All events</option>
+            <option>appointment_created</option>
+            <option>payment_confirmed</option>
+            <option>appointment_confirmed</option>
+            <option>appointment_cancelled</option>
+            <option>refund_initiated</option>
+            <option>prescription_issued</option>
+            <option>email_triggered</option>
+            <option>admin_action</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-actor">Actor type</label>
+          <select id="f-actor" class="input">
+            <option value="">All actors</option>
+            <option>Patient</option>
+            <option>Doctor</option>
+            <option>Admin</option>
+            <option>System</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-from">Date from</label>
+          <input id="f-from" class="input" type="date" value="2026-05-23">
+        </div>
+        <div class="field">
+          <label for="f-to">Date to</label>
+          <input id="f-to" class="input" type="date" value="2026-05-30">
+        </div>
+        <div class="field" style="display:flex;align-items:flex-end">
+          <button class="btn btn--primary btn--block">Search</button>
+        </div>
+      </div>
+
+      <!-- Records table -->
+      <div class="table-wrap" style="margin-bottom:var(--sp-6)">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Appointment ID</th>
+              <th>Slot</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>State</th>
+              <th class="num">Amount (PKR)</th>
+              <th>Payment ref</th>
+              <th>Refund ref</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-selected">
+              <td class="tnum">APT-20260529-00412</td>
+              <td class="tnum">29 May · 10:00 AM</td>
+              <td>Farida Qureshi</td>
+              <td>Dr. Ayesha Khan</td>
+              <td><span class="badge badge--success">Confirmed</span></td>
+              <td class="num tnum">2,500</td>
+              <td class="tnum">PAY-20260529-00184</td>
+              <td class="muted">—</td>
+              <td><a href="#detail" class="tbl-action">View</a></td>
+            </tr>
+            <tr>
+              <td class="tnum">APT-20260529-00388</td>
+              <td class="tnum">29 May · 2:30 PM</td>
+              <td>Usman Tariq <span class="body-sm muted" style="font-size:var(--fs-caption)">for: Rehan (son)</span></td>
+              <td>Dr. Ayesha Khan</td>
+              <td><span class="badge badge--warning">Awaiting Rx</span></td>
+              <td class="num tnum">2,500</td>
+              <td class="tnum">PAY-20260529-00163</td>
+              <td class="muted">—</td>
+              <td><a href="#detail" class="tbl-action">View</a></td>
+            </tr>
+            <tr>
+              <td class="tnum">APT-20260528-00391</td>
+              <td class="tnum">28 May · 3:00 PM</td>
+              <td>Bilal Ansari</td>
+              <td>Dr. Bilal Siddiqui</td>
+              <td><span class="badge badge--danger">Cancelled by doctor</span></td>
+              <td class="num tnum">3,000</td>
+              <td class="tnum">PAY-20260527-00099</td>
+              <td class="tnum" style="color:var(--color-danger)">REF-20260528-00042</td>
+              <td><a href="#detail" class="tbl-action">View</a></td>
+            </tr>
+            <tr>
+              <td class="tnum">APT-20260528-00374</td>
+              <td class="tnum">28 May · 11:00 AM</td>
+              <td>Neha Raza</td>
+              <td>Dr. Bilal Siddiqui</td>
+              <td><span class="badge badge--warning">Awaiting Rx</span></td>
+              <td class="num tnum">3,000</td>
+              <td class="tnum">PAY-20260527-00087</td>
+              <td class="muted">—</td>
+              <td><a href="#detail" class="tbl-action">View</a></td>
+            </tr>
+            <tr>
+              <td class="tnum">APT-20260527-00311</td>
+              <td class="tnum">27 May · 4:00 PM</td>
+              <td>Tariq Hussain</td>
+              <td>Dr. Kamran Rashid</td>
+              <td><span class="badge badge--warning">Missed (no-show)</span></td>
+              <td class="num tnum">2,200</td>
+              <td class="tnum">PAY-20260526-00072</td>
+              <td class="muted">—</td>
+              <td><a href="#detail" class="tbl-action">View</a></td>
+            </tr>
+            <tr>
+              <td class="tnum">APT-20260526-00288</td>
+              <td class="tnum">26 May · 6:00 PM</td>
+              <td>Amna Farooq</td>
+              <td>Dr. Ayesha Khan</td>
+              <td><span class="badge badge--success">Completed · Rx ready</span></td>
+              <td class="num tnum">2,500</td>
+              <td class="tnum">PAY-20260526-00055</td>
+              <td class="muted">—</td>
+              <td><a href="#detail" class="tbl-action">View</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Appointment detail panel (expanded for APT-20260529-00412) -->
+      <div id="detail" class="section-card">
+        <div class="section-card__title" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:var(--sp-3)">
+          <div>
+            <h2 class="h2">Appointment detail</h2>
+            <p class="muted tnum" style="font-size:var(--fs-body-sm);margin:var(--sp-1) 0 0">APT-20260529-00412 · Farida Qureshi · Dr. Ayesha Khan</p>
+          </div>
+          <div style="display:flex;gap:var(--sp-2);flex-wrap:wrap">
+            <button class="btn btn--secondary btn--sm">Re-trigger email</button>
+            <button class="btn btn--secondary btn--sm">Mark disputed</button>
+          </div>
+        </div>
+
+        <div class="alert alert--info" style="margin-bottom:var(--sp-5)">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><circle cx="8" cy="8" r="6"/><path d="M8 7v3M8 5.5h.01"/></svg>
+          <span style="font-size:var(--fs-caption)"><strong>Read-only / append-only.</strong> No records can be edited or deleted. Email re-trigger and the disputed flag are themselves audit-logged as admin actions.</span>
+        </div>
+
+        <!-- State-transition timeline -->
+        <h3 class="h3" style="margin-bottom:var(--sp-4)">State-transition history</h3>
+        <div class="timeline" style="margin-bottom:var(--sp-6)">
+
+          <div class="timeline-entry">
+            <div class="timeline-dot timeline-dot--info">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M7 4.5v3.5"/></svg>
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-event">appointment_created</div>
+              <div class="timeline-meta">
+                <span class="tnum">29 May 2026, 8:01 AM PKT</span>
+                &nbsp;·&nbsp;
+                <span class="actor-badge actor-badge--patient">Patient</span>
+                &nbsp;farida.qureshi@email.com
+              </div>
+            </div>
+          </div>
+
+          <div class="timeline-entry">
+            <div class="timeline-dot timeline-dot--info">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="10" height="8" rx="1"/><path d="M5 1v2M9 1v2"/></svg>
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-event">slot_locked</div>
+              <div class="timeline-meta">
+                <span class="tnum">29 May 2026, 8:01 AM PKT</span>
+                &nbsp;·&nbsp;
+                <span class="actor-badge actor-badge--system">System</span>
+                &nbsp;10-minute lock initiated
+              </div>
+            </div>
+          </div>
+
+          <div class="timeline-entry">
+            <div class="timeline-dot timeline-dot--success">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7l3 3 5-5"/></svg>
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-event">payment_confirmed</div>
+              <div class="timeline-meta">
+                <span class="tnum">29 May 2026, 8:03 AM PKT</span>
+                &nbsp;·&nbsp;
+                <span class="actor-badge actor-badge--system">System</span>
+                &nbsp;Gateway ref: PAY-20260529-00184 · PKR 2,500
+              </div>
+            </div>
+          </div>
+
+          <div class="timeline-entry">
+            <div class="timeline-dot timeline-dot--success">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7l3 3 5-5"/></svg>
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-event">appointment_confirmed</div>
+              <div class="timeline-meta">
+                <span class="tnum">29 May 2026, 8:03 AM PKT</span>
+                &nbsp;·&nbsp;
+                <span class="actor-badge actor-badge--system">System</span>
+                &nbsp;Confirmation email queued
+              </div>
+            </div>
+          </div>
+
+          <div class="timeline-entry">
+            <div class="timeline-dot timeline-dot--warning">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="10" height="8" rx="1"/><path d="M5 1v2M9 1v2"/></svg>
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-event">email_send_failed</div>
+              <div class="timeline-meta">
+                <span class="tnum">29 May 2026, 8:04 AM PKT</span>
+                &nbsp;·&nbsp;
+                <span class="actor-badge actor-badge--system">System</span>
+              </div>
+              <div class="timeline-reason">Confirmation email to farida.qureshi@email.com failed after 3 retries (550 bounce)</div>
+            </div>
+          </div>
+
+          <div class="timeline-entry">
+            <div class="timeline-dot timeline-dot--info">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7l5-5 5 5M7 2v8"/></svg>
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-event">email_re_triggered</div>
+              <div class="timeline-meta">
+                <span class="tnum">29 May 2026, 9:10 AM PKT</span>
+                &nbsp;·&nbsp;
+                <span class="actor-badge actor-badge--admin">Admin</span>
+                &nbsp;admin@dermestha.pk
+              </div>
+              <div class="timeline-reason">Manual re-trigger of confirmation email via admin panel</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Linked prescriptions -->
+        <h3 class="h3" style="margin-bottom:var(--sp-3)">Linked prescriptions</h3>
+        <p class="muted" style="font-size:var(--fs-body-sm);margin:0">No prescription issued yet for this appointment.</p>
+
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

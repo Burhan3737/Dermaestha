@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Payment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    .pay-body { padding: var(--sp-8) var(--sp-4) var(--sp-16); }
+    .pay-inner { max-width: 520px; margin: 0 auto; }
+
+    /* Spinner */
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--color-primary-border); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.9s linear infinite; margin: 0 auto var(--sp-4); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: var(--color-primary); } }
+
+    /* Order summary sub-card */
+    .order-summary { background: var(--color-bg); border: var(--border-1); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); margin: var(--sp-5) 0; }
+    .order-row { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-2) 0; }
+    .order-row + .order-row { border-top: var(--border-1); }
+    .order-divider { border-top: 1px solid var(--color-border-strong); margin: var(--sp-1) 0; }
+    .order-total-row { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-2) 0; border-top: 1px solid var(--color-border-strong); }
+
+    /* Method chips */
+    .methods-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; justify-content: center; margin-top: var(--sp-4); }
+    .method-chip { background: var(--color-surface); border: var(--border-1); border-radius: var(--r-sm); padding: 4px 10px; font-size: var(--fs-caption); font-weight: 600; color: var(--color-text-muted); }
+
+    /* Status icon circle */
+    .status-icon { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--sp-4); }
+    .status-icon--success { background: var(--color-success-bg); color: var(--color-success); }
+    .status-icon--warning { background: var(--color-warning-bg); color: var(--color-warning); }
+    .status-icon--danger  { background: var(--color-danger-bg);  color: var(--color-danger); }
+
+    /* Return state cards */
+    .return-card { background: var(--color-surface); border: var(--border-1); border-radius: var(--r-md); padding: var(--sp-6) var(--sp-6) var(--sp-5); text-align: center; margin-bottom: var(--sp-4); }
+    .return-card .h2 { margin-bottom: var(--sp-2); }
+    .return-card .body-sm { margin: 0 0 var(--sp-5); color: var(--color-text-body); }
+    .return-card .btn { min-width: 160px; }
+
+    /* Return section header */
+    .return-section { margin-top: var(--sp-10); padding-top: var(--sp-8); border-top: var(--border-1); }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav__inner">
+    <a class="brand" href="patient-01-landing.html">
+      <span class="brand__mark"></span>
+      <span class="brand__word">Dermestha</span>
+    </a>
+    <span class="caption" style="display:flex;align-items:center;gap:6px;color:var(--color-text-muted)">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg>
+      Secure checkout
+    </span>
+  </div>
+</nav>
+
+<div class="pay-body">
+  <div class="pay-inner">
+
+    <!-- PRIMARY state: redirecting to checkout -->
+    <div class="card" style="padding:var(--sp-8) var(--sp-6);text-align:center;margin-bottom:var(--sp-4)">
+      <div class="spinner"></div>
+      <h1 class="h2" style="margin-bottom:var(--sp-2)">Taking you to secure checkout</h1>
+      <p class="body-sm muted" style="margin-bottom:0">You'll be redirected to our payment partner to complete payment securely.</p>
+
+      <!-- Order summary -->
+      <div class="order-summary" style="text-align:left">
+        <div class="order-row">
+          <span class="body-sm muted">Dr. Ayesha Khan</span>
+          <span class="body-sm strong">Acne &amp; Pigmentation</span>
+        </div>
+        <div class="order-row">
+          <span class="body-sm muted">Slot</span>
+          <span class="body-sm tnum">Thu 29 May · 6:30 PM</span>
+        </div>
+        <div class="order-total-row">
+          <span class="body-sm strong">Total</span>
+          <span class="tnum strong" style="font-size:var(--fs-body);font-weight:800;color:var(--color-text-strong)">PKR 2,000</span>
+        </div>
+      </div>
+
+      <!-- Accepted methods -->
+      <p class="caption" style="color:var(--color-text-muted);margin-bottom:var(--sp-2)">Accepted methods</p>
+      <div class="methods-row">
+        <span class="method-chip">Visa</span>
+        <span class="method-chip">Mastercard</span>
+        <span class="method-chip">JazzCash</span>
+        <span class="method-chip">Easypaisa</span>
+        <span class="method-chip">Bank transfer</span>
+      </div>
+    </div>
+
+    <!-- RETURN STATES -->
+    <div class="return-section">
+      <p class="label" style="text-align:center;margin-bottom:var(--sp-6)">Return states</p>
+
+      <!-- 1. Success -->
+      <div class="return-card">
+        <div class="status-icon status-icon--success">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <span class="badge badge--success" style="margin-bottom:var(--sp-3)">Payment confirmed</span>
+        <h2 class="h2">Your appointment is booked.</h2>
+        <p class="body-sm">You'll receive a confirmation email shortly. Your slot with Dr. Ayesha Khan on <span class="tnum">Thu 29 May · 6:30 PM</span> is confirmed.</p>
+        <a href="patient-08-dashboard-upcoming.html" class="btn btn--primary">Go to dashboard</a>
+      </div>
+
+      <!-- 2. Failure -->
+      <div class="return-card">
+        <div class="status-icon status-icon--warning">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <span class="badge badge--warning" style="margin-bottom:var(--sp-3)">Payment not completed</span>
+        <h2 class="h2">Payment didn't go through.</h2>
+        <p class="body-sm">Your slot is still held — you can try again. Common causes: card declined, insufficient funds, or a network timeout. Your bank has not charged you.</p>
+        <a href="patient-07-payment.html" class="btn btn--primary">Retry payment</a>
+      </div>
+
+      <!-- 3. Lock expired -->
+      <div class="return-card">
+        <div class="status-icon status-icon--danger">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        </div>
+        <span class="badge badge--danger" style="margin-bottom:var(--sp-3)">Slot released</span>
+        <h2 class="h2">Your slot was released.</h2>
+        <p class="body-sm">The 10-minute hold expired before payment was completed. No payment was taken. Please choose a new slot.</p>
+        <a href="patient-06-booking.html" class="btn btn--secondary">Pick another slot</a>
+      </div>
+
+      <!-- 4. Platform refund -->
+      <div class="return-card">
+        <div class="status-icon status-icon--danger">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <span class="badge badge--danger" style="margin-bottom:var(--sp-3)">Booking error</span>
+        <h2 class="h2">We couldn't secure that slot.</h2>
+        <p class="body-sm">A full refund is on its way to your original payment method. No gateway fee is deducted for platform errors. Refund expected within 3–5 working days.</p>
+        <a href="patient-02-browse.html" class="btn btn--secondary">Browse doctors</a>
+      </div>
+
+    </div><!-- /return-section -->
+
+  </div><!-- /pay-inner -->
+</div><!-- /pay-body -->
+
+</body>
+</html>

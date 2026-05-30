@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Dr. Ayesha Khan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    .page-body { padding: 24px 0 80px; }
+    .profile-hero { display: grid; grid-template-columns: 320px 1fr; gap: 28px; align-items: start; margin-bottom: 36px; }
+    .profile-photo { position: relative; border-radius: var(--r-md); overflow: hidden; border: var(--border-1); }
+    .profile-photo img { width: 100%; display: block; aspect-ratio: 3/4; object-fit: cover; object-position: center 20%; }
+    .profile-photo .pmc-badge { top: 12px; right: 12px; font-size: 12px; padding: 4px 10px; }
+    .profile-meta { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+    .profile-specialization { color: var(--color-text-muted); font-size: var(--fs-body-lg); font-weight: 600; }
+    .profile-stats { display: flex; gap: 24px; flex-wrap: wrap; }
+    .profile-stat { display: flex; flex-direction: column; gap: 2px; }
+    .profile-stat__val { font-family: var(--font-head); font-weight: 800; font-size: 22px; color: var(--color-primary); }
+    .profile-stat__label { font-size: var(--fs-caption); color: var(--color-text-muted); }
+    .profile-fee { font-family: var(--font-head); font-weight: 800; font-size: 22px; color: var(--color-text-strong); }
+    .divider { border: none; border-top: var(--border-1); margin: 24px 0; }
+    .section-label { font-family: var(--font-head); font-weight: 700; font-size: var(--fs-label); letter-spacing: .8px; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 12px; }
+    .slot-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+    .cta-sticky { background: var(--color-surface); border-top: var(--border-1); padding: 16px 0; }
+
+    @media (max-width: 767px) {
+      .profile-hero { grid-template-columns: 1fr; gap: 24px; }
+      .profile-photo { max-width: 240px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top nav (desktop) -->
+<nav class="topnav only-desktop">
+  <div class="topnav__inner">
+    <a class="brand" href="patient-01-landing.html">
+      <span class="brand__mark"></span>
+      <span class="brand__word">Dermestha</span>
+    </a>
+    <div class="topnav__links">
+      <a href="patient-02-browse.html" class="active">Browse</a>
+      <a href="patient-08-dashboard-upcoming.html">My Appointments</a>
+      <a href="#">How it works</a>
+      <button class="btn btn--secondary btn--sm" onclick="location.href='patient-05-login.html'">Log in</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Bottom tabbar (mobile) -->
+<div class="tabbar only-mobile">
+  <a href="patient-02-browse.html" class="tabbar__item active">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><path d="M15 15l3 3"/></svg>
+    Browse
+  </a>
+  <a href="patient-08-dashboard-upcoming.html" class="tabbar__item">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M7 2v4M13 2v4M3 9h14"/></svg>
+    Appts
+  </a>
+  <a href="#" class="tabbar__item">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="10" cy="7" r="3"/><path d="M4 18c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+    Profile
+  </a>
+</div>
+
+<div class="page-body">
+  <div class="container">
+
+    <!-- Back link -->
+    <a href="patient-02-browse.html" style="display:inline-flex;align-items:center;gap:6px;color:var(--color-text-muted);font-size:var(--fs-body-sm);text-decoration:none;margin-bottom:20px">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M10 12L6 8l4-4"/></svg>
+      Back to Browse
+    </a>
+
+    <!-- Profile hero -->
+    <div class="profile-hero">
+      <div class="profile-photo">
+        <img src="https://randomuser.me/api/portraits/women/65.jpg" alt="Dr. Ayesha Khan">
+        <span class="pmc-badge">&#10003; PMC</span>
+      </div>
+      <div class="profile-meta">
+        <div>
+          <h1 class="h1" style="margin-bottom:6px">Dr. Ayesha Khan</h1>
+          <p class="profile-specialization">Acne &amp; Pigmentation</p>
+        </div>
+
+        <div class="profile-stats">
+          <div class="profile-stat">
+            <span class="profile-stat__val tnum">8</span>
+            <span class="profile-stat__label">Years experience</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat__val tnum">1,240+</span>
+            <span class="profile-stat__label">Consultations</span>
+          </div>
+          <div class="profile-stat">
+            <span class="profile-stat__val tnum">4.9</span>
+            <span class="profile-stat__label">Rating</span>
+          </div>
+        </div>
+
+        <div>
+          <span class="section-label">Consultation fee</span>
+          <p class="profile-fee tnum">PKR 2,000 <span style="font-size:14px;color:var(--color-text-muted);font-weight:400;letter-spacing:0">/ 30-min session</span></p>
+        </div>
+
+        <hr class="divider" style="margin:8px 0">
+
+        <div>
+          <span class="section-label">About Dr. Khan</span>
+          <p style="margin:0;line-height:1.65">Dr. Ayesha Khan is a PMC-registered dermatologist with 8 years of clinical experience specialising in acne, hyperpigmentation, and skin texture concerns. She completed her MBBS from Aga Khan University and her FCPS (Dermatology) from CPSP. Dr. Khan takes a science-first approach, combining evidence-based topical regimens with lifestyle guidance to achieve lasting results for her patients.</p>
+        </div>
+
+        <!-- Availability preview -->
+        <div>
+          <span class="section-label" style="display:block;margin-bottom:10px">Upcoming availability</span>
+          <div class="slot-grid">
+            <button class="slot tnum">Today 6:30 PM</button>
+            <button class="slot tnum">Today 7:00 PM</button>
+            <button class="slot slot--disabled tnum">Today 7:30 PM</button>
+            <button class="slot tnum">Tomorrow 10:00 AM</button>
+            <button class="slot tnum">Tomorrow 10:30 AM</button>
+            <button class="slot tnum">Tomorrow 11:00 AM</button>
+          </div>
+          <p class="help" style="margin-top:10px">Full slot picker available at booking. Lead time: 1 hour minimum.</p>
+        </div>
+
+        <a href="patient-06-booking.html" class="btn btn--primary btn--lg" style="align-self:flex-start;margin-top:4px">Book consultation</a>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+</div>
+
+</body>
+</html>

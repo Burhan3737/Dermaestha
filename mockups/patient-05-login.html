@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Log in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    .auth-form-heading { margin: 0 0 var(--sp-1); }
+    .auth-form-sub { font-size: var(--fs-body-sm); color: var(--color-text-muted); margin: 0 0 var(--sp-5); }
+    .auth-form-footer { text-align: center; margin-top: var(--sp-4); font-size: var(--fs-body-sm); color: var(--color-text-muted); }
+    .auth-form-footer a { color: var(--color-primary); text-decoration: none; }
+    .forgot-link { font-size: var(--fs-body-sm); color: var(--color-primary); text-decoration: none; display: block; text-align: right; margin-bottom: var(--sp-5); margin-top: calc(0px - var(--sp-2)); }
+    .auth-form .field { margin-bottom: var(--sp-4); }
+
+    /* Password recovery section below the split */
+    .recovery-section { background: var(--color-bg); padding: var(--sp-10) var(--sp-4) var(--sp-16); border-top: var(--border-1); }
+    .recovery-inner { max-width: 480px; margin: 0 auto; }
+    .recovery-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-top: var(--sp-4); }
+    .recovery-grid .section-card { margin-bottom: 0; }
+    .recovery-grid .field { max-width: none; margin-bottom: var(--sp-4); }
+    @media (max-width: 640px) {
+      .recovery-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="auth-split">
+
+  <!-- LEFT: brand panel -->
+  <div class="auth-panel">
+    <div class="auth-panel__top">
+      <span class="auth-panel__mark"></span>
+      <span class="auth-panel__word">Dermestha</span>
+    </div>
+
+    <div>
+      <p class="auth-panel__headline">Welcome back.</p>
+      <ul class="auth-panel__list">
+        <li>
+          <span class="auth-panel__check">&#10003;</span>
+          <span>Your bookings &amp; prescriptions in one place</span>
+        </li>
+        <li>
+          <span class="auth-panel__check">&#10003;</span>
+          <span>Join consults from any device</span>
+        </li>
+        <li>
+          <span class="auth-panel__check">&#10003;</span>
+          <span>PMC-verified specialists</span>
+        </li>
+      </ul>
+    </div>
+
+    <p class="auth-panel__foot">Trusted by patients across Pakistan.</p>
+  </div>
+
+  <!-- RIGHT: login form -->
+  <div class="auth-form-side">
+    <div class="auth-form">
+
+      <!-- Mobile-only brand -->
+      <div class="auth-brand-mobile">
+        <a class="brand" href="patient-01-landing.html">
+          <span class="brand__mark"></span>
+          <span class="brand__word">Dermestha</span>
+        </a>
+      </div>
+
+      <h1 class="h1 auth-form-heading">Log in</h1>
+      <p class="auth-form-sub">Patients, doctors, and admins all log in here.</p>
+
+      <div class="field">
+        <label>Email address</label>
+        <input type="email" class="input" placeholder="you@example.com" autocomplete="email">
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input type="password" class="input" placeholder="Your password" autocomplete="current-password">
+      </div>
+
+      <a href="#forgot-password" class="forgot-link">Forgot your password?</a>
+
+      <button class="btn btn--primary btn--block">Log in</button>
+
+      <p class="caption" style="margin-top:var(--sp-4);text-align:center;color:var(--color-text-muted)">Doctors and admins sign in here too.</p>
+
+      <p class="auth-form-footer">New to Dermestha? <a href="patient-04-signup.html">Create an account</a></p>
+
+    </div>
+  </div>
+
+</div><!-- /auth-split -->
+
+<!-- Full-width password recovery states section -->
+<div class="recovery-section" id="forgot-password">
+  <div class="recovery-inner">
+    <p class="label" style="margin-bottom:0">Password recovery — additional states</p>
+    <div class="recovery-grid">
+
+      <!-- Reset request -->
+      <div class="section-card">
+        <h2 class="h3 section-card__title">Reset your password</h2>
+        <div class="field">
+          <label>Email address</label>
+          <input type="email" class="input" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <button class="btn btn--primary btn--block" style="margin-bottom:var(--sp-3)">Send reset link</button>
+        <p class="help">If an account exists for that email, we'll send a reset link. Check your inbox and spam folder.</p>
+      </div>
+
+      <!-- Set new password -->
+      <div class="section-card">
+        <h2 class="h3 section-card__title">Set a new password</h2>
+        <div class="field">
+          <label>New password</label>
+          <input type="password" class="input" placeholder="At least 8 characters" autocomplete="new-password">
+          <span class="help">Min 8 characters. Mix letters and numbers.</span>
+        </div>
+        <div class="field">
+          <label>Confirm new password</label>
+          <input type="password" class="input" placeholder="Repeat your password" autocomplete="new-password">
+        </div>
+        <button class="btn btn--primary btn--block" style="margin-bottom:var(--sp-3)">Update password</button>
+        <p class="help">This link expires in 1 hour. Each link is single-use.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

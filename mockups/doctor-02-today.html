@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Today's appointments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    /* ── Mobile drawer ── */
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform var(--ease);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-overlay);
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        padding: 12px var(--sp-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-1);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .mobile-topbar .brand__word { font-size: var(--fs-h3); }
+      .content { padding-top: var(--sp-3); }
+    }
+    @media (min-width: 861px) {
+      .mobile-topbar { display: none; }
+    }
+
+    /* ── Page chrome ── */
+    .content-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--sp-6);
+      gap: var(--sp-4);
+      flex-wrap: wrap;
+    }
+
+    /* ── Tab nav ── */
+    .doc-tabs {
+      display: flex;
+      gap: var(--sp-1);
+      border-bottom: var(--border-1);
+      margin-bottom: var(--sp-5);
+    }
+    .doc-tab {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: var(--fs-body-sm);
+      padding: 10px var(--sp-4);
+      border-bottom: 2px solid transparent;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+    .doc-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    /* ── Appointment row card ── */
+    .appt-row {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sp-4);
+      padding: var(--sp-4) var(--sp-5);
+    }
+    .appt-time {
+      flex: 0 0 72px;
+      font-weight: 700;
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-strong);
+      padding-top: 2px;
+    }
+    .appt-meta { flex: 1; min-width: 0; }
+    .appt-patient {
+      font-weight: 700;
+      font-size: var(--fs-body);
+      color: var(--color-text-strong);
+      margin: 0;
+    }
+    .appt-sub {
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-muted);
+      margin: 2px 0 0;
+    }
+    .appt-reason {
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-muted);
+      margin: var(--sp-1) 0 0;
+      font-style: italic;
+    }
+    .appt-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      margin-top: var(--sp-3);
+      flex-wrap: wrap;
+    }
+
+    /* ── Active row tint ── */
+    .appt-row--active {
+      background: var(--color-primary-tint);
+      border-color: var(--color-primary-border);
+    }
+
+    /* ── Sidebar identity block ── */
+    .sidebar-identity {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-3) var(--sp-2);
+      border-top: var(--border-1);
+      margin-top: auto;
+      padding-top: var(--sp-4);
+    }
+    .sidebar-identity__info { min-width: 0; }
+    .sidebar-identity__name {
+      font-weight: 700;
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-strong);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-identity__logout {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      text-decoration: none;
+    }
+    .sidebar-identity__logout:hover { color: var(--color-danger); }
+
+    /* ── Section label ── */
+    .sidebar-caption {
+      font-family: var(--font-head);
+      font-size: var(--fs-label);
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      padding: var(--sp-2) var(--sp-2) var(--sp-3);
+      margin-bottom: var(--sp-1);
+    }
+
+    @media (max-width: 640px) {
+      .appt-row { flex-wrap: wrap; }
+      .appt-time { flex: 0 0 100%; padding-top: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar only-mobile">
+  <button class="btn btn--ghost btn--sm" data-drawer style="padding:8px;color:var(--color-text-muted)">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h14M3 10h14M3 15h14"/>
+    </svg>
+  </button>
+  <a class="brand" href="#">
+    <span class="brand__mark"></span>
+    <span class="brand__word">Dermestha</span>
+  </a>
+</div>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div style="margin-bottom:var(--sp-5)">
+      <a class="brand" href="#" style="text-decoration:none;display:inline-flex;margin-bottom:var(--sp-1)">
+        <span class="brand__mark"></span>
+        <span class="brand__word" style="margin-left:var(--sp-2)">Dermestha</span>
+      </a>
+      <p class="sidebar-caption" style="padding:0;margin-bottom:0;margin-top:4px">Doctor panel</p>
+    </div>
+
+    <nav style="display:flex;flex-direction:column;gap:var(--sp-1)">
+      <a href="doctor-02-today.html" class="sidebar__link active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 1v3M11 1v3M2 6h12"/></svg>
+        &nbsp;&nbsp;Today's appointments
+      </a>
+      <a href="doctor-03-availability.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.5"/></svg>
+        &nbsp;&nbsp;Availability
+      </a>
+      <a href="doctor-02-today.html#history" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><path d="M2 8a6 6 0 1012 0A6 6 0 002 8"/><path d="M2 4V8h4"/></svg>
+        &nbsp;&nbsp;History
+      </a>
+    </nav>
+
+    <!-- Doctor identity -->
+    <div class="sidebar-identity">
+      <span class="avatar avatar--md" style="flex:0 0 auto">AK</span>
+      <div class="sidebar-identity__info">
+        <p class="sidebar-identity__name">Dr. Ayesha Khan</p>
+        <a href="doctor-01-password.html" class="sidebar-identity__logout">Log out</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main content ── -->
+  <main class="content">
+    <div style="width:100%">
+
+      <!-- Content header -->
+      <div class="content-header">
+        <h1 class="h1">Today's appointments</h1>
+        <span class="muted tnum" style="font-size:var(--fs-body-sm)">Sat 30 May 2026</span>
+      </div>
+
+      <!-- Tab row + panels all inside the data-tabs container -->
+      <div data-tabs>
+        <div class="doc-tabs">
+          <button class="doc-tab active" data-tab="#tab-today">Today</button>
+          <button class="doc-tab" data-tab="#tab-history">History</button>
+        </div>
+
+      <!-- ── TODAY panel ── -->
+      <div id="tab-today" class="tab-panel">
+
+        <!-- Row 1 — 10:00 AM — upcoming, disabled join -->
+        <div class="card" style="margin-bottom:var(--sp-3)">
+          <div class="appt-row">
+            <div class="appt-time tnum">10:00 AM</div>
+            <div class="appt-meta">
+              <p class="appt-patient">Farida Qureshi</p>
+              <p class="appt-sub">Acne &amp; Pigmentation</p>
+              <p class="appt-reason">"Persistent breakouts along jawline for 3 months."</p>
+              <div class="appt-actions">
+                <button class="btn btn--primary btn--sm btn--disabled" disabled>Join Call</button>
+                <span class="help" style="margin:0">Active 10 min before</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2 — 11:30 AM — "for: Sana" — upcoming, disabled join -->
+        <div class="card" style="margin-bottom:var(--sp-3)">
+          <div class="appt-row">
+            <div class="appt-time tnum">11:30 AM</div>
+            <div class="appt-meta">
+              <p class="appt-patient">Ayesha Hassan</p>
+              <p class="appt-sub">for: Sana (daughter, age 9)</p>
+              <p class="appt-reason">"Eczema flare-up on inner elbows and behind knees."</p>
+              <div class="appt-actions">
+                <button class="btn btn--primary btn--sm btn--disabled" disabled>Join Call</button>
+                <span class="help" style="margin:0">Active 10 min before</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3 — 1:00 PM — ACTIVE (join enabled) -->
+        <div class="card appt-row--active" style="margin-bottom:var(--sp-3)">
+          <div class="appt-row">
+            <div class="appt-time tnum" style="color:var(--color-primary)">1:00 PM</div>
+            <div class="appt-meta">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-2)">
+                <div>
+                  <p class="appt-patient">Hina Baig</p>
+                  <p class="appt-sub">Hair &amp; Scalp</p>
+                  <p class="appt-reason">"Hair thinning around crown — started 6 weeks ago."</p>
+                </div>
+                <span class="badge badge--info">In progress</span>
+              </div>
+              <div class="appt-actions">
+                <a href="doctor-04-video.html" class="btn btn--primary btn--sm">Join Call</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 4 — 2:30 PM — completed, awaiting prescription -->
+        <div class="card" style="margin-bottom:var(--sp-3)">
+          <div class="appt-row">
+            <div class="appt-time tnum">2:30 PM</div>
+            <div class="appt-meta">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-2)">
+                <div>
+                  <p class="appt-patient">Usman Tariq</p>
+                  <p class="appt-sub">Acne &amp; Pigmentation</p>
+                  <p class="appt-reason">"Pigmentation marks after previous acne — looking for brightening."</p>
+                </div>
+                <span class="badge badge--warning">Awaiting prescription</span>
+              </div>
+              <div class="appt-actions">
+                <a href="doctor-05-prescription-builder.html" class="btn btn--secondary btn--sm">Write prescription</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 5 — 4:30 PM — upcoming, disabled -->
+        <div class="card" style="margin-bottom:var(--sp-3)">
+          <div class="appt-row">
+            <div class="appt-time tnum">4:30 PM</div>
+            <div class="appt-meta">
+              <p class="appt-patient">Sadia Mirza</p>
+              <p class="appt-sub">Eczema &amp; Dryness</p>
+              <p class="appt-reason">"Severe dryness and itching on forearms — flares in winter."</p>
+              <div class="appt-actions">
+                <button class="btn btn--primary btn--sm btn--disabled" disabled>Join Call</button>
+                <span class="help" style="margin:0">Active 10 min before</span>
+                <a href="doctor-06-cancel-modal.html" style="color:var(--color-danger);font-size:var(--fs-body-sm);text-decoration:none;font-weight:600">Cancel</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /tab-today -->
+
+      <!-- ── HISTORY panel ── -->
+      <div id="tab-history" class="tab-panel" hidden>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date &amp; time</th>
+              <th>Patient</th>
+              <th>Concern</th>
+              <th>Status</th>
+              <th>Prescription</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="tnum">Thu 29 May · 6:30 PM</td>
+              <td>Sana Khan <span class="body-sm muted">(via Ayesha Hassan)</span></td>
+              <td>Acne</td>
+              <td><span class="badge badge--success">Completed</span></td>
+              <td><a href="doctor-05-prescription-builder.html" style="color:var(--color-primary);font-size:var(--fs-body-sm);text-decoration:none;font-weight:600">View</a></td>
+            </tr>
+            <tr>
+              <td class="tnum">Wed 28 May · 3:00 PM</td>
+              <td>Bilal Ansari</td>
+              <td>Hair &amp; Scalp</td>
+              <td><span class="badge badge--success">Completed · Rx ready</span></td>
+              <td><a href="doctor-05-prescription-builder.html" style="color:var(--color-primary);font-size:var(--fs-body-sm);text-decoration:none;font-weight:600">View</a></td>
+            </tr>
+            <tr>
+              <td class="tnum">Tue 27 May · 11:00 AM</td>
+              <td>Neha Raza</td>
+              <td>Pigmentation</td>
+              <td><span class="badge badge--warning">Awaiting prescription</span></td>
+              <td><a href="doctor-05-prescription-builder.html" style="color:var(--color-primary);font-size:var(--fs-body-sm);text-decoration:none;font-weight:600">Write Rx</a></td>
+            </tr>
+            <tr>
+              <td class="tnum">Mon 26 May · 5:00 PM</td>
+              <td>Tariq Hussain</td>
+              <td>Eczema</td>
+              <td><span class="badge badge--warning">Missed (no-show)</span></td>
+              <td><span class="muted" style="font-size:var(--fs-body-sm)">—</span></td>
+            </tr>
+            <tr>
+              <td class="tnum">Fri 23 May · 9:00 AM</td>
+              <td>Amna Farooq</td>
+              <td>Acne &amp; Oiliness</td>
+              <td><span class="badge badge--danger">Cancelled by doctor</span></td>
+              <td><span class="muted" style="font-size:var(--fs-body-sm)">—</span></td>
+            </tr>
+            <tr>
+              <td class="tnum">Thu 22 May · 2:30 PM</td>
+              <td>Rahim Shah</td>
+              <td>Pigmentation</td>
+              <td><span class="badge badge--success">Completed · Rx ready</span></td>
+              <td><a href="doctor-05-prescription-builder.html" style="color:var(--color-primary);font-size:var(--fs-body-sm);text-decoration:none;font-weight:600">View</a></td>
+            </tr>
+          </tbody>
+        </table>
+
+      </div><!-- /tab-history -->
+
+      </div><!-- /data-tabs -->
+
+    </div><!-- /max-width -->
+  </main>
+
+</div><!-- /layout -->
+
+</body>
+</html>

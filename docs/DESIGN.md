@@ -59,7 +59,15 @@ Tokens are framework-agnostic name→value pairs. They map directly onto a Tailw
 | `color.feature-bg` | `#0F3A2A` | Deep green section background |
 | `color.on-dark` | `#DCE9E2` | Body text on green |
 | `color.on-dark-muted` | `#AFC6BA` | Secondary text on green |
-| `color.on-dark-accent` | `#9BE3B8` | Mint highlight on green (eyebrows, accents) |
+| `color.on-dark-accent` | `#9BE3B8` | Mint highlight on green (eyebrows, accents); also the video "live" indicator |
+
+**Dark / immersive chrome** (video stage + waiting-room camera preview). Spruce-derived (NOT neutral black) so dark surfaces stay on-brand and feel part of Dermestha.
+| Token | Value | Use |
+|---|---|---|
+| `color.dark-bg` | `#0A2C20` | Video stage / camera-preview background (deep spruce) |
+| `color.dark-surface` | `#0E3328` | Self-tile / inset surface on dark |
+| `color.dark-border` | `#1F5440` | Hairline on dark surfaces |
+| `color.dark-deep` | `#072018` | Full-bleed immersive page background (video consultation screen) |
 
 **Semantic / status** (text color / background tint)
 | Token | Text | Background | Use |
@@ -186,6 +194,15 @@ The "light" approach: ~16 hand-built components, all token-driven. Each is indep
 
 ### 3.18 Empty state
 - Centered icon + short message + primary CTA. E.g., "No upcoming appointments — Browse doctors" (P9), empty listing, empty search.
+
+### 3.19 Signature layout patterns (anti-generic)
+To keep screens feeling finished and on-brand rather than generic, these composition patterns are standard:
+- **Split-auth** (`.auth-split`): sign-up and login are a two-pane layout — a full-height spruce brand panel (wordmark + value props + trust line) beside the form (max ~400px). Collapses to a single column with a compact centered brand lockup below 860px. Avoids the "small form adrift on white" look.
+- **Document "paper"** (`.rx-paper`): the prescription renders as a centered ~760px document card with a 3px brass top accent and a clinic-lockup header (mark + "PRESCRIPTION" + date) — reads like a real medical Rx, not a generic list.
+- **Centered status card**: payment handoff/return states are centered, constrained (~520px) finished cards (icon circle + title + body + single action), not bare alert bars. Return-state variants live under a labelled "Return states" divider.
+- **Real centered modals**: cancellation/confirmation modals render centered on a dimmed backdrop (never left-aligned in a content column).
+- **Branded immersive header**: the dark video screen carries a slim spruce top bar (mark + wordmark + "Connected" badge) so it's unmistakably in-app.
+- **Constraint over whitespace**: content is constrained to intentional reading widths and centered/composed; full-bleed brand surfaces (spruce panels/bands) fill space rather than leaving large empty margins. Top nav is full-width (logo at the left edge, links at the right).
 
 ---
 

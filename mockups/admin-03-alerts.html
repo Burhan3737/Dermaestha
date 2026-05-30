@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — System health</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform var(--ease);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-overlay);
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        padding: 12px var(--sp-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-1);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .mobile-topbar .brand__word { font-size: var(--fs-h3); }
+      .content { padding-top: var(--sp-3); }
+    }
+    @media (min-width: 861px) {
+      .mobile-topbar { display: none; }
+    }
+
+    .content-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--sp-6);
+      gap: var(--sp-4);
+      flex-wrap: wrap;
+    }
+
+    .sidebar-identity {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-3) var(--sp-2);
+      border-top: var(--border-1);
+      margin-top: auto;
+      padding-top: var(--sp-4);
+    }
+    .sidebar-identity__info { min-width: 0; }
+    .sidebar-identity__name {
+      font-weight: 700;
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-strong);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sidebar-identity__logout {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      text-decoration: none;
+    }
+    .sidebar-identity__logout:hover { color: var(--color-danger); }
+
+    .sidebar-caption {
+      font-family: var(--font-head);
+      font-size: var(--fs-label);
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      padding: 0;
+      margin: 4px 0 var(--sp-1);
+    }
+
+    /* Alert feed card */
+    .feed-item {
+      background: var(--color-surface);
+      border: var(--border-1);
+      border-radius: var(--r-md);
+      padding: var(--sp-4) var(--sp-5);
+      margin-bottom: var(--sp-3);
+      display: flex;
+      gap: var(--sp-4);
+      align-items: flex-start;
+    }
+    .feed-item--danger { border-left: 3px solid var(--color-danger); }
+    .feed-item--warning { border-left: 3px solid var(--color-warning); }
+
+    .feed-icon {
+      flex: 0 0 auto;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--r-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .feed-icon--danger {
+      background: var(--color-danger-bg);
+      color: var(--color-danger);
+    }
+    .feed-icon--warning {
+      background: var(--color-warning-bg);
+      color: var(--color-warning);
+    }
+
+    .feed-body { flex: 1; min-width: 0; }
+    .feed-title {
+      font-weight: 700;
+      font-size: var(--fs-body);
+      color: var(--color-text-strong);
+      margin: 0 0 var(--sp-1);
+    }
+    .feed-desc {
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-body);
+      margin: 0 0 var(--sp-2);
+      line-height: 1.5;
+    }
+    .feed-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      flex-wrap: wrap;
+    }
+    .feed-time {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .feed-link {
+      font-size: var(--fs-body-sm);
+      font-weight: 600;
+      color: var(--color-primary);
+      text-decoration: none;
+    }
+    .feed-link:hover { text-decoration: underline; }
+
+    /* Manual-action callout */
+    .manual-only-note {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-1);
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      background: var(--color-surface-sunken);
+      border-radius: var(--r-sm);
+      padding: 3px 8px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar only-mobile">
+  <button class="btn btn--ghost btn--sm" data-drawer style="padding:8px;color:var(--color-text-muted)">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h14M3 10h14M3 15h14"/>
+    </svg>
+  </button>
+  <a class="brand" href="#">
+    <span class="brand__mark"></span>
+    <span class="brand__word">Dermestha</span>
+  </a>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div style="margin-bottom:var(--sp-5)">
+      <a class="brand" href="#" style="text-decoration:none;display:inline-flex;margin-bottom:var(--sp-1)">
+        <span class="brand__mark"></span>
+        <span class="brand__word" style="margin-left:var(--sp-2)">Dermestha</span>
+      </a>
+      <p class="sidebar-caption">Admin panel</p>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:var(--sp-1)">
+      <a href="admin-01-doctors.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><circle cx="6" cy="5" r="3"/><path d="M1 14c0-3 2-5 5-5h0c1 0 1.8.3 2.5.8"/><path d="M11 10v5M8.5 12.5h5"/></svg>
+        &nbsp;&nbsp;Doctors
+      </a>
+      <a href="admin-02-medicines.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><rect x="5" y="1" width="6" height="3" rx="1"/><path d="M3 4h10l1 10H2L3 4z"/><path d="M6 8h4"/></svg>
+        &nbsp;&nbsp;Medicines
+      </a>
+      <a href="admin-03-alerts.html" class="sidebar__link active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><path d="M8 2a5 5 0 015 5v3l1 2H2l1-2V7a5 5 0 015-5z"/><path d="M6.5 13a1.5 1.5 0 003 0"/></svg>
+        &nbsp;&nbsp;Alerts
+      </a>
+      <a href="admin-04-records-audit.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+        &nbsp;&nbsp;Records &amp; Audit
+      </a>
+      <a href="admin-05-settings.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><circle cx="8" cy="8" r="2"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1M4 4l.7.7M11.3 11.3l.7.7M4 12l.7-.7M11.3 4.7l.7-.7"/></svg>
+        &nbsp;&nbsp;Settings
+      </a>
+    </nav>
+    <div class="sidebar-identity">
+      <span class="avatar avatar--md" style="flex:0 0 auto">AD</span>
+      <div class="sidebar-identity__info">
+        <p class="sidebar-identity__name">Admin</p>
+        <a href="#" class="sidebar-identity__logout">Log out</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+    <div style="width:100%">
+
+      <!-- Content header -->
+      <div class="content-header">
+        <h1 class="h1">System health</h1>
+        <span class="muted" style="font-size:var(--fs-body-sm)">Last checked: just now</span>
+      </div>
+
+      <!-- Manual actions note -->
+      <div class="alert alert--info" style="margin-bottom:var(--sp-5)">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="flex:0 0 auto;margin-top:1px"><circle cx="9" cy="9" r="7"/><path d="M9 8v4M9 6h.01"/></svg>
+        <span>The <strong>only manual action</strong> available on this screen is re-triggering transactional emails after send failures. Payment refunds and API failures must be resolved out-of-band in the payment gateway dashboard — the platform reconciles status but does not re-trigger refunds.</span>
+      </div>
+
+      <!-- Feed item 1: Payment-webhook reconciliation mismatch (danger) -->
+      <div class="feed-item feed-item--danger">
+        <div class="feed-icon feed-icon--danger">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <path d="M9 2L1 16h16L9 2z"/><path d="M9 7v4M9 13h.01"/>
+          </svg>
+        </div>
+        <div class="feed-body">
+          <p class="feed-title">Payment-webhook reconciliation mismatch</p>
+          <p class="feed-desc">
+            Payment reference <strong class="tnum">PAY-20260529-00184</strong> was received from the gateway but no matching appointment could be found in the system. The amount (PKR 2,500) is in a pending state. Manual review required.
+          </p>
+          <div class="feed-meta">
+            <span class="feed-time">Today, 11:43 AM PKT</span>
+            <span class="badge badge--danger">Danger</span>
+            <a href="admin-04-records-audit.html" class="feed-link">View record →</a>
+            <span class="manual-only-note">No in-app action — resolve in gateway dashboard</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed item 2: Refund API failure (danger) -->
+      <div class="feed-item feed-item--danger">
+        <div class="feed-icon feed-icon--danger">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <circle cx="9" cy="9" r="7"/><path d="M9 5v4"/><path d="M9 13h.01"/>
+          </svg>
+        </div>
+        <div class="feed-body">
+          <p class="feed-title">Refund API failure — retries exhausted</p>
+          <p class="feed-desc">
+            Automated refund for appointment <strong class="tnum">APT-20260528-00391</strong> (PKR 2,200 to Sadia Mirza) failed after 5 retry attempts. The refund was not processed by the gateway.
+          </p>
+          <div class="alert alert--warning" style="margin:var(--sp-2) 0">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><path d="M8 2L1 14h14L8 2z"/><path d="M8 7v3M8 12h.01"/></svg>
+            <span style="font-size:var(--fs-caption)"><strong>Refunds are NOT re-triggered in-app.</strong> Resolve this out-of-band in the payment gateway dashboard. The platform will reconcile the status once the gateway confirms.</span>
+          </div>
+          <div class="feed-meta">
+            <span class="feed-time">Yesterday, 4:12 PM PKT</span>
+            <span class="badge badge--danger">Danger</span>
+            <a href="admin-04-records-audit.html" class="feed-link">View appointment →</a>
+            <span class="manual-only-note">No in-app action — resolve in gateway dashboard</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed item 3: Transactional email failure (warning) — has re-trigger action -->
+      <div class="feed-item feed-item--warning">
+        <div class="feed-icon feed-icon--warning">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <rect x="2" y="5" width="14" height="10" rx="2"/><path d="M2 7l7 5 7-5"/>
+          </svg>
+        </div>
+        <div class="feed-body">
+          <p class="feed-title">Transactional email send failure (retries exhausted)</p>
+          <p class="feed-desc">
+            Appointment confirmation email to <strong>farida.qureshi@email.com</strong> for appointment <strong class="tnum">APT-20260529-00412</strong> failed to deliver after 3 retry attempts. The transactional email provider returned a 550 bounce code.
+          </p>
+          <div class="feed-meta">
+            <span class="feed-time">Today, 9:05 AM PKT</span>
+            <span class="badge badge--warning">Warning</span>
+            <a href="admin-04-records-audit.html" class="feed-link">View record →</a>
+            <button class="btn btn--secondary btn--sm">Re-trigger email</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed item 4: Another email failure -->
+      <div class="feed-item feed-item--warning">
+        <div class="feed-icon feed-icon--warning">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <rect x="2" y="5" width="14" height="10" rx="2"/><path d="M2 7l7 5 7-5"/>
+          </svg>
+        </div>
+        <div class="feed-body">
+          <p class="feed-title">Prescription-ready notification not delivered</p>
+          <p class="feed-desc">
+            Prescription-ready email for patient <strong>Usman Tariq</strong> (appointment <strong class="tnum">APT-20260529-00388</strong>) failed after 3 attempts. Patient has not been notified their prescription is available.
+          </p>
+          <div class="feed-meta">
+            <span class="feed-time">Today, 2:51 PM PKT</span>
+            <span class="badge badge--warning">Warning</span>
+            <a href="admin-04-records-audit.html" class="feed-link">View record →</a>
+            <button class="btn btn--secondary btn--sm">Re-trigger email</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed item 5: Awaiting prescription >12h (warning) -->
+      <div class="feed-item feed-item--warning">
+        <div class="feed-icon feed-icon--warning">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <circle cx="9" cy="9" r="7"/><path d="M9 5v4.5l3 1.5"/>
+          </svg>
+        </div>
+        <div class="feed-body">
+          <p class="feed-title">Appointment awaiting prescription — over 12 hours</p>
+          <p class="feed-desc">
+            Appointment <strong class="tnum">APT-20260528-00374</strong> (Dr. Bilal Siddiqui — patient Neha Raza, completed 28 May at 11:00 AM) has been in <em>awaiting prescription</em> state for 15 hours 22 minutes. The doctor has not yet issued a prescription.
+          </p>
+          <div class="feed-meta">
+            <span class="feed-time">28 May, 11:00 AM PKT — 15 h 22 min elapsed</span>
+            <span class="badge badge--warning">Warning</span>
+            <a href="admin-04-records-audit.html" class="feed-link">View appointment →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed item 6: Unhandled exception (danger) -->
+      <div class="feed-item feed-item--danger">
+        <div class="feed-icon feed-icon--danger">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <path d="M9 2L1 16h16L9 2z"/><path d="M9 7v4M9 13h.01"/>
+          </svg>
+        </div>
+        <div class="feed-body">
+          <p class="feed-title">Unhandled application exception</p>
+          <p class="feed-desc">
+            An unhandled <code style="font-size:var(--fs-caption);background:var(--color-surface-sunken);padding:1px 5px;border-radius:var(--r-sm)">TypeError: Cannot read properties of null</code> was captured in the prescription builder (doctor panel). Error ID: <strong class="tnum">ERR-20260529-0017</strong>. Reported by the error tracker (Sentry). No patient data was exposed.
+          </p>
+          <div class="feed-meta">
+            <span class="feed-time">Today, 3:18 PM PKT</span>
+            <span class="badge badge--danger">Danger</span>
+            <a href="#" class="feed-link">View in error tracker →</a>
+            <span class="manual-only-note">No in-app action — fix in codebase</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

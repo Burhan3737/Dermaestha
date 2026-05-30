@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Create your account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    .auth-form-heading { margin: 0 0 var(--sp-1); }
+    .auth-form-sub { font-size: var(--fs-body-sm); color: var(--color-text-muted); margin: 0 0 var(--sp-5); }
+    .auth-form-footer { text-align: center; margin-top: var(--sp-4); font-size: var(--fs-body-sm); color: var(--color-text-muted); }
+    .auth-form-footer a { color: var(--color-primary); text-decoration: none; }
+    .consent-block { background: var(--color-bg); border: var(--border-1); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); margin: var(--sp-4) 0; }
+    .consent-block .choice { align-items: flex-start; }
+    .consent-block .choice input { margin-top: 2px; flex: 0 0 auto; }
+    .consent-sub { margin-top: var(--sp-2); padding-left: 26px; }
+    .auth-form .field { margin-bottom: var(--sp-4); }
+    .auth-form .field:last-of-type { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+<div class="auth-split">
+
+  <!-- LEFT: brand panel -->
+  <div class="auth-panel">
+    <div class="auth-panel__top">
+      <span class="auth-panel__mark"></span>
+      <span class="auth-panel__word">Dermestha</span>
+    </div>
+
+    <div>
+      <p class="auth-panel__headline">Skin care,<br>made simple.</p>
+      <ul class="auth-panel__list">
+        <li>
+          <span class="auth-panel__check">&#10003;</span>
+          <span>PMC-verified dermatologists</span>
+        </li>
+        <li>
+          <span class="auth-panel__check">&#10003;</span>
+          <span>30-minute private video consults</span>
+        </li>
+        <li>
+          <span class="auth-panel__check">&#10003;</span>
+          <span>Clear, itemised prescriptions</span>
+        </li>
+      </ul>
+    </div>
+
+    <p class="auth-panel__foot">Trusted by patients across Pakistan.</p>
+  </div>
+
+  <!-- RIGHT: form -->
+  <div class="auth-form-side">
+    <div class="auth-form">
+
+      <!-- Mobile-only brand (hidden on desktop) -->
+      <div class="auth-brand-mobile">
+        <a class="brand" href="patient-01-landing.html">
+          <span class="brand__mark"></span>
+          <span class="brand__word">Dermestha</span>
+        </a>
+      </div>
+
+      <h1 class="h1 auth-form-heading">Create your account</h1>
+      <p class="auth-form-sub">Sign up to book consultations with PMC-verified dermatologists.</p>
+
+      <!-- Full name -->
+      <div class="field">
+        <label>Full name</label>
+        <input type="text" class="input" placeholder="e.g. Sana Khan" autocomplete="name">
+        <span class="help">Enter your name as on your CNIC.</span>
+      </div>
+
+      <!-- Email — duplicate-email error example -->
+      <div class="field">
+        <label>Email address</label>
+        <input type="email" class="input input--error" value="sana.khan@example.com" autocomplete="email">
+        <span class="error-text">An account with this email already exists. <a href="patient-05-login.html" style="color:var(--color-danger-deep)">Log in instead?</a></span>
+      </div>
+
+      <!-- Phone -->
+      <div class="field">
+        <label>Mobile number</label>
+        <input type="tel" class="input" placeholder="03XX-XXXXXXX" autocomplete="tel">
+        <span class="help">Pakistani mobile number — for appointment reminders only.</span>
+      </div>
+
+      <!-- Password -->
+      <div class="field">
+        <label>Password</label>
+        <input type="password" class="input" placeholder="At least 8 characters" autocomplete="new-password">
+        <span class="help">Min 8 characters. Mix letters and numbers for a stronger password.</span>
+      </div>
+
+      <!-- Mandatory consent -->
+      <div class="consent-block">
+        <label class="choice">
+          <input type="checkbox" id="tosConsent">
+          I agree to the <a href="/legal/terms" style="color:var(--color-primary);margin:0 3px">Terms of Service</a> and <a href="/legal/privacy" style="color:var(--color-primary);margin-left:3px">Privacy Policy</a>
+        </label>
+        <div class="consent-sub">
+          <span class="help" style="margin:0">You must accept the terms to create an account and book consultations.</span>
+        </div>
+      </div>
+
+      <!-- Submit — disabled until consent checked -->
+      <button class="btn btn--primary btn--block btn--disabled" disabled aria-describedby="consentNote">Create account</button>
+      <p class="help" id="consentNote" style="text-align:center;margin-top:var(--sp-2)">Accept the terms to continue.</p>
+
+      <p class="auth-form-footer">Already have an account? <a href="patient-05-login.html">Log in</a></p>
+
+    </div>
+  </div>
+
+</div><!-- /auth-split -->
+
+</body>
+</html>

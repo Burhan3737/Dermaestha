@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Doctors</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    /* Mobile drawer */
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform var(--ease);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-overlay);
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        padding: 12px var(--sp-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-1);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .mobile-topbar .brand__word { font-size: var(--fs-h3); }
+      .content { padding-top: var(--sp-3); }
+    }
+    @media (min-width: 861px) {
+      .mobile-topbar { display: none; }
+    }
+
+    .content-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--sp-6);
+      gap: var(--sp-4);
+      flex-wrap: wrap;
+    }
+
+    .sidebar-identity {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-3) var(--sp-2);
+      border-top: var(--border-1);
+      margin-top: auto;
+      padding-top: var(--sp-4);
+    }
+    .sidebar-identity__info { min-width: 0; }
+    .sidebar-identity__name {
+      font-weight: 700;
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-strong);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-identity__logout {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      text-decoration: none;
+    }
+    .sidebar-identity__logout:hover { color: var(--color-danger); }
+
+    .sidebar-caption {
+      font-family: var(--font-head);
+      font-size: var(--fs-label);
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      padding: 0;
+      margin: 4px 0 var(--sp-1);
+    }
+
+    /* Form grid */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-4) var(--sp-5);
+    }
+    .form-grid .field { max-width: none; }
+    .form-grid .field--full { grid-column: 1 / -1; }
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .field--full { grid-column: 1; }
+    }
+
+    /* Table action links */
+    .tbl-action {
+      color: var(--color-primary);
+      font-size: var(--fs-body-sm);
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .tbl-action--danger { color: var(--color-danger); }
+    .tbl-action:hover { text-decoration: underline; }
+
+    /* Table wrap for horizontal scroll on mobile */
+    .table-wrap { overflow-x: auto; width: 100%; }
+
+    /* Immutable field hint */
+    .input--immutable {
+      background: var(--color-surface-sunken);
+      color: var(--color-text-muted);
+    }
+
+    /* Edit-mode note strip */
+    .edit-note {
+      background: var(--color-accent-tint);
+      border: 1px solid var(--color-accent-deep);
+      border-radius: var(--r-md);
+      padding: var(--sp-3) var(--sp-4);
+      font-size: var(--fs-body-sm);
+      color: var(--color-accent-deep);
+      margin-bottom: var(--sp-4);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar only-mobile">
+  <button class="btn btn--ghost btn--sm" data-drawer style="padding:8px;color:var(--color-text-muted)">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h14M3 10h14M3 15h14"/>
+    </svg>
+  </button>
+  <a class="brand" href="#">
+    <span class="brand__mark"></span>
+    <span class="brand__word">Dermestha</span>
+  </a>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div style="margin-bottom:var(--sp-5)">
+      <a class="brand" href="#" style="text-decoration:none;display:inline-flex;margin-bottom:var(--sp-1)">
+        <span class="brand__mark"></span>
+        <span class="brand__word" style="margin-left:var(--sp-2)">Dermestha</span>
+      </a>
+      <p class="sidebar-caption">Admin panel</p>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:var(--sp-1)">
+      <a href="admin-01-doctors.html" class="sidebar__link active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><circle cx="6" cy="5" r="3"/><path d="M1 14c0-3 2-5 5-5h0c1 0 1.8.3 2.5.8"/><path d="M11 10v5M8.5 12.5h5"/></svg>
+        &nbsp;&nbsp;Doctors
+      </a>
+      <a href="admin-02-medicines.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><rect x="5" y="1" width="6" height="3" rx="1"/><path d="M3 4h10l1 10H2L3 4z"/><path d="M6 8h4"/></svg>
+        &nbsp;&nbsp;Medicines
+      </a>
+      <a href="admin-03-alerts.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><path d="M8 2a5 5 0 015 5v3l1 2H2l1-2V7a5 5 0 015-5z"/><path d="M6.5 13a1.5 1.5 0 003 0"/></svg>
+        &nbsp;&nbsp;Alerts
+      </a>
+      <a href="admin-04-records-audit.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+        &nbsp;&nbsp;Records &amp; Audit
+      </a>
+      <a href="admin-05-settings.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><circle cx="8" cy="8" r="2"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1M4 4l.7.7M11.3 11.3l.7.7M4 12l.7-.7M11.3 4.7l.7-.7"/></svg>
+        &nbsp;&nbsp;Settings
+      </a>
+    </nav>
+
+    <!-- Admin identity -->
+    <div class="sidebar-identity">
+      <span class="avatar avatar--md" style="flex:0 0 auto">AD</span>
+      <div class="sidebar-identity__info">
+        <p class="sidebar-identity__name">Admin</p>
+        <a href="#" class="sidebar-identity__logout">Log out</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+    <div style="width:100%">
+
+      <!-- Content header -->
+      <div class="content-header">
+        <h1 class="h1">Doctors</h1>
+        <button class="btn btn--primary">Add doctor</button>
+      </div>
+
+      <!-- Doctors table -->
+      <div class="table-wrap" style="margin-bottom:var(--sp-6)">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>PMC #</th>
+              <th>Specialization</th>
+              <th class="num">Fee (PKR)</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong class="strong">Dr. Ayesha Khan</strong></td>
+              <td class="tnum">PMC-DRM-00412</td>
+              <td>Dermatology &amp; Laser Therapy</td>
+              <td class="num tnum">2,500</td>
+              <td><span class="badge badge--success">Active</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action tbl-action--danger" data-open="#modal-deactivate">Deactivate</a>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Dr. Bilal Siddiqui</strong></td>
+              <td class="tnum">PMC-DRM-00839</td>
+              <td>Cosmetic Dermatology</td>
+              <td class="num tnum">3,000</td>
+              <td><span class="badge badge--success">Active</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action tbl-action--danger" data-open="#modal-deactivate">Deactivate</a>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Dr. Nadia Malik</strong></td>
+              <td class="tnum">PMC-DRM-01201</td>
+              <td>Paediatric Dermatology</td>
+              <td class="num tnum">2,000</td>
+              <td><span class="badge badge--warning">Pending</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <span style="color:var(--color-text-muted);font-size:var(--fs-body-sm)">—</span>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Dr. Kamran Rashid</strong></td>
+              <td class="tnum">PMC-DRM-00577</td>
+              <td>Acne &amp; Pigmentation</td>
+              <td class="num tnum">2,200</td>
+              <td><span class="badge badge--success">Active</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action tbl-action--danger" data-open="#modal-deactivate">Deactivate</a>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Dr. Sara Qureshi</strong></td>
+              <td class="tnum">PMC-DRM-01445</td>
+              <td>Hair &amp; Scalp Disorders</td>
+              <td class="num tnum">1,800</td>
+              <td><span class="badge badge--warning">Pending</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <span style="color:var(--color-text-muted);font-size:var(--fs-body-sm)">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Add / Edit doctor form -->
+      <div class="section-card">
+        <div class="section-card__title">
+          <h2 class="h2">Add / edit doctor</h2>
+          <p class="help" style="margin-top:var(--sp-2)">Fields marked with an asterisk are required. When editing, PMC number and email are immutable.</p>
+        </div>
+
+        <!-- Edit-mode notice (visible in edit mode) -->
+        <div class="edit-note">
+          <strong>Edit mode:</strong> PMC number and email cannot be changed after creation. Changing the consultation fee never affects existing appointments.
+        </div>
+
+        <form>
+          <div class="form-grid">
+            <!-- Full name -->
+            <div class="field">
+              <label for="doc-name">Full name *</label>
+              <input id="doc-name" class="input" type="text" placeholder="Dr. Ayesha Khan" value="Dr. Ayesha Khan">
+            </div>
+            <!-- PMC number -->
+            <div class="field">
+              <label for="doc-pmc">PMC number *</label>
+              <input id="doc-pmc" class="input input--immutable" type="text" placeholder="PMC-DRM-00000" value="PMC-DRM-00412" disabled>
+              <p class="help">Cannot be changed after creation.</p>
+            </div>
+            <!-- Email -->
+            <div class="field">
+              <label for="doc-email">Email address *</label>
+              <input id="doc-email" class="input input--immutable" type="email" placeholder="doctor@example.com" value="ayesha.khan@dermestha.pk" disabled>
+              <p class="help">Cannot be changed after creation.</p>
+            </div>
+            <!-- Phone -->
+            <div class="field">
+              <label for="doc-phone">Phone number</label>
+              <input id="doc-phone" class="input" type="tel" placeholder="+92 300 0000000" value="+92 301 4512383">
+            </div>
+            <!-- Specialization -->
+            <div class="field">
+              <label for="doc-spec">Specialization *</label>
+              <input id="doc-spec" class="input" type="text" placeholder="e.g. Cosmetic Dermatology" value="Dermatology &amp; Laser Therapy">
+            </div>
+            <!-- Consultation fee -->
+            <div class="field">
+              <label for="doc-fee">Consultation fee (PKR) *</label>
+              <input id="doc-fee" class="input" type="number" placeholder="2000" value="2500">
+              <p class="help">Changing the fee never affects existing appointments.</p>
+            </div>
+            <!-- Profile photo -->
+            <div class="field field--full">
+              <label for="doc-photo">Profile photo</label>
+              <input id="doc-photo" class="input" type="file" accept="image/jpeg,image/png,image/webp" style="padding:8px 12px;">
+              <p class="help">JPEG / PNG / WebP · max 2 MB.</p>
+            </div>
+            <!-- Bio -->
+            <div class="field field--full">
+              <label for="doc-bio">Bio</label>
+              <textarea id="doc-bio" class="input" rows="3" placeholder="Short biography visible on doctor profile page…">FCPS-certified dermatologist with 8 years of clinical experience. Specialises in laser-assisted acne treatment and post-inflammatory hyperpigmentation correction.</textarea>
+            </div>
+            <!-- Weekly availability template -->
+            <div class="field field--full">
+              <label for="doc-avail">Weekly availability template <span class="muted" style="font-weight:400;font-size:var(--fs-caption)">(optional)</span></label>
+              <input id="doc-avail" class="input" type="text" placeholder="e.g. Mon–Fri 10:00 AM – 5:00 PM, Sat 10:00 AM – 2:00 PM">
+              <p class="help">Guides the doctor's initial slot setup; the doctor manages detailed availability in their panel.</p>
+            </div>
+            <!-- Initial password -->
+            <div class="field">
+              <label for="doc-pass">Initial password *</label>
+              <input id="doc-pass" class="input" type="password" placeholder="Temporary password" value="D3rm3stha#2026">
+              <p class="help">Shared with the doctor out-of-band; they'll be forced to change it on first login.</p>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:var(--sp-3);margin-top:var(--sp-5);flex-wrap:wrap">
+            <button type="submit" class="btn btn--primary">Save doctor</button>
+            <button type="button" class="btn btn--ghost">Cancel</button>
+          </div>
+        </form>
+      </div><!-- /section-card -->
+
+    </div><!-- /width:100% -->
+  </main>
+
+</div><!-- /layout -->
+
+<!-- Deactivate confirmation modal -->
+<div id="modal-deactivate" class="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-deactivate-title">
+    <div class="modal__accent modal__accent--danger"></div>
+    <div class="modal__body">
+      <h3 class="h3" id="modal-deactivate-title" style="margin-bottom:var(--sp-3)">Deactivate Dr. Ayesha Khan?</h3>
+      <div class="alert alert--warning" style="margin-bottom:var(--sp-4)">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="flex:0 0 auto;margin-top:1px"><path d="M9 2L1 16h16L9 2z"/><path d="M9 7v4M9 13h.01"/></svg>
+        <span><strong>3 upcoming confirmed appointments</strong> will remain on the calendar and be honored — deactivation cancels nothing and issues no refunds.</span>
+      </div>
+      <p style="font-size:var(--fs-body-sm);color:var(--color-text-body);margin:0 0 var(--sp-2)">
+        Deactivating this doctor will:
+      </p>
+      <ul style="font-size:var(--fs-body-sm);color:var(--color-text-body);margin:0 0 var(--sp-4);padding-left:var(--sp-4)">
+        <li style="margin-bottom:var(--sp-1)">Remove Dr. Ayesha Khan from the public doctor listing immediately.</li>
+        <li style="margin-bottom:var(--sp-1)">Block new bookings — no patient can book new slots.</li>
+        <li>Leave all confirmed upcoming appointments unaffected; they proceed as scheduled.</li>
+      </ul>
+      <p style="font-size:var(--fs-body-sm);color:var(--color-text-muted);margin:0 var(--sp-4) 0 0">
+        Reactivation restores the listing and re-enables bookings.
+      </p>
+      <div class="modal__actions">
+        <button class="btn btn--ghost btn--sm" data-close>Keep active</button>
+        <button class="btn btn--danger btn--sm">Deactivate</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

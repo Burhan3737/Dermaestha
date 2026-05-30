@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Cancel appointment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    .page-body { padding: var(--sp-8) var(--sp-4) var(--sp-16); }
+
+    /* Appointment card row */
+    .appt-row { display: flex; align-items: flex-start; gap: var(--sp-4); padding: var(--sp-5); }
+    .appt-row img { width: 48px; height: 48px; border-radius: var(--r-pill); object-fit: cover; flex: 0 0 auto; }
+
+    /* Modal backdrop block — centered display for review */
+    .modal-block { background: rgba(15,33,24,.18); border-radius: var(--r-md); min-height: 320px; display: flex; align-items: center; justify-content: center; padding: var(--sp-8) var(--sp-4); margin-bottom: var(--sp-6); }
+    .modal-block .modal { max-width: 380px; }
+
+    /* Variant label */
+    .variant-note { display: inline-block; font-family: var(--font-head); font-size: var(--fs-label); font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--color-text-muted); background: var(--color-bg); border: var(--border-1); border-radius: var(--r-sm); padding: 3px 8px; margin-bottom: var(--sp-3); }
+  </style>
+</head>
+<body>
+
+<!-- Top nav (desktop) -->
+<nav class="topnav only-desktop">
+  <div class="topnav__inner">
+    <a class="brand" href="patient-01-landing.html">
+      <span class="brand__mark"></span>
+      <span class="brand__word">Dermestha</span>
+    </a>
+    <div class="topnav__links">
+      <a href="patient-02-browse.html">Browse</a>
+      <a href="patient-08-dashboard-upcoming.html" class="active">My Appointments</a>
+      <span class="avatar avatar--sm">SK</span>
+    </div>
+  </div>
+</nav>
+<div class="tabbar only-mobile">
+  <a href="patient-02-browse.html" class="tabbar__item">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><path d="M15 15l3 3"/></svg>
+    Browse
+  </a>
+  <a href="patient-08-dashboard-upcoming.html" class="tabbar__item active">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M7 2v4M13 2v4M3 9h14"/></svg>
+    Appts
+  </a>
+  <a href="#" class="tabbar__item">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="10" cy="7" r="3"/><path d="M4 18c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+    Profile
+  </a>
+</div>
+
+<div class="page-body">
+  <div class="container" style="max-width:680px">
+
+    <h1 class="h1" style="margin-bottom:var(--sp-6)">Cancel appointment</h1>
+
+    <!-- Confirmed appointment card -->
+    <div class="card" style="margin-bottom:var(--sp-8)">
+      <div class="appt-row">
+        <img src="https://randomuser.me/api/portraits/women/65.jpg" alt="Dr. Ayesha Khan">
+        <div style="flex:1">
+          <div class="between" style="align-items:flex-start;gap:var(--sp-2)">
+            <div>
+              <p style="font-weight:700;margin:0;font-size:var(--fs-body)">Dr. Ayesha Khan</p>
+              <p style="font-size:var(--fs-body-sm);color:var(--color-text-muted);margin-top:2px">Acne &amp; Pigmentation · for: Sana (daughter)</p>
+            </div>
+            <span class="badge badge--success">Confirmed</span>
+          </div>
+          <p class="body-sm muted" style="margin-top:var(--sp-2)"><span class="tnum">Thu 29 May · 6:30 PM</span></p>
+          <p class="body-sm muted"><span class="tnum">PKR 2,000</span></p>
+          <div style="margin-top:var(--sp-3)">
+            <button class="btn btn--danger btn--sm" data-open="#cancelModal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL VARIANT A: ≥2 hours — Refund applies ── -->
+    <span class="variant-note">Modal variant A — &#x2265;2 hours before &middot; Refund applies</span>
+
+    <div class="modal-block" id="cancelModal">
+      <div class="modal" style="box-shadow:var(--shadow-overlay)">
+        <div class="modal__accent modal__accent--danger"></div>
+        <div class="modal__body">
+          <p class="h3" style="margin-bottom:var(--sp-2)">Cancel this appointment?</p>
+          <p class="body-sm muted" style="margin-bottom:var(--sp-4)">
+            You're cancelling <strong>more than 2 hours</strong> before your slot. A refund will be processed automatically.
+          </p>
+
+          <!-- Refund breakdown -->
+          <div class="card" style="padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-2)">
+            <div class="between" style="padding:var(--sp-2) 0;border-bottom:var(--border-1)">
+              <span class="body-sm">Paid</span>
+              <span class="body-sm tnum strong">PKR 2,000</span>
+            </div>
+            <div class="between" style="padding:var(--sp-2) 0;border-bottom:var(--border-1)">
+              <span class="body-sm" style="color:var(--color-danger)">Gateway fee</span>
+              <span class="body-sm tnum" style="color:var(--color-danger)">&#x2212; PKR 45</span>
+            </div>
+            <div class="between" style="padding:var(--sp-2) 0">
+              <span class="body-sm strong">Your refund</span>
+              <span class="body-sm tnum strong" style="color:var(--color-success)">PKR 1,955</span>
+            </div>
+          </div>
+          <p class="caption" style="margin-bottom:0;color:var(--color-text-muted)">Refund excludes the payment-gateway fee charged at booking. Expected within 3–5 working days.</p>
+
+          <div class="modal__actions">
+            <button class="btn btn--ghost btn--sm" data-close>Keep it</button>
+            <button class="btn btn--danger btn--sm">Cancel &amp; refund</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL VARIANT B: <2 hours — No refund ── -->
+    <span class="variant-note">Variant — less than 2 hours before</span>
+
+    <div class="modal-block">
+      <div class="modal" style="box-shadow:var(--shadow-overlay)">
+        <div class="modal__accent modal__accent--danger"></div>
+        <div class="modal__body">
+          <p class="h3" style="margin-bottom:var(--sp-2)">Cancel this appointment?</p>
+
+          <div class="alert alert--warning" style="margin-bottom:var(--sp-4)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7"/></svg>
+            <span><strong>No refund is available for late cancellations.</strong> You are cancelling less than 2 hours before your slot.</span>
+          </div>
+
+          <p class="body-sm muted" style="margin-bottom:var(--sp-1)">The slot stays blocked on the doctor's calendar and the consultation fee of <span class="tnum">PKR 2,000</span> will not be refunded.</p>
+          <p class="body-sm muted" style="margin-bottom:var(--sp-4)">The doctor may still be able to help if you join on time.</p>
+
+          <div class="modal__actions">
+            <button class="btn btn--ghost btn--sm" data-close>Keep it</button>
+            <button class="btn btn--danger btn--sm">Cancel anyway</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+</div>
+
+</body>
+</html>

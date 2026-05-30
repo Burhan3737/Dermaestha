@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Write prescription</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    /* ── Mobile drawer ── */
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform var(--ease);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-overlay);
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        padding: 12px var(--sp-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-1);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .content { padding-top: var(--sp-3); }
+    }
+    @media (min-width: 861px) {
+      .mobile-topbar { display: none; }
+    }
+
+    /* ── Constrained form column ── */
+    .rx-builder { width: 100%; }
+
+    .content-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--sp-5); gap: var(--sp-4); flex-wrap: wrap;
+    }
+
+    /* ── Patient ID band ── */
+    .rx-patient-band {
+      background: var(--color-primary-tint);
+      border: 1px solid var(--color-primary-border);
+      border-radius: var(--r-md);
+      padding: var(--sp-3) var(--sp-4);
+      margin-bottom: var(--sp-4);
+    }
+    .rx-patient-label {
+      font-family: var(--font-head); font-weight: 700; font-size: var(--fs-label);
+      letter-spacing: .8px; text-transform: uppercase; color: var(--color-primary); margin-bottom: 3px;
+    }
+    .rx-patient-line {
+      font-size: var(--fs-body); color: var(--color-text-strong); font-weight: 600; margin: 0;
+    }
+
+    /* ── Medicine row in builder ── */
+    .rx-builder-item {
+      display: flex; align-items: flex-start; gap: var(--sp-4);
+      padding: var(--sp-3) 0; border-bottom: var(--border-1);
+    }
+    .rx-builder-item__left { flex: 1; min-width: 0; }
+    .rx-builder-item__name {
+      font-weight: 700; color: var(--color-text-strong); margin: 0 0 var(--sp-2);
+      font-size: var(--fs-body); display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+    }
+    .rx-builder-item__fields {
+      display: grid; grid-template-columns: 1fr 1fr 2fr; gap: var(--sp-2);
+    }
+    .rx-builder-item__price {
+      font-variant-numeric: tabular-nums; font-weight: 700;
+      color: var(--color-text-strong); white-space: nowrap; padding-top: 2px;
+    }
+
+    .mini-field > label {
+      font-family: var(--font-head); font-weight: 700; font-size: 10px;
+      letter-spacing: .5px; text-transform: uppercase; color: var(--color-text-muted);
+      display: block; margin-bottom: 3px;
+    }
+    .mini-field .input { padding: 7px 10px; font-size: var(--fs-body-sm); }
+
+    /* ── Read-only previous Rx ── */
+    .rx-prev {
+      background: var(--color-surface);
+      border: var(--border-1);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      margin-top: var(--sp-5);
+    }
+    .rx-prev__accent { height: 3px; background: var(--color-accent); }
+    .rx-prev__body { padding: var(--sp-5) var(--sp-5) var(--sp-4); }
+    .rx-prev-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: var(--sp-3); gap: var(--sp-3); flex-wrap: wrap;
+    }
+
+    /* ── Sidebar shared ── */
+    .sidebar-identity {
+      display: flex; align-items: center; gap: var(--sp-2);
+      padding-top: var(--sp-4); border-top: var(--border-1); margin-top: auto;
+    }
+    .sidebar-identity__name { font-weight: 700; font-size: var(--fs-body-sm); color: var(--color-text-strong); }
+    .sidebar-identity__logout { font-size: var(--fs-caption); color: var(--color-text-muted); text-decoration: none; }
+    .sidebar-identity__logout:hover { color: var(--color-danger); }
+    .sidebar-caption { font-family: var(--font-head); font-size: var(--fs-label); font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--color-text-muted); margin: 4px 0 var(--sp-1); }
+
+    @media (max-width: 640px) {
+      .rx-builder-item__fields { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar only-mobile">
+  <button class="btn btn--ghost btn--sm" data-drawer style="padding:8px;color:var(--color-text-muted)">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h14M3 10h14M3 15h14"/>
+    </svg>
+  </button>
+  <a class="brand" href="#">
+    <span class="brand__mark"></span>
+    <span class="brand__word">Dermestha</span>
+  </a>
+</div>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div style="margin-bottom:var(--sp-5)">
+      <a class="brand" href="#" style="text-decoration:none;display:inline-flex;margin-bottom:var(--sp-1)">
+        <span class="brand__mark"></span>
+        <span class="brand__word" style="margin-left:var(--sp-2)">Dermestha</span>
+      </a>
+      <p class="sidebar-caption">Doctor panel</p>
+    </div>
+
+    <nav style="display:flex;flex-direction:column;gap:var(--sp-1)">
+      <a href="doctor-02-today.html" class="sidebar__link active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 1v3M11 1v3M2 6h12"/></svg>
+        &nbsp;&nbsp;Today's appointments
+      </a>
+      <a href="doctor-03-availability.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.5"/></svg>
+        &nbsp;&nbsp;Availability
+      </a>
+      <a href="doctor-02-today.html#history" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><path d="M2 8a6 6 0 1012 0A6 6 0 002 8"/><path d="M2 4V8h4"/></svg>
+        &nbsp;&nbsp;History
+      </a>
+    </nav>
+
+    <div class="sidebar-identity">
+      <span class="avatar avatar--md" style="flex:0 0 auto">AK</span>
+      <div>
+        <p class="sidebar-identity__name">Dr. Ayesha Khan</p>
+        <a href="doctor-01-password.html" class="sidebar-identity__logout">Log out</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main content ── -->
+  <main class="content">
+    <div class="rx-builder">
+
+      <!-- Content header -->
+      <div class="content-header">
+        <div>
+          <a href="doctor-02-today.html" style="display:inline-flex;align-items:center;gap:6px;color:var(--color-text-muted);font-size:var(--fs-body-sm);text-decoration:none;margin-bottom:var(--sp-2)">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M9 11L5 7l4-4"/></svg>
+            Back to Today's appointments
+          </a>
+          <h1 class="h1">Write prescription</h1>
+        </div>
+      </div>
+
+      <!-- Patient ID band (read-only) -->
+      <div class="rx-patient-band">
+        <p class="rx-patient-label">Prescription for</p>
+        <p class="rx-patient-line">Sana Khan &middot; Age 9 &middot; Daughter &middot; <span style="font-weight:400;color:var(--color-text-muted)">(booked by Ayesha Hassan)</span></p>
+        <p class="help" style="margin-top:var(--sp-2)">Confirm the patient before submitting. (Auto-filled — you don't type this.)</p>
+      </div>
+
+      <!-- Add medicine card -->
+      <div class="section-card">
+        <div class="section-card__title">
+          <h2 class="h3">Add medicine</h2>
+        </div>
+
+        <!-- Search input -->
+        <div style="margin-bottom:var(--sp-2)">
+          <input type="text" class="input" placeholder="Search the medicine catalogue…" style="width:100%" value="">
+          <p class="help" style="margin-top:var(--sp-1)">Not in the catalogue? Add as free text — it won't be priced and will be flagged for the patient.</p>
+        </div>
+
+        <!-- Medicines list -->
+        <div style="margin-top:var(--sp-4)">
+
+          <!-- Item 1 — catalogue, priced -->
+          <div class="rx-builder-item">
+            <div class="rx-builder-item__left">
+              <p class="rx-builder-item__name">Tretinoin 0.025% Cream</p>
+              <div class="rx-builder-item__fields">
+                <div class="mini-field">
+                  <label>Dosage</label>
+                  <input type="text" class="input" value="Pea-sized amount">
+                </div>
+                <div class="mini-field">
+                  <label>Duration</label>
+                  <input type="text" class="input" value="3 months">
+                </div>
+                <div class="mini-field">
+                  <label>Instructions</label>
+                  <input type="text" class="input" value="Apply at night only · Avoid eye area">
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-2);flex:0 0 auto">
+              <span class="rx-builder-item__price tnum">PKR 850</span>
+              <button class="btn btn--ghost btn--sm" style="color:var(--color-danger);padding:4px 8px" title="Remove">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Item 2 — catalogue, priced -->
+          <div class="rx-builder-item">
+            <div class="rx-builder-item__left">
+              <p class="rx-builder-item__name">Clindamycin 1% Gel</p>
+              <div class="rx-builder-item__fields">
+                <div class="mini-field">
+                  <label>Dosage</label>
+                  <input type="text" class="input" value="Thin layer">
+                </div>
+                <div class="mini-field">
+                  <label>Duration</label>
+                  <input type="text" class="input" value="6 weeks">
+                </div>
+                <div class="mini-field">
+                  <label>Instructions</label>
+                  <input type="text" class="input" value="Apply twice daily · Wash hands after">
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-2);flex:0 0 auto">
+              <span class="rx-builder-item__price tnum">PKR 650</span>
+              <button class="btn btn--ghost btn--sm" style="color:var(--color-danger);padding:4px 8px" title="Remove">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Item 3 — catalogue, priced -->
+          <div class="rx-builder-item">
+            <div class="rx-builder-item__left">
+              <p class="rx-builder-item__name">Benzoyl Peroxide 2.5% Wash</p>
+              <div class="rx-builder-item__fields">
+                <div class="mini-field">
+                  <label>Dosage</label>
+                  <input type="text" class="input" value="60 ml bottle">
+                </div>
+                <div class="mini-field">
+                  <label>Duration</label>
+                  <input type="text" class="input" value="Ongoing">
+                </div>
+                <div class="mini-field">
+                  <label>Instructions</label>
+                  <input type="text" class="input" value="Once daily · Leave 1 min before rinse">
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-2);flex:0 0 auto">
+              <span class="rx-builder-item__price tnum">PKR 420</span>
+              <button class="btn btn--ghost btn--sm" style="color:var(--color-danger);padding:4px 8px" title="Remove">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Item 4 — free-text, not priced -->
+          <div class="rx-builder-item">
+            <div class="rx-builder-item__left">
+              <p class="rx-builder-item__name">
+                Niacinamide 10% Serum
+                <span class="tag-unpriced">Not priced</span>
+              </p>
+              <div class="rx-builder-item__fields">
+                <div class="mini-field">
+                  <label>Dosage</label>
+                  <input type="text" class="input" value="Few drops">
+                </div>
+                <div class="mini-field">
+                  <label>Duration</label>
+                  <input type="text" class="input" value="Ongoing">
+                </div>
+                <div class="mini-field">
+                  <label>Instructions</label>
+                  <input type="text" class="input" value="Apply in morning after cleanser · OTC">
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-2);flex:0 0 auto">
+              <span class="rx-builder-item__price tnum" style="color:var(--color-text-muted)">—</span>
+              <button class="btn btn--ghost btn--sm" style="color:var(--color-danger);padding:4px 8px" title="Remove">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Running total -->
+          <div class="rx-total tnum" style="margin-top:var(--sp-3)">
+            <span>Total (priced items)</span>
+            <span class="tnum">PKR 1,920</span>
+          </div>
+          <p class="caption" style="margin-top:var(--sp-2);color:var(--color-text-muted)">1 item not priced — excluded from total.</p>
+
+        </div><!-- /medicines list -->
+
+        <button class="btn btn--secondary btn--sm" style="margin-top:var(--sp-4)">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M7 2v10M2 7h10"/></svg>
+          Add medicine
+        </button>
+      </div><!-- /add medicine card -->
+
+      <!-- General notes -->
+      <div class="section-card">
+        <div class="section-card__title">
+          <h2 class="h3">General notes</h2>
+        </div>
+        <textarea class="input" rows="4" style="width:100%;resize:vertical" placeholder="Clinical notes for the patient (e.g., sun sensitivity, dietary advice, warning signs)…">Use SPF 30+ sunscreen daily — retinoids increase sun sensitivity. Avoid exfoliants (AHAs/BHAs) while on Tretinoin. If irritation occurs, reduce to alternate nights.</textarea>
+      </div>
+
+      <!-- Follow-up date -->
+      <div class="section-card">
+        <div class="section-card__title">
+          <h2 class="h3">Follow-up</h2>
+        </div>
+        <div class="field" style="max-width:none">
+          <label for="followup-date">Follow-up date <span class="caption muted">(optional)</span></label>
+          <input type="date" id="followup-date" class="input" value="2026-07-23" style="max-width:280px">
+          <p class="help">If set, the patient will see this in their prescription view.</p>
+        </div>
+      </div>
+
+      <!-- Submit area -->
+      <div style="padding:var(--sp-5) 0 var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3);align-items:flex-start">
+        <button class="btn btn--primary" onclick="this.textContent='Submitting…';this.disabled=true" style="min-width:200px">
+          Submit prescription
+        </button>
+        <p class="help">
+          Once submitted, a prescription can't be edited. To correct it, issue a new prescription — both will appear in the patient's history.
+        </p>
+      </div>
+
+      <!-- Divider — previously submitted -->
+      <hr style="border:0;border-top:var(--border-1);margin:var(--sp-6) 0 var(--sp-5)">
+
+      <p class="label" style="margin-bottom:var(--sp-4)">Previously submitted</p>
+
+      <!-- Previous Rx (read-only summary) -->
+      <div class="rx-prev">
+        <div class="rx-prev__accent"></div>
+        <div class="rx-prev__body">
+          <div class="rx-prev-header">
+            <div>
+              <p class="h3" style="margin-bottom:2px">Prescription for Sana Khan</p>
+              <p class="caption muted">Issued <span class="tnum">Sun 22 Mar 2026 · 6:52 PM</span> &middot; Dr. Ayesha Khan</p>
+            </div>
+            <span class="badge badge--success">Submitted</span>
+          </div>
+
+          <!-- Read-only items -->
+          <div class="rx-item">
+            <div>
+              <p class="rx-item__name">Adapalene 0.1% Gel</p>
+              <p class="rx-item__detail">Apply at night &middot; 15g &middot; 8 weeks &middot; Starter course</p>
+            </div>
+            <span class="rx-item__price tnum">PKR 620</span>
+          </div>
+          <div class="rx-item">
+            <div>
+              <p class="rx-item__name">Azithromycin 500mg Tablet <span class="tag-unpriced">Not priced</span></p>
+              <p class="rx-item__detail">Once daily &middot; 5 days &middot; With food</p>
+            </div>
+            <span class="rx-item__price tnum">—</span>
+          </div>
+          <div class="rx-item">
+            <div>
+              <p class="rx-item__name">Zinc Pyrithione 1% Wash</p>
+              <p class="rx-item__detail">Once daily &middot; 100ml &middot; Leave 2 min then rinse</p>
+            </div>
+            <span class="rx-item__price tnum">PKR 380</span>
+          </div>
+          <div class="rx-total tnum" style="margin-top:var(--sp-3)">
+            <span>Total</span>
+            <span>PKR 1,000</span>
+          </div>
+          <p class="caption" style="margin-top:var(--sp-2);color:var(--color-text-muted)">1 item not priced — excluded from total.</p>
+
+          <div style="margin-top:var(--sp-4);display:flex;gap:var(--sp-2)">
+            <button class="btn btn--secondary btn--sm">View full prescription</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /rx-builder -->
+  </main>
+
+</div><!-- /layout -->
+
+</body>
+</html>

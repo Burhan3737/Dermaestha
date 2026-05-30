@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Book consultation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    .page-body { padding: 24px 0 80px; }
+    .booking-grid { display: grid; grid-template-columns: 1fr 320px; gap: 28px; align-items: start; }
+    .day-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .day-tab { font-family: var(--font-head); font-weight: 700; font-size: var(--fs-body-sm); padding: 8px 16px; border-radius: var(--r-sm); border: var(--border-strong); background: var(--color-surface); color: var(--color-text-muted); cursor: pointer; }
+    .day-tab.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+    .slot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px; }
+    .who-for-section { margin-top: 24px; }
+    .extra-patient { background: var(--color-bg); border: var(--border-1); border-radius: var(--r-md); padding: 16px; margin-top: 12px; }
+    .fee-summary { background: var(--color-surface); border: var(--border-1); border-radius: var(--r-md); padding: 20px; position: sticky; top: 24px; }
+    .fee-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: var(--border-1); }
+    .fee-row:last-child { border-bottom: 0; font-weight: 700; }
+    .fee-total { display: flex; justify-content: space-between; padding: 12px 0 0; font-family: var(--font-head); font-weight: 800; color: var(--color-primary); font-size: 18px; }
+    .field { max-width: 100%; margin-bottom: 14px; }
+    @media (max-width: 767px) {
+      .booking-grid { grid-template-columns: 1fr; }
+      .fee-summary { position: static; }
+      .slot-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 479px) { .slot-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+
+<!-- Top nav -->
+<nav class="topnav only-desktop">
+  <div class="topnav__inner">
+    <a class="brand" href="patient-01-landing.html">
+      <span class="brand__mark"></span>
+      <span class="brand__word">Dermestha</span>
+    </a>
+    <div class="topnav__links">
+      <a href="patient-02-browse.html">Browse</a>
+      <a href="patient-08-dashboard-upcoming.html">My Appointments</a>
+    </div>
+  </div>
+</nav>
+<div class="tabbar only-mobile">
+  <a href="patient-02-browse.html" class="tabbar__item active">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><path d="M15 15l3 3"/></svg>
+    Browse
+  </a>
+  <a href="patient-08-dashboard-upcoming.html" class="tabbar__item">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M7 2v4M13 2v4M3 9h14"/></svg>
+    Appts
+  </a>
+  <a href="#" class="tabbar__item">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="10" cy="7" r="3"/><path d="M4 18c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+    Profile
+  </a>
+</div>
+
+<div class="page-body">
+  <div class="container">
+
+    <h1 class="h1" style="margin-bottom:4px">Book consultation</h1>
+    <p class="muted" style="margin-bottom:24px">Dr. Ayesha Khan · Acne &amp; Pigmentation</p>
+
+    <!-- Stepper -->
+    <div class="stepper" style="margin-bottom:28px">
+      <div class="stepper__step active">
+        <span class="stepper__num">1</span>
+        Select slot
+      </div>
+      <div style="width:24px;height:1px;background:var(--color-border)"></div>
+      <div class="stepper__step">
+        <span class="stepper__num">2</span>
+        Who for
+      </div>
+      <div style="width:24px;height:1px;background:var(--color-border)"></div>
+      <div class="stepper__step">
+        <span class="stepper__num">3</span>
+        Pay
+      </div>
+    </div>
+
+    <!-- Error: slot taken -->
+    <div class="alert alert--danger" style="margin-bottom:20px">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7"/></svg>
+      <span>That slot was just taken by another patient — please pick another.</span>
+    </div>
+
+    <div class="booking-grid">
+      <!-- Left: slot selection + who-for -->
+      <div>
+
+        <!-- Day tabs + slot grids -->
+        <div class="section-card">
+          <h2 class="h3" style="margin-bottom:16px">Step 1 — Select a slot</h2>
+
+          <div data-tabs>
+            <div class="day-tabs">
+              <button class="day-tab active" data-tab="#slots-thu">Thu 29 May</button>
+              <button class="day-tab" data-tab="#slots-fri">Fri 30 May</button>
+              <button class="day-tab" data-tab="#slots-sat">Sat 31 May</button>
+            </div>
+
+            <!-- Thursday -->
+            <div class="tab-panel" id="slots-thu">
+              <p class="caption" style="margin-bottom:10px">Select a 30-minute slot</p>
+              <div class="slot-grid">
+                <button class="slot tnum">10:00 AM</button>
+                <button class="slot tnum">10:30 AM</button>
+                <button class="slot slot--disabled tnum">11:00 AM</button>
+                <button class="slot slot--locked tnum">11:30 AM</button>
+                <button class="slot slot--selected tnum">6:30 PM</button>
+                <button class="slot tnum">7:00 PM</button>
+                <button class="slot slot--disabled tnum">7:30 PM</button>
+                <button class="slot tnum">8:00 PM</button>
+              </div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px">
+                <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-muted)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--color-surface);box-shadow:inset 0 0 0 1px var(--color-primary-border)"></span>Available</span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-muted)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--color-primary)"></span>Selected</span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-muted)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--color-surface-sunken)"></span>Booked</span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-muted)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--color-surface-sunken);border:1px dashed var(--color-border)"></span>Held by another</span>
+              </div>
+            </div>
+
+            <!-- Friday -->
+            <div class="tab-panel" id="slots-fri" hidden>
+              <p class="caption" style="margin-bottom:10px">Select a 30-minute slot</p>
+              <div class="slot-grid">
+                <button class="slot tnum">9:00 AM</button>
+                <button class="slot tnum">9:30 AM</button>
+                <button class="slot tnum">10:00 AM</button>
+                <button class="slot slot--disabled tnum">10:30 AM</button>
+                <button class="slot tnum">11:00 AM</button>
+                <button class="slot tnum">2:30 PM</button>
+                <button class="slot tnum">3:00 PM</button>
+                <button class="slot tnum">3:30 PM</button>
+              </div>
+            </div>
+
+            <!-- Saturday -->
+            <div class="tab-panel" id="slots-sat" hidden>
+              <p class="caption" style="margin-bottom:10px">Select a 30-minute slot</p>
+              <div class="slot-grid">
+                <button class="slot tnum">11:00 AM</button>
+                <button class="slot tnum">11:30 AM</button>
+                <button class="slot slot--disabled tnum">12:00 PM</button>
+                <button class="slot tnum">12:30 PM</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Who for -->
+        <div class="section-card who-for-section">
+          <h2 class="h3" style="margin-bottom:16px">Step 2 — Who is this consultation for?</h2>
+          <div class="col" style="gap:10px;margin-bottom:12px">
+            <label class="choice">
+              <input type="radio" name="who-for" value="myself" checked>
+              Myself
+            </label>
+            <label class="choice">
+              <input type="radio" name="who-for" value="someone-else" id="whoSomeoneElse">
+              Someone else
+            </label>
+          </div>
+
+          <!-- Patient details for "Someone else" — shown here as visible for mockup review -->
+          <div class="extra-patient">
+            <p class="body-sm strong" style="margin-bottom:14px">Someone else's details</p>
+            <div class="field">
+              <label>Patient full name</label>
+              <input type="text" class="input" placeholder="e.g. Sana Khan" value="Sana Khan">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="field" style="margin-bottom:0">
+                <label>Age</label>
+                <input type="number" class="input" placeholder="e.g. 9" value="9" min="0" max="120">
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label>Relation</label>
+                <select class="input" style="cursor:pointer">
+                  <option>Daughter</option>
+                  <option>Son</option>
+                  <option>Mother</option>
+                  <option>Father</option>
+                  <option>Spouse</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+            <p class="help" style="margin-top:8px">The doctor will see this information during the consultation.</p>
+          </div>
+        </div>
+
+      </div><!-- /left -->
+
+      <!-- Right: fee summary -->
+      <div class="fee-summary">
+        <p class="h3" style="margin-bottom:16px">Fee summary</p>
+        <div class="fee-row">
+          <span class="body-sm">Dr. Ayesha Khan</span>
+          <span class="body-sm tnum">PKR 2,000</span>
+        </div>
+        <div class="fee-row">
+          <span class="body-sm">Platform fee</span>
+          <span class="body-sm tnum">PKR 0</span>
+        </div>
+        <div class="fee-total">
+          <span>Total</span>
+          <span class="tnum">PKR 2,000</span>
+        </div>
+        <a href="patient-07-payment.html" class="btn btn--primary btn--block" style="margin-top:20px">Confirm &amp; Pay</a>
+        <p class="help" style="text-align:center;margin-top:8px">Your slot is held for 10 minutes while you pay.</p>
+      </div>
+
+    </div><!-- /booking-grid -->
+
+  </div>
+</div>
+
+</body>
+</html>

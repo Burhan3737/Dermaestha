@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Cancel appointment (Doctor)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    /* ── Mobile drawer ── */
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform var(--ease);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-overlay);
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        padding: 12px var(--sp-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-1);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .content { padding-top: var(--sp-3); }
+    }
+    @media (min-width: 861px) {
+      .mobile-topbar { display: none; }
+    }
+
+    /* ── Content ── */
+    .content-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap;
+    }
+
+    /* ── Appointment card ── */
+    .appt-card { display: flex; align-items: flex-start; gap: var(--sp-4); padding: var(--sp-5); }
+    .appt-card img { width: 48px; height: 48px; border-radius: var(--r-pill); object-fit: cover; flex: 0 0 auto; }
+
+    /* ── Modal: larger than default, with internal reason ── */
+    .modal--cancel { max-width: 460px; }
+    .modal__body .field { max-width: none; }
+    .modal__body .field label {
+      font-family: var(--font-head); font-weight: 700;
+      font-size: var(--fs-caption); color: var(--color-text-strong);
+      display: block; margin-bottom: var(--sp-1);
+    }
+
+    /* ── Backdrop with visible display for mockup review ── */
+    .modal-backdrop { position: relative; inset: auto; background: rgba(15,33,24,.45);
+      border-radius: var(--r-md); min-height: 480px;
+      display: flex; align-items: center; justify-content: center;
+      padding: var(--sp-8) var(--sp-4); margin-top: var(--sp-5);
+    }
+
+    /* ── Sidebar shared ── */
+    .sidebar-identity {
+      display: flex; align-items: center; gap: var(--sp-2);
+      padding-top: var(--sp-4); border-top: var(--border-1); margin-top: auto;
+    }
+    .sidebar-identity__name { font-weight: 700; font-size: var(--fs-body-sm); color: var(--color-text-strong); }
+    .sidebar-identity__logout { font-size: var(--fs-caption); color: var(--color-text-muted); text-decoration: none; }
+    .sidebar-identity__logout:hover { color: var(--color-danger); }
+    .sidebar-caption { font-family: var(--font-head); font-size: var(--fs-label); font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--color-text-muted); margin: 4px 0 var(--sp-1); }
+  </style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar only-mobile">
+  <button class="btn btn--ghost btn--sm" data-drawer style="padding:8px;color:var(--color-text-muted)">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h14M3 10h14M3 15h14"/>
+    </svg>
+  </button>
+  <a class="brand" href="#">
+    <span class="brand__mark"></span>
+    <span class="brand__word">Dermestha</span>
+  </a>
+</div>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div style="margin-bottom:var(--sp-5)">
+      <a class="brand" href="#" style="text-decoration:none;display:inline-flex;margin-bottom:var(--sp-1)">
+        <span class="brand__mark"></span>
+        <span class="brand__word" style="margin-left:var(--sp-2)">Dermestha</span>
+      </a>
+      <p class="sidebar-caption">Doctor panel</p>
+    </div>
+
+    <nav style="display:flex;flex-direction:column;gap:var(--sp-1)">
+      <a href="doctor-02-today.html" class="sidebar__link active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 1v3M11 1v3M2 6h12"/></svg>
+        &nbsp;&nbsp;Today's appointments
+      </a>
+      <a href="doctor-03-availability.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.5"/></svg>
+        &nbsp;&nbsp;Availability
+      </a>
+      <a href="doctor-02-today.html#history" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><path d="M2 8a6 6 0 1012 0A6 6 0 002 8"/><path d="M2 4V8h4"/></svg>
+        &nbsp;&nbsp;History
+      </a>
+    </nav>
+
+    <div class="sidebar-identity">
+      <span class="avatar avatar--md" style="flex:0 0 auto">AK</span>
+      <div>
+        <p class="sidebar-identity__name">Dr. Ayesha Khan</p>
+        <a href="doctor-01-password.html" class="sidebar-identity__logout">Log out</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main content ── -->
+  <main class="content">
+    <div style="width:100%">
+
+      <!-- Content header -->
+      <div class="content-header">
+        <div>
+          <a href="doctor-02-today.html" style="display:inline-flex;align-items:center;gap:6px;color:var(--color-text-muted);font-size:var(--fs-body-sm);text-decoration:none;margin-bottom:var(--sp-2)">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M9 11L5 7l4-4"/></svg>
+            Back to Today's appointments
+          </a>
+          <h1 class="h1">Cancel appointment</h1>
+        </div>
+      </div>
+
+      <!-- Appointment card -->
+      <div class="card" style="margin-bottom:var(--sp-4)">
+        <div class="appt-card">
+          <img src="https://randomuser.me/api/portraits/women/55.jpg" alt="Sadia Mirza">
+          <div style="flex:1">
+            <div class="between" style="align-items:flex-start;gap:var(--sp-2)">
+              <div>
+                <p style="font-weight:700;margin:0;font-size:var(--fs-body)">Sadia Mirza</p>
+                <p style="font-size:var(--fs-body-sm);color:var(--color-text-muted);margin-top:2px">Eczema &amp; Dryness</p>
+              </div>
+              <span class="badge badge--success">Confirmed</span>
+            </div>
+            <p class="body-sm muted" style="margin-top:var(--sp-2)"><span class="tnum">Sat 30 May 2026 · 4:30 PM</span></p>
+            <p class="body-sm muted"><span class="tnum">PKR 2,200</span></p>
+            <div style="margin-top:var(--sp-3)">
+              <button class="btn btn--danger btn--sm" data-open="#cancelModal">Cancel appointment</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Context note -->
+      <div class="alert alert--info">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex:0 0 auto;margin-top:1px"><circle cx="8" cy="8" r="7"/></svg>
+        <span>Doctor-initiated cancellations have no time limit. The patient will be fully refunded (net of the gateway fee) and sent an apology email automatically.</span>
+      </div>
+
+      <!-- ── Modal backdrop (always visible for mockup review) ── -->
+      <div class="modal-backdrop" id="cancelModal">
+        <div class="modal modal--cancel" style="box-shadow:var(--shadow-overlay);max-width:460px;width:100%">
+          <div class="modal__accent modal__accent--danger"></div>
+          <div class="modal__body">
+
+            <p class="h3" style="margin-bottom:var(--sp-2)">Cancel this appointment?</p>
+
+            <!-- Required internal reason -->
+            <div class="field" style="max-width:none;margin-bottom:var(--sp-3)">
+              <label for="cancel-reason">Reason for cancellation <span class="caption muted">(internal — shown to admin only)</span></label>
+              <textarea id="cancel-reason" class="input" rows="3" placeholder="e.g., Emergency — unable to attend clinic today. Please reschedule." style="width:100%;resize:vertical"></textarea>
+              <p class="help">Required. Patients will not see this reason.</p>
+            </div>
+
+            <!-- Explanation -->
+            <div class="alert alert--warning" style="margin-bottom:var(--sp-3)">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex:0 0 auto;margin-top:1px"><path d="M8 2L2 14h12L8 2zm0 4v4m0 2v1.5" stroke="#fff" stroke-width="0"/><path d="M7.25 6.5h1.5V10h-1.5V6.5zM7.25 11h1.5v1.5h-1.5V11z" fill="currentColor"/></svg>
+              <span>The patient will be refunded automatically (net of the gateway fee) and sent an apology email. Doctor cancellations have no time limit.</span>
+            </div>
+
+            <!-- Refund breakdown -->
+            <div class="card" style="padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-3)">
+              <div class="between" style="padding:var(--sp-2) 0;border-bottom:var(--border-1)">
+                <span class="body-sm">Paid by patient</span>
+                <span class="body-sm tnum strong">PKR 2,200</span>
+              </div>
+              <div class="between" style="padding:var(--sp-2) 0;border-bottom:var(--border-1)">
+                <span class="body-sm" style="color:var(--color-danger)">Gateway fee</span>
+                <span class="body-sm tnum" style="color:var(--color-danger)">&#x2212; PKR 45</span>
+              </div>
+              <div class="between" style="padding:var(--sp-2) 0">
+                <span class="body-sm strong">Patient refund</span>
+                <span class="body-sm tnum strong" style="color:var(--color-success)">PKR 2,155</span>
+              </div>
+            </div>
+
+            <div class="modal__actions">
+              <button class="btn btn--ghost btn--sm" data-close>Keep it</button>
+              <button class="btn btn--danger btn--sm">Cancel &amp; refund patient</button>
+            </div>
+
+          </div>
+        </div>
+      </div><!-- /modal-backdrop -->
+
+    </div><!-- /max-width -->
+  </main>
+
+</div><!-- /layout -->
+
+</body>
+</html>

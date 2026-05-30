@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Mockup Gallery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <style>
+    .gal-hero { background: var(--color-feature-bg); color: var(--color-on-dark); padding: var(--sp-10) var(--sp-4); }
+    .gal-hero__inner { max-width: var(--maxw); margin: 0 auto; }
+    .gal-hero__eyebrow { font-family: var(--font-head); font-weight: 700; font-size: var(--fs-label); letter-spacing: 1.3px; text-transform: uppercase; color: var(--color-on-dark-accent); margin: 0 0 var(--sp-3); }
+    .gal-hero h1 { font-family: var(--font-head); font-weight: 800; font-size: 34px; letter-spacing: -.8px; color: #fff; margin: 0 0 var(--sp-3); }
+    .gal-hero p { color: var(--color-on-dark-muted); font-size: var(--fs-body-lg); margin: 0; max-width: 60ch; }
+    .gal-hero__meta { display: flex; gap: var(--sp-5); margin-top: var(--sp-5); flex-wrap: wrap; }
+    .gal-hero__meta span { font-size: var(--fs-body-sm); color: var(--color-on-dark); }
+    .gal-hero__meta b { font-family: var(--font-head); color: var(--color-on-dark-accent); }
+
+    .gal-body { max-width: var(--maxw); margin: 0 auto; padding: var(--sp-10) var(--sp-4) var(--sp-16); }
+    .gal-section { margin-bottom: var(--sp-10); }
+    .gal-section__head { display: flex; align-items: baseline; gap: var(--sp-3); margin-bottom: var(--sp-5); padding-bottom: var(--sp-3); border-bottom: var(--border-1); }
+    .gal-section__head h2 { font-family: var(--font-head); font-weight: 800; font-size: var(--fs-h2); letter-spacing: -.4px; color: var(--color-text-strong); margin: 0; }
+    .gal-section__count { font-size: var(--fs-body-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
+    .gal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-4); }
+    .gal-card { display: block; text-decoration: none; background: var(--color-surface); border: var(--border-1); border-radius: var(--r-md); padding: var(--sp-4); transition: box-shadow var(--ease), border-color var(--ease); position: relative; }
+    .gal-card:hover { box-shadow: 0 6px 20px rgba(20,48,42,.10); border-color: var(--color-primary-border); }
+    .gal-card__id { font-family: var(--font-head); font-weight: 700; font-size: var(--fs-label); letter-spacing: .6px; text-transform: uppercase; color: var(--color-accent-deep); margin: 0 0 var(--sp-2); }
+    .gal-card__title { font-family: var(--font-head); font-weight: 700; font-size: var(--fs-h3); color: var(--color-primary); margin: 0 0 var(--sp-1); letter-spacing: -.2px; }
+    .gal-card__desc { font-size: var(--fs-body-sm); color: var(--color-text-muted); margin: 0; }
+    .gal-card__arrow { position: absolute; top: var(--sp-4); right: var(--sp-4); color: var(--color-primary-border); }
+    .gal-card:hover .gal-card__arrow { color: var(--color-primary); }
+
+    .gal-foot { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--sp-4) var(--sp-12); }
+    .gal-ref { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); background: var(--color-primary-tint); border: 1px solid var(--color-primary-border); border-radius: var(--r-md); padding: var(--sp-5); flex-wrap: wrap; }
+    .gal-ref p { margin: 0; }
+    .gal-ref__title { font-family: var(--font-head); font-weight: 700; font-size: var(--fs-h3); color: var(--color-primary); }
+    .gal-ref__desc { font-size: var(--fs-body-sm); color: var(--color-text-body); margin-top: 2px; }
+
+    @media (max-width: 900px) { .gal-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .gal-grid { grid-template-columns: 1fr; } .gal-hero h1 { font-size: 28px; } }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<header class="gal-hero">
+  <div class="gal-hero__inner">
+    <div class="brand" style="margin-bottom:var(--sp-5)">
+      <span class="brand__mark" style="background:var(--color-on-dark-accent)"></span>
+      <span class="brand__word" style="color:#fff">Dermestha</span>
+    </div>
+    <p class="gal-hero__eyebrow">Visual design mockups · v1</p>
+    <h1>Mockup gallery</h1>
+    <p>High-fidelity static mockups of the Dermestha telederm platform — patient, doctor, and admin surfaces. Built on a shared design system (see the component reference below). Click any screen to open it.</p>
+    <div class="gal-hero__meta">
+      <span><b>24</b> screens</span>
+      <span><b>3</b> surfaces</span>
+      <span><b>Responsive</b> · mobile + desktop</span>
+    </div>
+  </div>
+</header>
+
+<div class="gal-body">
+
+  <!-- Patient -->
+  <section class="gal-section">
+    <div class="gal-section__head">
+      <h2>Patient surface</h2>
+      <span class="gal-section__count">13 screens · responsive web</span>
+    </div>
+    <div class="gal-grid">
+      <a class="gal-card" href="patient-01-landing.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-01</p><p class="gal-card__title">Landing</p><p class="gal-card__desc">Marketing hero, how-it-works, featured specialists</p></a>
+      <a class="gal-card" href="patient-02-browse.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-02</p><p class="gal-card__title">Browse doctors</p><p class="gal-card__desc">Filter chips + responsive specialist grid</p></a>
+      <a class="gal-card" href="patient-03-doctor-profile.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-03</p><p class="gal-card__title">Doctor profile</p><p class="gal-card__desc">Bio, fee, availability, book CTA</p></a>
+      <a class="gal-card" href="patient-04-signup.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-04</p><p class="gal-card__title">Sign up</p><p class="gal-card__desc">Split-screen form with ToS consent</p></a>
+      <a class="gal-card" href="patient-05-login.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-05</p><p class="gal-card__title">Login &amp; recovery</p><p class="gal-card__desc">Shared login + forgot/reset states</p></a>
+      <a class="gal-card" href="patient-06-booking.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-06</p><p class="gal-card__title">Booking</p><p class="gal-card__desc">Slot picker, who-for, fee summary</p></a>
+      <a class="gal-card" href="patient-07-payment.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-07</p><p class="gal-card__title">Payment</p><p class="gal-card__desc">Checkout handoff + return states</p></a>
+      <a class="gal-card" href="patient-08-dashboard-upcoming.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-08</p><p class="gal-card__title">Dashboard — Upcoming</p><p class="gal-card__desc">Confirmed appointments, Join Call, Cancel</p></a>
+      <a class="gal-card" href="patient-09-dashboard-past.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-09</p><p class="gal-card__title">Dashboard — Past</p><p class="gal-card__desc">Terminal states, refund status, download</p></a>
+      <a class="gal-card" href="patient-10-cancel-modal.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-10</p><p class="gal-card__title">Cancellation</p><p class="gal-card__desc">Refund breakdown · ≥2h and &lt;2h variants</p></a>
+      <a class="gal-card" href="patient-11-waiting-room.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-11</p><p class="gal-card__title">Waiting room</p><p class="gal-card__desc">Camera preview, lighting prompt, Join</p></a>
+      <a class="gal-card" href="patient-12-video.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-12</p><p class="gal-card__title">Video consultation</p><p class="gal-card__desc">Stage, controls, timer (patient side)</p></a>
+      <a class="gal-card" href="patient-13-prescription.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">P-13</p><p class="gal-card__title">Prescription</p><p class="gal-card__desc">Itemised document, totals, Download PDF</p></a>
+    </div>
+  </section>
+
+  <!-- Doctor -->
+  <section class="gal-section">
+    <div class="gal-section__head">
+      <h2>Doctor surface</h2>
+      <span class="gal-section__count">6 screens · desktop-first</span>
+    </div>
+    <div class="gal-grid">
+      <a class="gal-card" href="doctor-01-password.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">D-01</p><p class="gal-card__title">First-login password</p><p class="gal-card__desc">Forced password change before panel</p></a>
+      <a class="gal-card" href="doctor-02-today.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">D-02</p><p class="gal-card__title">Today &amp; History</p><p class="gal-card__desc">Today's appointments + history tabs</p></a>
+      <a class="gal-card" href="doctor-03-availability.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">D-03</p><p class="gal-card__title">Availability</p><p class="gal-card__desc">Weekly recurring schedule grid</p></a>
+      <a class="gal-card" href="doctor-04-video.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">D-04</p><p class="gal-card__title">Video consultation</p><p class="gal-card__desc">Doctor-side call + 5-min warning</p></a>
+      <a class="gal-card" href="doctor-05-prescription-builder.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">D-05</p><p class="gal-card__title">Prescription builder</p><p class="gal-card__desc">Catalogue search, running total, immutable</p></a>
+      <a class="gal-card" href="doctor-06-cancel-modal.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">D-06</p><p class="gal-card__title">Cancel appointment</p><p class="gal-card__desc">Reason + auto-refund + apology</p></a>
+    </div>
+  </section>
+
+  <!-- Admin -->
+  <section class="gal-section">
+    <div class="gal-section__head">
+      <h2>Admin surface</h2>
+      <span class="gal-section__count">5 screens · desktop</span>
+    </div>
+    <div class="gal-grid">
+      <a class="gal-card" href="admin-01-doctors.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">A-01</p><p class="gal-card__title">Doctors</p><p class="gal-card__desc">List, add/edit, deactivate (honored appts)</p></a>
+      <a class="gal-card" href="admin-02-medicines.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">A-02</p><p class="gal-card__title">Medicine catalogue</p><p class="gal-card__desc">Searchable list with admin-set prices</p></a>
+      <a class="gal-card" href="admin-03-alerts.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">A-03</p><p class="gal-card__title">System health</p><p class="gal-card__desc">Alert feed · email re-trigger only</p></a>
+      <a class="gal-card" href="admin-04-records-audit.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">A-04</p><p class="gal-card__title">Records &amp; Audit</p><p class="gal-card__desc">Filters, records table, audit timeline</p></a>
+      <a class="gal-card" href="admin-05-settings.html"><span class="gal-card__arrow">&rarr;</span><p class="gal-card__id">A-05</p><p class="gal-card__title">Settings</p><p class="gal-card__desc">Booking lead time + fallback fee</p></a>
+    </div>
+  </section>
+
+</div>
+
+<!-- Component reference -->
+<div class="gal-foot">
+  <a class="gal-ref" href="_component-reference.html" style="text-decoration:none">
+    <div>
+      <p class="gal-ref__title">Component reference &rarr;</p>
+      <p class="gal-ref__desc">The full design system — color tokens, type scale, buttons, badges, and every shared component.</p>
+    </div>
+    <span class="btn btn--primary">Open reference</span>
+  </a>
+</div>
+
+</body>
+</html>

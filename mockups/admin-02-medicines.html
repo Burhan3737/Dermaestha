@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Medicine catalogue</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform var(--ease);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-overlay);
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        padding: 12px var(--sp-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-1);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .mobile-topbar .brand__word { font-size: var(--fs-h3); }
+      .content { padding-top: var(--sp-3); }
+    }
+    @media (min-width: 861px) {
+      .mobile-topbar { display: none; }
+    }
+
+    .content-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--sp-5);
+      gap: var(--sp-4);
+      flex-wrap: wrap;
+    }
+
+    .sidebar-identity {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-3) var(--sp-2);
+      border-top: var(--border-1);
+      margin-top: auto;
+      padding-top: var(--sp-4);
+    }
+    .sidebar-identity__info { min-width: 0; }
+    .sidebar-identity__name {
+      font-weight: 700;
+      font-size: var(--fs-body-sm);
+      color: var(--color-text-strong);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sidebar-identity__logout {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      text-decoration: none;
+    }
+    .sidebar-identity__logout:hover { color: var(--color-danger); }
+
+    .sidebar-caption {
+      font-family: var(--font-head);
+      font-size: var(--fs-label);
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      padding: 0;
+      margin: 4px 0 var(--sp-1);
+    }
+
+    .tbl-action {
+      color: var(--color-primary);
+      font-size: var(--fs-body-sm);
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .tbl-action--danger { color: var(--color-danger); }
+    .tbl-action:hover { text-decoration: underline; }
+
+    .table-wrap { overflow-x: auto; width: 100%; }
+
+    /* Search bar above table */
+    .search-bar {
+      display: flex;
+      gap: var(--sp-3);
+      margin-bottom: var(--sp-4);
+      align-items: center;
+    }
+    .search-bar .input { max-width: 360px; }
+
+    /* Form grid */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-4) var(--sp-5);
+    }
+    .form-grid .field { max-width: none; }
+    .form-grid .field--full { grid-column: 1 / -1; }
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .field--full { grid-column: 1; }
+    }
+
+    /* Dosage tag chips (visual) */
+    .dosage-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-top: var(--sp-1); }
+    .dosage-chip {
+      background: var(--color-primary-tint);
+      color: var(--color-primary);
+      font-size: var(--fs-label);
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: var(--r-sm);
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar only-mobile">
+  <button class="btn btn--ghost btn--sm" data-drawer style="padding:8px;color:var(--color-text-muted)">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h14M3 10h14M3 15h14"/>
+    </svg>
+  </button>
+  <a class="brand" href="#">
+    <span class="brand__mark"></span>
+    <span class="brand__word">Dermestha</span>
+  </a>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div style="margin-bottom:var(--sp-5)">
+      <a class="brand" href="#" style="text-decoration:none;display:inline-flex;margin-bottom:var(--sp-1)">
+        <span class="brand__mark"></span>
+        <span class="brand__word" style="margin-left:var(--sp-2)">Dermestha</span>
+      </a>
+      <p class="sidebar-caption">Admin panel</p>
+    </div>
+    <nav style="display:flex;flex-direction:column;gap:var(--sp-1)">
+      <a href="admin-01-doctors.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><circle cx="6" cy="5" r="3"/><path d="M1 14c0-3 2-5 5-5h0c1 0 1.8.3 2.5.8"/><path d="M11 10v5M8.5 12.5h5"/></svg>
+        &nbsp;&nbsp;Doctors
+      </a>
+      <a href="admin-02-medicines.html" class="sidebar__link active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><rect x="5" y="1" width="6" height="3" rx="1"/><path d="M3 4h10l1 10H2L3 4z"/><path d="M6 8h4"/></svg>
+        &nbsp;&nbsp;Medicines
+      </a>
+      <a href="admin-03-alerts.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><path d="M8 2a5 5 0 015 5v3l1 2H2l1-2V7a5 5 0 015-5z"/><path d="M6.5 13a1.5 1.5 0 003 0"/></svg>
+        &nbsp;&nbsp;Alerts
+      </a>
+      <a href="admin-04-records-audit.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+        &nbsp;&nbsp;Records &amp; Audit
+      </a>
+      <a href="admin-05-settings.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;display:inline-block;vertical-align:middle"><circle cx="8" cy="8" r="2"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1M4 4l.7.7M11.3 11.3l.7.7M4 12l.7-.7M11.3 4.7l.7-.7"/></svg>
+        &nbsp;&nbsp;Settings
+      </a>
+    </nav>
+    <div class="sidebar-identity">
+      <span class="avatar avatar--md" style="flex:0 0 auto">AD</span>
+      <div class="sidebar-identity__info">
+        <p class="sidebar-identity__name">Admin</p>
+        <a href="#" class="sidebar-identity__logout">Log out</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+    <div style="width:100%">
+
+      <!-- Content header -->
+      <div class="content-header">
+        <h1 class="h1">Medicine catalogue</h1>
+        <button class="btn btn--primary">Add medicine</button>
+      </div>
+
+      <!-- Search -->
+      <div class="search-bar">
+        <input class="input" type="search" placeholder="Search medicines…" style="max-width:360px;width:100%">
+      </div>
+
+      <!-- Medicines table -->
+      <div class="table-wrap" style="margin-bottom:var(--sp-6)">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Generic name</th>
+              <th>Dosage forms</th>
+              <th class="num">Unit price (PKR)</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong class="strong">Tretinoin 0.05%</strong></td>
+              <td class="muted">Tretinoin</td>
+              <td>
+                <div class="dosage-chips">
+                  <span class="dosage-chip">Cream</span>
+                  <span class="dosage-chip">Gel</span>
+                </div>
+              </td>
+              <td class="num tnum">850</td>
+              <td><span class="badge badge--success">Active</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action tbl-action--danger">Deactivate</a>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Clindamycin 1%</strong></td>
+              <td class="muted">Clindamycin phosphate</td>
+              <td>
+                <div class="dosage-chips">
+                  <span class="dosage-chip">Solution</span>
+                  <span class="dosage-chip">Lotion</span>
+                  <span class="dosage-chip">Gel</span>
+                </div>
+              </td>
+              <td class="num tnum">420</td>
+              <td><span class="badge badge--success">Active</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action tbl-action--danger">Deactivate</a>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Benzoyl Peroxide 5%</strong></td>
+              <td class="muted">Benzoyl peroxide</td>
+              <td>
+                <div class="dosage-chips">
+                  <span class="dosage-chip">Cream</span>
+                  <span class="dosage-chip">Wash</span>
+                </div>
+              </td>
+              <td class="num tnum">310</td>
+              <td><span class="badge badge--success">Active</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action tbl-action--danger">Deactivate</a>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Adapalene 0.1%</strong></td>
+              <td class="muted">Adapalene</td>
+              <td>
+                <div class="dosage-chips">
+                  <span class="dosage-chip">Gel</span>
+                  <span class="dosage-chip">Cream</span>
+                </div>
+              </td>
+              <td class="num tnum">680</td>
+              <td><span class="badge badge--success">Active</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action tbl-action--danger">Deactivate</a>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Azithromycin 500 mg</strong></td>
+              <td class="muted">Azithromycin</td>
+              <td>
+                <div class="dosage-chips">
+                  <span class="dosage-chip">Tablet</span>
+                  <span class="dosage-chip">Oral suspension</span>
+                </div>
+              </td>
+              <td class="num tnum">180</td>
+              <td><span class="badge badge--neutral">Inactive</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action" style="color:var(--color-success)">Activate</a>
+              </td>
+            </tr>
+            <tr>
+              <td><strong class="strong">Hydroquinone 4%</strong></td>
+              <td class="muted">Hydroquinone</td>
+              <td>
+                <div class="dosage-chips">
+                  <span class="dosage-chip">Cream</span>
+                </div>
+              </td>
+              <td class="num tnum">1,200</td>
+              <td><span class="badge badge--success">Active</span></td>
+              <td>
+                <a href="#" class="tbl-action">Edit</a>
+                &nbsp;·&nbsp;
+                <a href="#" class="tbl-action tbl-action--danger">Deactivate</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Add / Edit medicine form -->
+      <div class="section-card">
+        <div class="section-card__title">
+          <h2 class="h2">Add / edit medicine</h2>
+        </div>
+
+        <div class="alert alert--info" style="margin-bottom:var(--sp-4)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" style="flex:0 0 auto;margin-top:1px"><circle cx="9" cy="9" r="7"/><path d="M9 8v4M9 6h.01"/></svg>
+          <span>Renaming or re-pricing a medicine updates the prescription builder but <strong>never changes existing prescriptions</strong>, which store a snapshot at issue-time.</span>
+        </div>
+
+        <form>
+          <div class="form-grid">
+            <div class="field">
+              <label for="med-name">Medicine name *</label>
+              <input id="med-name" class="input" type="text" placeholder="e.g. Tretinoin 0.05%" value="Hydroquinone 4%">
+            </div>
+            <div class="field">
+              <label for="med-generic">Generic name <span class="muted" style="font-weight:400;font-size:var(--fs-caption)">(optional)</span></label>
+              <input id="med-generic" class="input" type="text" placeholder="e.g. Hydroquinone" value="Hydroquinone">
+            </div>
+            <div class="field">
+              <label for="med-forms">Dosage forms</label>
+              <input id="med-forms" class="input" type="text" placeholder="e.g. tablet, cream, syrup" value="Cream">
+              <p class="help">Comma-separated list of available forms. Shown in the prescription builder.</p>
+            </div>
+            <div class="field">
+              <label for="med-price">Unit price (PKR) *</label>
+              <input id="med-price" class="input" type="number" placeholder="0" value="1200">
+              <p class="help">Used in the prescription builder for running totals. Existing prescriptions are unaffected by price changes.</p>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:var(--sp-3);margin-top:var(--sp-5);flex-wrap:wrap">
+            <button type="submit" class="btn btn--primary">Save medicine</button>
+            <button type="button" class="btn btn--ghost">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

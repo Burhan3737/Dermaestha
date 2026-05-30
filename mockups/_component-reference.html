@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Component Reference</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    .ref-section { margin-bottom: 48px; }
+    .ref-section > .ref-heading { margin-bottom: 4px; }
+    .ref-section > .label { margin-bottom: 16px; display: block; }
+    .ref-demo { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+    .ref-divider { border: none; border-top: 1px solid var(--color-border); margin: 48px 0; }
+  </style>
+</head>
+<body>
+<div class="container" style="padding:24px 16px 80px">
+
+  <div style="margin-bottom:40px">
+    <p class="display">Component Reference</p>
+    <p class="muted" style="margin-top:8px">Dermestha design system — visual QA reference for all token-driven components.</p>
+  </div>
+
+  <!-- ─── 1. Typography ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Typography</h2>
+    <span class="label">Type scale &amp; utilities</span>
+    <div class="col" style="gap:16px">
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.display — 30px / 800</span>
+        <p class="display">Clearer Skin Starts Here</p>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.h1 — 24px / 800</span>
+        <p class="h1">Book a Dermatologist</p>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.h2 — 20px / 700</span>
+        <p class="h2">Your Appointments</p>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.h3 — 17px / 700</span>
+        <p class="h3">Select a time slot</p>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">Body — 14px (default)</span>
+        <p style="margin:0">You can book a dermatology consultation from anywhere in Pakistan. Browse verified doctors and pay securely online.</p>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.body-lg — 16px</span>
+        <p class="body-lg" style="margin:0">Verified doctors. Secure payments. Same-day slots.</p>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.body-sm — 13px</span>
+        <p class="body-sm" style="margin:0">Acne &amp; Pigmentation · 8 yrs experience</p>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.caption — 12px / muted</span>
+        <p class="caption" style="margin:0">Appointment confirmed · 29 May 2026</p>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.label — 11px / 700 / uppercase</span>
+        <span class="label">Upcoming appointments</span>
+      </div>
+      <div>
+        <span class="caption" style="display:block;margin-bottom:4px">.tnum — tabular numerics</span>
+        <span class="tnum">PKR 2,000 · Today 6:30 PM</span>
+      </div>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 2. Buttons ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Buttons</h2>
+    <span class="label">All variants + sizes</span>
+    <div class="ref-demo" style="margin-bottom:16px">
+      <button class="btn btn--primary">Primary</button>
+      <button class="btn btn--secondary">Secondary</button>
+      <button class="btn btn--ghost">Ghost</button>
+      <button class="btn btn--danger">Danger</button>
+      <button class="btn btn--brass">Brass</button>
+      <button class="btn btn--primary btn--disabled" disabled>Disabled</button>
+    </div>
+    <div class="ref-demo">
+      <button class="btn btn--primary btn--sm">Small primary</button>
+      <button class="btn btn--primary">Default primary</button>
+      <button class="btn btn--primary btn--lg">Large primary</button>
+    </div>
+    <p class="caption" style="margin-top:8px">Hover .btn--primary to see background darken to --color-primary-hover. Focus visible shows 3px green ring.</p>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 3. Form fields ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Form Fields</h2>
+    <span class="label">Inputs, choices, states</span>
+    <div class="col" style="gap:20px">
+
+      <!-- Default input -->
+      <div class="field">
+        <label>Full name</label>
+        <input type="text" class="input" placeholder="e.g. Ayesha Khan">
+        <span class="help">Enter your full name as on your ID.</span>
+      </div>
+
+      <!-- Focused (simulated) -->
+      <div class="field">
+        <label>Email address</label>
+        <input type="email" class="input" placeholder="you@example.com" style="border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(15,58,42,.15)">
+        <span class="help">Focus state — green border + ring</span>
+      </div>
+
+      <!-- Error state -->
+      <div class="field">
+        <label>Phone number</label>
+        <input type="tel" class="input input--error" value="03001234">
+        <span class="error-text">Enter a valid 11-digit Pakistani mobile number.</span>
+      </div>
+
+      <!-- Checkbox choice -->
+      <label class="choice">
+        <input type="checkbox" checked>
+        I agree to the <a href="/legal/terms" style="color:var(--color-primary);margin:0 4px">Terms of Service</a> and <a href="/legal/privacy" style="color:var(--color-primary);margin-left:4px">Privacy Policy</a>
+      </label>
+
+      <!-- Radio pair -->
+      <div class="col" style="gap:8px">
+        <label class="choice">
+          <input type="radio" name="gender" value="female" checked>
+          Female
+        </label>
+        <label class="choice">
+          <input type="radio" name="gender" value="male">
+          Male
+        </label>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 4. Avatars ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Avatars</h2>
+    <span class="label">Initials + photo, three sizes</span>
+    <div class="ref-demo" style="align-items:center">
+      <span class="avatar avatar--sm">AK</span>
+      <span class="avatar avatar--md">AK</span>
+      <span class="avatar avatar--lg">AK</span>
+      <img class="avatar avatar--sm" src="https://randomuser.me/api/portraits/women/65.jpg" alt="Avatar">
+      <img class="avatar avatar--md" src="https://randomuser.me/api/portraits/women/65.jpg" alt="Avatar">
+      <img class="avatar avatar--lg" src="https://randomuser.me/api/portraits/women/65.jpg" alt="Avatar">
+    </div>
+    <p class="caption" style="margin-top:8px">sm = 28px · md = 34px · lg = 48px</p>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 5. Doctor card ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Doctor Card</h2>
+    <span class="label">Full doc-card with PMC badge</span>
+    <div style="max-width:280px">
+      <div class="doc-card">
+        <div class="doc-card__img">
+          <img src="https://randomuser.me/api/portraits/women/65.jpg" alt="Dr. Ayesha Khan">
+          <span class="pmc-badge">&#10003; PMC</span>
+        </div>
+        <div class="doc-card__body">
+          <p class="doc-card__name">Dr. Ayesha Khan</p>
+          <p class="doc-card__spec">Acne &amp; Pigmentation · 8 yrs</p>
+          <div class="doc-card__foot">
+            <span class="doc-card__fee tnum">PKR 2,000</span>
+            <span class="doc-card__slot tnum">Today 6:30 PM</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 6. Time slots ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Time Slots</h2>
+    <span class="label">Available, selected, disabled, locked</span>
+    <div class="row" style="flex-wrap:wrap">
+      <button class="slot tnum">9:00 AM</button>
+      <button class="slot tnum">10:00 AM</button>
+      <button class="slot slot--selected tnum">11:00 AM</button>
+      <button class="slot slot--disabled tnum">12:00 PM</button>
+      <button class="slot slot--locked tnum">1:00 PM</button>
+      <button class="slot tnum">2:00 PM</button>
+      <button class="slot tnum">3:30 PM</button>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 7. Status badges ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Status Badges</h2>
+    <span class="label">All five semantic variants</span>
+    <div class="ref-demo">
+      <span class="badge badge--success">Confirmed</span>
+      <span class="badge badge--info">In progress</span>
+      <span class="badge badge--warning">Awaiting prescription</span>
+      <span class="badge badge--danger">Cancelled by doctor</span>
+      <span class="badge badge--neutral">Cancelled — no refund</span>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 8. Modal ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Modal</h2>
+    <span class="label">Danger variant — cancel &amp; refund flow (shown in-flow)</span>
+    <div class="modal" style="max-width:360px">
+      <div class="modal__accent modal__accent--danger"></div>
+      <div class="modal__body">
+        <p class="h3">Cancel this appointment?</p>
+        <p class="body-sm muted" style="margin-top:8px;margin-bottom:16px">This action cannot be undone. Your refund will be processed within 3–5 business days.</p>
+
+        <!-- Refund breakdown -->
+        <div class="card" style="padding:12px 16px;margin-bottom:4px">
+          <div class="between" style="padding:6px 0;border-bottom:1px solid var(--color-border)">
+            <span class="body-sm">Paid</span>
+            <span class="body-sm tnum strong">PKR 2,000</span>
+          </div>
+          <div class="between" style="padding:6px 0;border-bottom:1px solid var(--color-border)">
+            <span class="body-sm">Gateway fee</span>
+            <span class="body-sm tnum" style="color:var(--color-danger)">− PKR 45</span>
+          </div>
+          <div class="between" style="padding:6px 0">
+            <span class="body-sm strong">Refund</span>
+            <span class="body-sm tnum strong">PKR 1,955</span>
+          </div>
+        </div>
+
+        <div class="modal__actions">
+          <button class="btn btn--ghost btn--sm">Keep it</button>
+          <button class="btn btn--danger btn--sm">Cancel &amp; refund</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 9. Alerts ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Alerts</h2>
+    <span class="label">Four semantic variants</span>
+    <div class="col">
+      <div class="alert alert--success">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7"/></svg>
+        <span>Your appointment has been confirmed. Check your email for details.</span>
+      </div>
+      <div class="alert alert--info">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7"/></svg>
+        <span>The doctor will join in approximately 5 minutes.</span>
+      </div>
+      <div class="alert alert--warning">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7"/></svg>
+        <span>Payment processing is temporarily delayed. We'll notify you once confirmed.</span>
+      </div>
+      <div class="alert alert--danger">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7"/></svg>
+        <span>Your session has expired. Please log in again to continue.</span>
+      </div>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 10. Banner ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Banner</h2>
+    <span class="label">Full-width system notification</span>
+    <div class="banner banner--warning">
+      New bookings are paused — payments temporarily unavailable
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 11. Empty state ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Empty State</h2>
+    <span class="label">Zero-data placeholder</span>
+    <div class="empty">
+      <div class="empty__icon">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="2"/>
+          <path d="M14 20h12M20 14v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p class="h3 strong" style="margin-bottom:8px">No upcoming appointments</p>
+      <p class="body-sm" style="margin-bottom:16px">You haven't booked any consultations yet. Find a verified dermatologist and get started.</p>
+      <button class="btn btn--primary">Browse doctors</button>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 12. Top nav ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Top Nav</h2>
+    <span class="label">Desktop navigation bar</span>
+    <div style="border:1px solid var(--color-border);border-radius:var(--r-md);overflow:hidden">
+      <nav class="topnav">
+        <div class="topnav__inner">
+          <a class="brand" href="/">
+            <span class="brand__mark"></span>
+            <span class="brand__word">Dermestha</span>
+          </a>
+          <div class="topnav__links">
+            <a href="#" class="active">Browse</a>
+            <a href="#">My Appointments</a>
+            <a href="#">How it works</a>
+            <button class="btn btn--secondary btn--sm">Login</button>
+          </div>
+        </div>
+      </nav>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 13. Bottom tabs ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Bottom Tabs</h2>
+    <span class="label">Mobile tab bar (shown static)</span>
+    <div style="border:1px solid var(--color-border);border-radius:var(--r-md);overflow:hidden">
+      <div class="tabbar" style="position:static">
+        <a href="#" class="tabbar__item active">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="16" height="16" rx="2"/></svg>
+          Browse
+        </a>
+        <a href="#" class="tabbar__item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="16" height="16" rx="2"/></svg>
+          Appts
+        </a>
+        <a href="#" class="tabbar__item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="16" height="16" rx="2"/></svg>
+          Profile
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 14. Sidebar ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Sidebar</h2>
+    <span class="label">Doctor / admin sidebar navigation</span>
+    <div class="sidebar" style="height:220px;border-radius:var(--r-md);border:1px solid var(--color-border);position:static;width:240px">
+      <div class="brand" style="margin-bottom:16px">
+        <span class="brand__mark"></span>
+        <span class="brand__word">Dermestha</span>
+      </div>
+      <a href="#" class="sidebar__link active">Dashboard</a>
+      <a href="#" class="sidebar__link">My Schedule</a>
+      <a href="#" class="sidebar__link">Patients</a>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 15. Table ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Table</h2>
+    <span class="label">Admin data table with badges</span>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>Doctor</th>
+          <th>Status</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Sana Mirza</td>
+          <td>Dr. Ayesha Khan</td>
+          <td><span class="badge badge--success">Confirmed</span></td>
+          <td class="num tnum">PKR 2,000</td>
+        </tr>
+        <tr>
+          <td>Hassan Raza</td>
+          <td>Dr. Bilal Sheikh</td>
+          <td><span class="badge badge--warning">Awaiting prescription</span></td>
+          <td class="num tnum">PKR 1,500</td>
+        </tr>
+        <tr>
+          <td>Fatima Noor</td>
+          <td>Dr. Zara Malik</td>
+          <td><span class="badge badge--danger">Cancelled by doctor</span></td>
+          <td class="num tnum">PKR 2,500</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 16. Stepper ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Stepper</h2>
+    <span class="label">Multi-step booking progress (step 1 active)</span>
+    <div class="stepper">
+      <div class="stepper__step active">
+        <span class="stepper__num">1</span>
+        Select slot
+      </div>
+      <div style="width:24px;height:1px;background:var(--color-border)"></div>
+      <div class="stepper__step">
+        <span class="stepper__num">2</span>
+        Who for
+      </div>
+      <div style="width:24px;height:1px;background:var(--color-border)"></div>
+      <div class="stepper__step">
+        <span class="stepper__num">3</span>
+        Pay
+      </div>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 17. Prescription items ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Prescription Items</h2>
+    <span class="label">Rx line items with totals</span>
+    <div style="max-width:480px">
+      <div class="rx-item">
+        <div>
+          <p class="rx-item__name">Tretinoin 0.025% Cream</p>
+          <p class="rx-item__detail">Apply at night · 30g tube · 3 months</p>
+        </div>
+        <span class="rx-item__price tnum">PKR 850</span>
+      </div>
+      <div class="rx-item">
+        <div>
+          <p class="rx-item__name">Clindamycin 1% Gel</p>
+          <p class="rx-item__detail">Apply twice daily · 20g tube</p>
+        </div>
+        <span class="rx-item__price tnum">PKR 650</span>
+      </div>
+      <div class="rx-item">
+        <div>
+          <p class="rx-item__name">Niacinamide 10% Serum <span class="tag-unpriced">Not priced</span></p>
+          <p class="rx-item__detail">Apply in the morning · OTC</p>
+        </div>
+        <span class="rx-item__price tnum">—</span>
+      </div>
+      <div class="rx-total">
+        <span>Total</span>
+        <span class="tnum">PKR 1,500</span>
+      </div>
+      <p class="caption" style="margin-top:8px">1 item not priced</p>
+    </div>
+  </section>
+
+  <hr class="ref-divider">
+
+  <!-- ─── 18. Video chrome ─── -->
+  <section class="ref-section">
+    <h2 class="h2 ref-heading">Video Chrome</h2>
+    <span class="label">Consultation call UI elements</span>
+    <div style="max-width:640px">
+      <div class="video-stage">
+        <div style="text-align:center">
+          <p class="h3" style="color:var(--color-on-dark);margin-bottom:4px">Dr. Ayesha Khan</p>
+          <span class="caption" style="color:var(--color-on-dark-muted)">Connecting…</span>
+        </div>
+        <div class="video-self"></div>
+      </div>
+      <div class="video-controls">
+        <button class="video-ctrl" title="Toggle mic">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="var(--color-text-body)"><rect x="7" y="2" width="6" height="10" rx="3"/><path d="M4 10a6 6 0 0012 0" stroke="var(--color-text-body)" stroke-width="1.5" fill="none" stroke-linecap="round"/><line x1="10" y1="16" x2="10" y2="19" stroke="var(--color-text-body)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button class="video-ctrl" title="Toggle camera">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="12" height="10" rx="2" stroke="var(--color-text-body)" stroke-width="1.5"/><path d="M14 8l4-2v8l-4-2V8z" fill="var(--color-text-body)"/></svg>
+        </button>
+        <button class="video-ctrl video-ctrl--leave" title="Leave call">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 10h14M14 6l4 4-4 4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

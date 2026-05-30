@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Weekly availability</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    /* ── Mobile drawer ── */
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform var(--ease);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-overlay);
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        padding: 12px var(--sp-4);
+        background: var(--color-surface);
+        border-bottom: var(--border-1);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .content { padding-top: var(--sp-3); }
+    }
+    @media (min-width: 861px) {
+      .mobile-topbar { display: none; }
+    }
+
+    .content-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--sp-2);
+      gap: var(--sp-4);
+      flex-wrap: wrap;
+    }
+
+    /* ── Availability grid ── */
+    .avail-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: var(--sp-5);
+      border: var(--border-1);
+      border-radius: var(--r-md);
+      background: var(--color-surface);
+    }
+    .avail-grid {
+      display: grid;
+      grid-template-columns: 64px repeat(7, minmax(80px, 1fr));
+      min-width: 700px;
+    }
+    .avail-header {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: var(--fs-label);
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      text-align: center;
+      padding: 10px var(--sp-2) 10px;
+      border-bottom: var(--border-1);
+      background: var(--color-bg);
+    }
+    .avail-header:first-child { text-align: left; padding-left: var(--sp-3); }
+    .avail-time {
+      font-size: var(--fs-caption);
+      color: var(--color-text-muted);
+      padding: 0 var(--sp-3);
+      display: flex;
+      align-items: center;
+      border-bottom: var(--border-1);
+      border-right: var(--border-1);
+      background: var(--color-bg);
+      min-height: 44px;
+      white-space: nowrap;
+    }
+    .avail-cell {
+      border-bottom: var(--border-1);
+      border-right: var(--border-1);
+      min-height: 44px;
+      cursor: pointer;
+      transition: background var(--ease);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .avail-cell:last-child { border-right: 0; }
+    .avail-cell:hover {
+      background: var(--color-primary-tint);
+    }
+    .avail-cell--on {
+      background: var(--color-primary-tint);
+      border-color: var(--color-primary-border);
+    }
+    .avail-cell--on::after {
+      content: "";
+      display: block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-primary);
+    }
+    /* Last row: no bottom border */
+    .avail-grid > :nth-last-child(-n+8) {
+      border-bottom: 0;
+    }
+
+    /* ── Sidebar shared styles ── */
+    .sidebar-identity {
+      display: flex; align-items: center; gap: var(--sp-2);
+      padding-top: var(--sp-4); border-top: var(--border-1); margin-top: auto;
+    }
+    .sidebar-identity__name { font-weight: 700; font-size: var(--fs-body-sm); color: var(--color-text-strong); }
+    .sidebar-identity__logout { font-size: var(--fs-caption); color: var(--color-text-muted); text-decoration: none; }
+    .sidebar-identity__logout:hover { color: var(--color-danger); }
+    .sidebar-caption { font-family: var(--font-head); font-size: var(--fs-label); font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--color-text-muted); margin: 4px 0 var(--sp-1); }
+  </style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="mobile-topbar only-mobile">
+  <button class="btn btn--ghost btn--sm" data-drawer style="padding:8px;color:var(--color-text-muted)">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 5h14M3 10h14M3 15h14"/>
+    </svg>
+  </button>
+  <a class="brand" href="#">
+    <span class="brand__mark"></span>
+    <span class="brand__word">Dermestha</span>
+  </a>
+</div>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div style="margin-bottom:var(--sp-5)">
+      <a class="brand" href="#" style="text-decoration:none;display:inline-flex;margin-bottom:var(--sp-1)">
+        <span class="brand__mark"></span>
+        <span class="brand__word" style="margin-left:var(--sp-2)">Dermestha</span>
+      </a>
+      <p class="sidebar-caption">Doctor panel</p>
+    </div>
+
+    <nav style="display:flex;flex-direction:column;gap:var(--sp-1)">
+      <a href="doctor-02-today.html" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 1v3M11 1v3M2 6h12"/></svg>
+        &nbsp;&nbsp;Today's appointments
+      </a>
+      <a href="doctor-03-availability.html" class="sidebar__link active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.5"/></svg>
+        &nbsp;&nbsp;Availability
+      </a>
+      <a href="doctor-02-today.html#history" class="sidebar__link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto"><path d="M2 8a6 6 0 1012 0A6 6 0 002 8"/><path d="M2 4V8h4"/></svg>
+        &nbsp;&nbsp;History
+      </a>
+    </nav>
+
+    <div class="sidebar-identity">
+      <span class="avatar avatar--md" style="flex:0 0 auto">AK</span>
+      <div>
+        <p class="sidebar-identity__name">Dr. Ayesha Khan</p>
+        <a href="doctor-01-password.html" class="sidebar-identity__logout">Log out</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main content ── -->
+  <main class="content">
+    <div style="width:100%">
+
+      <!-- Content header -->
+      <div class="content-header">
+        <h1 class="h1">Weekly availability</h1>
+        <button class="btn btn--primary btn--sm" onclick="this.textContent='Saved ✓';this.disabled=true;setTimeout(()=>{this.textContent='Save changes';this.disabled=false},2000)">Save changes</button>
+      </div>
+      <p class="muted" style="font-size:var(--fs-body-sm);margin-bottom:var(--sp-5)">
+        Set the time blocks you're available each week. Slots are generated in 30-minute increments.
+      </p>
+
+      <!-- Availability grid -->
+      <div class="avail-wrap">
+        <div class="avail-grid">
+
+          <!-- Header row -->
+          <div class="avail-header">Time</div>
+          <div class="avail-header">Sun</div>
+          <div class="avail-header">Mon</div>
+          <div class="avail-header">Tue</div>
+          <div class="avail-header">Wed</div>
+          <div class="avail-header">Thu</div>
+          <div class="avail-header">Fri</div>
+          <div class="avail-header">Sat</div>
+
+          <!-- 9 AM -->
+          <div class="avail-time tnum">9 AM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell"></div>
+
+          <!-- 10 AM -->
+          <div class="avail-time tnum">10 AM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell"></div>
+
+          <!-- 11 AM -->
+          <div class="avail-time tnum">11 AM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell"></div>
+
+          <!-- 12 PM -->
+          <div class="avail-time tnum">12 PM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+
+          <!-- 1 PM -->
+          <div class="avail-time tnum">1 PM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell"></div>
+
+          <!-- 2 PM -->
+          <div class="avail-time tnum">2 PM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+
+          <!-- 3 PM -->
+          <div class="avail-time tnum">3 PM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+
+          <!-- 4 PM -->
+          <div class="avail-time tnum">4 PM</div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+
+          <!-- 5 PM -->
+          <div class="avail-time tnum">5 PM</div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+
+          <!-- 6 PM -->
+          <div class="avail-time tnum">6 PM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell"></div>
+
+          <!-- 7 PM -->
+          <div class="avail-time tnum">7 PM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+
+          <!-- 8 PM -->
+          <div class="avail-time tnum">8 PM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell avail-cell--on"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+
+          <!-- 9 PM -->
+          <div class="avail-time tnum">9 PM</div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+          <div class="avail-cell"></div>
+
+        </div><!-- /avail-grid -->
+      </div><!-- /avail-wrap -->
+
+      <!-- Warning alert -->
+      <div class="alert alert--warning" style="margin-bottom:var(--sp-5)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex:0 0 auto;margin-top:1px"><path d="M8 1L1 14h14L8 1zm0 4v4m0 2v2" stroke="#fff" stroke-width="0"/><path d="M8 2.5L2 13.5h12L8 2.5zM7.25 6h1.5v4h-1.5V6zm0 5h1.5v1.5h-1.5V11z" fill="currentColor"/></svg>
+        <span><strong>Editing a block with confirmed bookings?</strong> This block has confirmed bookings — cancel each booking before removing the block.</span>
+      </div>
+
+      <p class="caption muted">
+        Selected blocks (green dot) are open for patient booking. Tap any cell to toggle. Changes take effect immediately after saving.
+        Slots outside these blocks are not shown to patients.
+      </p>
+
+    </div>
+  </main>
+
+</div><!-- /layout -->
+
+</body>
+</html>

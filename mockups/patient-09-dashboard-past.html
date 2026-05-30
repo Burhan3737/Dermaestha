@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Past Appointments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    .page-body { padding: 24px 0 80px; }
+    .appt-card { display: flex; align-items: flex-start; gap: 16px; padding: 18px; margin-bottom: 12px; }
+    .appt-photo { flex: 0 0 auto; }
+    .appt-photo img { width: 48px; height: 48px; border-radius: var(--r-pill); object-fit: cover; }
+    .appt-body { flex: 1; min-width: 0; }
+    .appt-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .nav-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: var(--border-1); }
+    .nav-tab { font-family: var(--font-head); font-weight: 700; font-size: var(--fs-body-sm); padding: 10px 16px; border-bottom: 2px solid transparent; color: var(--color-text-muted); cursor: pointer; text-decoration: none; }
+    .nav-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+    .refund-detail { display: flex; flex-direction: column; gap: 0; }
+    .refund-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: var(--border-1); font-size: var(--fs-body-sm); }
+    .refund-row:last-child { border-bottom: 0; }
+  </style>
+</head>
+<body>
+
+<!-- Top nav (desktop) -->
+<nav class="topnav only-desktop">
+  <div class="topnav__inner">
+    <a class="brand" href="patient-01-landing.html">
+      <span class="brand__mark"></span>
+      <span class="brand__word">Dermestha</span>
+    </a>
+    <div class="topnav__links">
+      <a href="patient-02-browse.html">Browse</a>
+      <a href="patient-08-dashboard-upcoming.html" class="active">My Appointments</a>
+      <span class="avatar avatar--sm" style="margin-left:8px">SK</span>
+    </div>
+  </div>
+</nav>
+
+<!-- Bottom tabbar (mobile) -->
+<div class="tabbar only-mobile">
+  <a href="patient-02-browse.html" class="tabbar__item">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><path d="M15 15l3 3"/></svg>
+    Browse
+  </a>
+  <a href="patient-08-dashboard-upcoming.html" class="tabbar__item active">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M7 2v4M13 2v4M3 9h14"/></svg>
+    Appts
+  </a>
+  <a href="#" class="tabbar__item">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="10" cy="7" r="3"/><path d="M4 18c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+    Profile
+  </a>
+</div>
+
+<div class="page-body">
+  <div class="container">
+
+    <h1 class="h1" style="margin-bottom:20px">My appointments</h1>
+
+    <div class="nav-tabs">
+      <a href="patient-08-dashboard-upcoming.html" class="nav-tab">Upcoming</a>
+      <a href="patient-09-dashboard-past.html" class="nav-tab active">Past</a>
+    </div>
+
+    <h2 class="h2" style="margin-bottom:16px">Past appointments</h2>
+
+    <!-- 1. Completed · Prescription ready -->
+    <div class="card appt-card">
+      <div class="appt-photo">
+        <img src="https://randomuser.me/api/portraits/women/65.jpg" alt="Dr. Ayesha Khan">
+      </div>
+      <div class="appt-body">
+        <div class="between" style="align-items:flex-start;gap:8px">
+          <div>
+            <p class="strong" style="font-weight:700;margin:0;font-size:var(--fs-body)">Dr. Ayesha Khan</p>
+            <p style="font-size:var(--fs-body-sm);color:var(--color-text-muted);margin-top:2px">Acne &amp; Pigmentation</p>
+          </div>
+          <span class="badge badge--success">Completed · Prescription ready</span>
+        </div>
+        <p class="body-sm muted" style="margin-top:6px"><span class="tnum">Thu 22 May · 6:30 PM</span></p>
+        <p class="body-sm muted"><span class="tnum">PKR 2,000</span></p>
+        <div class="appt-actions">
+          <a href="patient-13-prescription.html" class="btn btn--secondary btn--sm">Download Prescription</a>
+          <a href="patient-03-doctor-profile.html" style="color:var(--color-primary);font-size:var(--fs-body-sm);text-decoration:none;font-weight:600">Rebook</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Cancelled — refunded -->
+    <div class="card appt-card">
+      <div class="appt-photo">
+        <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Dr. Bilal Sheikh">
+      </div>
+      <div class="appt-body">
+        <div class="between" style="align-items:flex-start;gap:8px">
+          <div>
+            <p class="strong" style="font-weight:700;margin:0;font-size:var(--fs-body)">Dr. Bilal Sheikh</p>
+            <p style="font-size:var(--fs-body-sm);color:var(--color-text-muted);margin-top:2px">Hair &amp; Scalp</p>
+          </div>
+          <span class="badge badge--info">Cancelled — refunded</span>
+        </div>
+        <p class="body-sm muted" style="margin-top:6px"><span class="tnum">Sat 17 May · 11:00 AM</span></p>
+        <p class="body-sm muted"><span class="tnum">PKR 2,500</span> paid · <span class="tnum">PKR 2,455</span> refunded</p>
+      </div>
+    </div>
+
+    <!-- 3. Missed (no-show) -->
+    <div class="card appt-card">
+      <div class="appt-photo">
+        <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Dr. Zara Malik">
+      </div>
+      <div class="appt-body">
+        <div class="between" style="align-items:flex-start;gap:8px">
+          <div>
+            <p class="strong" style="font-weight:700;margin:0;font-size:var(--fs-body)">Dr. Zara Malik</p>
+            <p style="font-size:var(--fs-body-sm);color:var(--color-text-muted);margin-top:2px">Eczema &amp; Anti-ageing</p>
+          </div>
+          <span class="badge badge--warning">Missed (no-show)</span>
+        </div>
+        <p class="body-sm muted" style="margin-top:6px"><span class="tnum">Thu 15 May · 8:00 PM</span></p>
+        <p class="body-sm muted"><span class="tnum">PKR 1,800</span> · No refund issued</p>
+        <div class="appt-actions">
+          <a href="patient-03-doctor-profile.html" style="color:var(--color-primary);font-size:var(--fs-body-sm);text-decoration:none;font-weight:600">Rebook</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Cancelled by doctor — refund issued -->
+    <div class="card appt-card">
+      <div class="appt-photo">
+        <img src="https://randomuser.me/api/portraits/men/52.jpg" alt="Dr. Omar Farooq">
+      </div>
+      <div class="appt-body">
+        <div class="between" style="align-items:flex-start;gap:8px">
+          <div>
+            <p class="strong" style="font-weight:700;margin:0;font-size:var(--fs-body)">Dr. Omar Farooq</p>
+            <p style="font-size:var(--fs-body-sm);color:var(--color-text-muted);margin-top:2px">Acne &amp; Hair &amp; Scalp</p>
+          </div>
+          <span class="badge badge--danger">Cancelled by doctor — refund issued</span>
+        </div>
+        <p class="body-sm muted" style="margin-top:6px"><span class="tnum">Mon 12 May · 4:30 PM</span></p>
+        <p class="body-sm muted"><span class="tnum">PKR 2,200</span> paid · <span class="tnum">PKR 2,200</span> full refund</p>
+        <div class="appt-actions">
+          <a href="patient-03-doctor-profile.html" style="color:var(--color-primary);font-size:var(--fs-body-sm);text-decoration:none;font-weight:600">Rebook</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Cancelled — no refund -->
+    <div class="card appt-card">
+      <div class="appt-photo">
+        <img src="https://randomuser.me/api/portraits/women/68.jpg" alt="Dr. Nadia Hussain">
+      </div>
+      <div class="appt-body">
+        <div class="between" style="align-items:flex-start;gap:8px">
+          <div>
+            <p class="strong" style="font-weight:700;margin:0;font-size:var(--fs-body)">Dr. Nadia Hussain</p>
+            <p style="font-size:var(--fs-body-sm);color:var(--color-text-muted);margin-top:2px">Pigmentation &amp; Anti-ageing</p>
+          </div>
+          <span class="badge badge--neutral">Cancelled — no refund</span>
+        </div>
+        <p class="body-sm muted" style="margin-top:6px"><span class="tnum">Fri 9 May · 11:00 AM</span></p>
+        <p class="body-sm muted"><span class="tnum">PKR 3,000</span> · Cancelled &lt;2h before — no refund applies</p>
+      </div>
+    </div>
+
+    <!-- Refund status card -->
+    <h2 class="h2" style="margin-top:28px;margin-bottom:16px">Refund status</h2>
+    <div class="card" style="padding:20px;max-width:480px">
+      <p class="h3" style="margin-bottom:4px">Refund for Bilal Sheikh appointment</p>
+      <p class="body-sm muted" style="margin-bottom:16px"><span class="tnum">Sat 17 May · 11:00 AM</span></p>
+
+      <div class="refund-detail">
+        <div class="refund-row">
+          <span>Paid</span>
+          <span class="tnum strong">PKR 2,500</span>
+        </div>
+        <div class="refund-row">
+          <span style="color:var(--color-danger)">Gateway fee</span>
+          <span class="tnum" style="color:var(--color-danger)">− PKR 45</span>
+        </div>
+        <div class="refund-row" style="font-weight:700">
+          <span>Refund</span>
+          <span class="tnum" style="color:var(--color-success)">PKR 2,455</span>
+        </div>
+      </div>
+
+      <p class="body-sm muted" style="margin-top:14px">Gateway reference: <span class="tnum" style="font-family:monospace;color:var(--color-text-strong)">PAY-20260517-83712</span></p>
+      <p class="body-sm muted" style="margin-top:4px">Refund initiated 2 days ago — expected within <strong>7 working days</strong>.</p>
+
+      <div class="alert alert--info" style="margin-top:16px">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7"/></svg>
+        <span>Refund excludes the payment-gateway fee charged at booking. This is standard across all payment processors.</span>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+</div>
+
+</body>
+</html>

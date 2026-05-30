@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — See a real skin doctor without leaving home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    /* Landing-specific layout */
+    .hero-inner { max-width: var(--maxw); margin: 0 auto; padding: 52px var(--sp-4); display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+    .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+    .hero-cta .btn--primary { font-size: 15px; padding: 14px 24px; }
+    .hero-cta .btn--secondary { font-size: 15px; padding: 14px 24px; background: transparent; color: var(--color-on-dark); box-shadow: inset 0 0 0 1px var(--color-on-dark-muted); }
+    .hero-cta .btn--secondary:hover { background: rgba(255,255,255,.08); }
+    .trust-row { display: flex; gap: 20px; margin-top: 24px; flex-wrap: wrap; }
+    .trust-item { font-size: var(--fs-body-sm); color: var(--color-on-dark-muted); display: flex; align-items: center; gap: 6px; }
+    .trust-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-on-dark-accent); display: inline-block; }
+    .hero-card { display: flex; justify-content: flex-end; }
+
+    .porcelain { background: var(--color-bg); }
+    .section { padding: 40px 0; }
+    .section-title { text-align: center; margin-bottom: 28px; }
+    .section-title .h2 { margin-bottom: 8px; }
+
+    .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .step-card { background: var(--color-surface); border: var(--border-1); border-radius: var(--r-md); padding: 28px 24px; }
+    .step-num { font-family: var(--font-head); font-weight: 800; font-size: 32px; color: var(--color-primary-border); margin-bottom: 12px; }
+    .step-card .h3 { margin-bottom: 8px; }
+
+    .doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+    .trust-strip { padding: 40px 0; background: var(--color-surface); border-top: var(--border-1); border-bottom: var(--border-1); }
+    .trust-strip-inner { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--sp-4); display: flex; justify-content: center; gap: 48px; flex-wrap: wrap; align-items: center; }
+    .trust-strip-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .trust-strip-num { font-family: var(--font-head); font-weight: 800; font-size: 28px; color: var(--color-primary); }
+
+    .feature-footer { padding: 40px 0; }
+    .feature-footer-inner { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--sp-4); text-align: center; }
+    .feature-footer .btn--primary { margin-top: 24px; }
+    .footer-links { display: flex; gap: 24px; justify-content: center; margin-top: 32px; flex-wrap: wrap; }
+    .footer-links a { color: var(--color-on-dark-muted); font-size: var(--fs-body-sm); text-decoration: none; }
+    .footer-links a:hover { color: var(--color-on-dark); }
+    .footer-copy { color: var(--color-on-dark-muted); font-size: var(--fs-caption); margin-top: 20px; }
+
+    @media (max-width: 767px) {
+      .hero-inner { grid-template-columns: 1fr; padding: 36px var(--sp-4) 40px; gap: 32px; }
+      .hero-card { justify-content: stretch; }
+      .hero-card .doc-card { width: 100%; }
+      .hero-cta { flex-direction: column; }
+      .hero-cta .btn--primary, .hero-cta .btn--secondary { width: 100%; justify-content: center; }
+      .how-grid { grid-template-columns: 1fr; }
+      .doc-grid { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 640px) and (max-width: 1023px) {
+      .doc-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top nav (logged-out) -->
+<nav class="topnav">
+  <div class="topnav__inner">
+    <a class="brand" href="patient-01-landing.html">
+      <span class="brand__mark"></span>
+      <span class="brand__word">Dermestha</span>
+    </a>
+    <div class="topnav__links">
+      <a href="patient-02-browse.html">Browse</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#">For doctors</a>
+      <a href="patient-05-login.html" class="btn btn--secondary btn--sm">Log in</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero (feature dark band) -->
+<section class="feature">
+  <div class="hero-inner">
+    <!-- Copy -->
+    <div class="hero-copy">
+      <span class="feature__eyebrow">PMC-Verified Dermatologists</span>
+      <h1 class="display" style="margin-top:14px;margin-bottom:16px">See a real skin doctor without leaving home.</h1>
+      <p class="body-lg" style="color:var(--color-on-dark);max-width:460px">Book a 30-minute video consultation with a verified dermatologist — get a proper diagnosis, prescription, and follow-up plan. From anywhere in Pakistan.</p>
+      <div class="hero-cta">
+        <a href="patient-02-browse.html" class="btn btn--primary btn--lg">Find your dermatologist</a>
+        <a href="#how-it-works" class="btn btn--secondary btn--lg">How it works</a>
+      </div>
+      <div class="trust-row">
+        <span class="trust-item"><span class="trust-dot"></span>PMC-verified</span>
+        <span class="trust-item"><span class="trust-dot"></span>30-min video</span>
+        <span class="trust-item"><span class="trust-dot"></span>Itemised Rx</span>
+      </div>
+    </div>
+    <!-- Featured doctor card -->
+    <div class="hero-card">
+      <a href="patient-03-doctor-profile.html" style="text-decoration:none;display:block;max-width:280px;width:100%">
+        <div class="doc-card">
+          <div class="doc-card__img">
+            <img src="https://randomuser.me/api/portraits/women/65.jpg" alt="Dr. Ayesha Khan">
+            <span class="pmc-badge">&#10003; PMC</span>
+          </div>
+          <div class="doc-card__body">
+            <p class="doc-card__name">Dr. Ayesha Khan</p>
+            <p class="doc-card__spec">Acne &amp; Pigmentation · 8 yrs</p>
+            <div class="doc-card__foot">
+              <span class="doc-card__fee tnum">PKR 2,000</span>
+              <span class="doc-card__slot tnum">Today 6:30 PM</span>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="porcelain section" id="how-it-works">
+  <div class="container">
+    <div class="section-title">
+      <p class="h2">How Dermestha works</p>
+      <p class="body-lg muted" style="margin-top:8px">Three steps to clear skin, from your phone or laptop.</p>
+    </div>
+    <div class="how-grid">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <p class="h3" style="margin-bottom:8px">Browse &amp; book</p>
+        <p style="margin:0">Choose from PMC-verified dermatologists by specialization, availability, and fee. Pick a slot that works for you.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <p class="h3" style="margin-bottom:8px">Consult by video</p>
+        <p style="margin:0">Join a 30-minute HD video call. Your doctor will examine your skin, ask questions, and make a proper diagnosis.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <p class="h3" style="margin-bottom:8px">Receive your Rx</p>
+        <p style="margin:0">Your itemised prescription is available to download instantly after the consultation — with dosage, duration, and prices.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Featured specialists -->
+<section class="porcelain section" style="padding-top:0">
+  <div class="container">
+    <div class="section-title">
+      <p class="h2">Featured specialists</p>
+      <p class="body-lg muted" style="margin-top:8px">Browse our full panel of PMC-verified dermatologists.</p>
+    </div>
+    <div class="doc-grid">
+      <a href="patient-03-doctor-profile.html" style="text-decoration:none">
+        <div class="doc-card">
+          <div class="doc-card__img">
+            <img src="https://randomuser.me/api/portraits/women/65.jpg" alt="Dr. Ayesha Khan">
+            <span class="pmc-badge">&#10003; PMC</span>
+          </div>
+          <div class="doc-card__body">
+            <p class="doc-card__name">Dr. Ayesha Khan</p>
+            <p class="doc-card__spec">Acne &amp; Pigmentation · 8 yrs</p>
+            <div class="doc-card__foot">
+              <span class="doc-card__fee tnum">PKR 2,000</span>
+              <span class="doc-card__slot tnum">Today 6:30 PM</span>
+            </div>
+          </div>
+        </div>
+      </a>
+      <a href="patient-03-doctor-profile.html" style="text-decoration:none">
+        <div class="doc-card">
+          <div class="doc-card__img">
+            <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Dr. Bilal Sheikh">
+            <span class="pmc-badge">&#10003; PMC</span>
+          </div>
+          <div class="doc-card__body">
+            <p class="doc-card__name">Dr. Bilal Sheikh</p>
+            <p class="doc-card__spec">Hair &amp; Scalp · 12 yrs</p>
+            <div class="doc-card__foot">
+              <span class="doc-card__fee tnum">PKR 2,500</span>
+              <span class="doc-card__slot tnum">Tomorrow 10:00 AM</span>
+            </div>
+          </div>
+        </div>
+      </a>
+      <a href="patient-03-doctor-profile.html" style="text-decoration:none">
+        <div class="doc-card">
+          <div class="doc-card__img">
+            <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Dr. Zara Malik">
+            <span class="pmc-badge">&#10003; PMC</span>
+          </div>
+          <div class="doc-card__body">
+            <p class="doc-card__name">Dr. Zara Malik</p>
+            <p class="doc-card__spec">Eczema &amp; Anti-ageing · 6 yrs</p>
+            <div class="doc-card__foot">
+              <span class="doc-card__fee tnum">PKR 1,800</span>
+              <span class="doc-card__slot tnum">Today 8:00 PM</span>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+    <div style="text-align:center;margin-top:32px">
+      <a href="patient-02-browse.html" class="btn btn--secondary">View all specialists</a>
+    </div>
+  </div>
+</section>
+
+<!-- Trust strip -->
+<div class="trust-strip">
+  <div class="trust-strip-inner">
+    <div class="trust-strip-item">
+      <span class="trust-strip-num tnum">120+</span>
+      <span class="caption">PMC-verified doctors</span>
+    </div>
+    <div class="trust-strip-item">
+      <span class="trust-strip-num tnum">15,000+</span>
+      <span class="caption">Consultations completed</span>
+    </div>
+    <div class="trust-strip-item">
+      <span class="trust-strip-num tnum">4.8 / 5</span>
+      <span class="caption">Average patient rating</span>
+    </div>
+    <div class="trust-strip-item">
+      <span class="trust-strip-num tnum">30-min</span>
+      <span class="caption">Standard consultation</span>
+    </div>
+  </div>
+</div>
+
+<!-- Feature footer -->
+<footer class="feature feature-footer">
+  <div class="feature-footer-inner">
+    <span class="feature__eyebrow">Ready to start?</span>
+    <h2 class="display" style="margin-top:12px;color:#fff">Clearer skin is one click away.</h2>
+    <p class="body-lg" style="color:var(--color-on-dark);margin-top:12px;max-width:480px;margin-left:auto;margin-right:auto">No referral needed. No waiting room. Just expert dermatology, when and where you need it.</p>
+    <a href="patient-02-browse.html" class="btn btn--brass btn--lg" style="margin-top:24px">Find your dermatologist</a>
+    <div class="footer-links">
+      <a href="#">For doctors</a>
+      <a href="#">About Dermestha</a>
+      <a href="/legal/terms">Terms of Service</a>
+      <a href="/legal/privacy">Privacy Policy</a>
+    </div>
+    <p class="footer-copy">© 2026 Dermestha · All consultations conducted by PMC-registered physicians</p>
+  </div>
+</footer>
+
+</body>
+</html>

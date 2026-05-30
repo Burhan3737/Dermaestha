@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dermestha — Video consultation (Doctor)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="icon" href="assets/img/logo-mark.svg">
+  <script defer src="assets/js/ui.js"></script>
+  <style>
+    body { background: var(--color-feature-bg); }
+
+    /* Page layout — matches patient-12-video exactly */
+    .video-page { padding: var(--sp-6) var(--sp-4) var(--sp-8); display: flex; flex-direction: column; align-items: center; }
+    .video-shell { width: 100%; max-width: 860px; }
+
+    /* Stage header row */
+    .video-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-3); }
+    .video-doctor-label { color: var(--color-on-dark); font-size: var(--fs-body-sm); font-weight: 600; display: flex; align-items: center; gap: var(--sp-2); }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-on-dark-accent); display: inline-block; flex: 0 0 auto; }
+
+    /* Timer */
+    .timer-row { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); justify-content: center; flex-wrap: wrap; }
+    .timer-value { font-family: var(--font-head); font-weight: 800; font-size: 20px; color: var(--color-on-dark); font-variant-numeric: tabular-nums; }
+    .timer-label { color: var(--color-on-dark-muted); font-size: var(--fs-body-sm); }
+    .slot-cutoff { font-size: var(--fs-caption); color: var(--color-on-dark-muted); }
+
+    /* Controls */
+    .ctrl-label { font-size: 10px; font-weight: 700; color: var(--color-on-dark-muted); margin-top: 4px; text-align: center; font-family: var(--font-head); text-transform: uppercase; letter-spacing: .5px; }
+    .ctrl-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .video-controls { display: flex; gap: var(--sp-4); justify-content: center; margin-top: var(--sp-4); flex-wrap: wrap; }
+
+    .time-alert { margin-top: var(--sp-4); }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .video-topbar-label { display: none; }
+      .video-page { padding: var(--sp-4) var(--sp-3) var(--sp-6); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Standard white top nav — same as patient video page -->
+<nav class="topnav">
+  <div class="topnav__inner">
+    <a class="brand" href="doctor-02-today.html">
+      <span class="brand__mark"></span>
+      <span class="brand__word">Dermestha</span>
+    </a>
+    <div class="topnav__links">
+      <span class="video-topbar-label caption" style="color:var(--color-text-muted)">Consultation &middot; with Sana Khan (for Ayesha's account)</span>
+      <span class="badge badge--success">Connected</span>
+    </div>
+  </div>
+</nav>
+
+<div class="video-page">
+  <div class="video-shell">
+
+    <!-- Stage header -->
+    <div class="video-header">
+      <div class="video-doctor-label">
+        <span class="live-dot"></span>
+        Sana Khan &mdash; Age 9 &middot; Eczema &amp; Dryness
+      </div>
+      <span class="caption" style="color:var(--color-on-dark-muted)">Dr. Ayesha Khan &middot; Acne &amp; Pigmentation</span>
+    </div>
+
+    <!-- Video stage — patient tile (large) -->
+    <div class="video-stage">
+      <div style="text-align:center">
+        <img src="https://randomuser.me/api/portraits/women/72.jpg" alt="Sana Khan" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.15);margin-bottom:var(--sp-3)">
+        <p class="h3" style="color:var(--color-on-dark);margin-bottom:var(--sp-1)">Sana Khan</p>
+        <span class="caption" style="color:var(--color-on-dark-muted)">Patient &middot; Video on &middot; Audio on</span>
+      </div>
+      <!-- Self tile — doctor view of themselves -->
+      <div class="video-self">
+        <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--color-on-dark-muted);font-size:10px;font-weight:600">You</div>
+      </div>
+    </div>
+
+    <!-- Timer -->
+    <div class="timer-row">
+      <span class="timer-value tnum">5:00</span>
+      <span class="timer-label">remaining</span>
+      <span class="slot-cutoff">&middot; Slot ends at <span class="tnum">7:00 PM</span> &middot; Call closes at <span class="tnum">7:05 PM</span></span>
+    </div>
+
+    <!-- Controls -->
+    <div class="video-controls">
+      <div class="ctrl-wrap">
+        <button class="video-ctrl" title="Toggle microphone">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="var(--color-text-body)">
+            <rect x="7" y="2" width="6" height="10" rx="3"/>
+            <path d="M4 10a6 6 0 0012 0" stroke="var(--color-text-body)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <line x1="10" y1="16" x2="10" y2="19" stroke="var(--color-text-body)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <span class="ctrl-label">Mic</span>
+      </div>
+      <div class="ctrl-wrap">
+        <button class="video-ctrl" title="Toggle camera">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="5" width="12" height="10" rx="2" stroke="var(--color-text-body)" stroke-width="1.5"/>
+            <path d="M14 8l4-2v8l-4-2V8z" fill="var(--color-text-body)"/>
+          </svg>
+        </button>
+        <span class="ctrl-label">Camera</span>
+      </div>
+      <div class="ctrl-wrap">
+        <button class="video-ctrl video-ctrl--leave" title="Leave call" onclick="if(confirm('End the call?')) location.href='doctor-05-prescription-builder.html'">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M18 10H4M8 6l-4 4 4 4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <span class="ctrl-label">Leave</span>
+      </div>
+    </div>
+
+    <!-- Doctor-specific: 5-min remaining warning -->
+    <div class="time-alert">
+      <div class="alert alert--warning">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:0 0 auto;margin-top:1px"><circle cx="8" cy="8" r="6"/><path d="M8 5v3M8 11v.5"/></svg>
+        <span><strong>5 minutes remaining</strong> — the room closes at <span class="tnum">7:05 PM</span>. Please wrap up and issue your prescription after the call.</span>
+      </div>
+    </div>
+
+  </div><!-- /video-shell -->
+</div><!-- /video-page -->
+
+</body>
+</html>
