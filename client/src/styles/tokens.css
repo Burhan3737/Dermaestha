@@ -1,0 +1,65 @@
+/* tokens.css — Dermestha design tokens (DESIGN.md §2). Values are the single source of truth. */
+:root {
+  /* Brand */
+  --color-primary:        #0F3A2A;
+  --color-primary-hover:  #0A2C20;
+  --color-primary-tint:   #E6F1EA;
+  --color-primary-border: #C2D3C8;
+  --color-on-primary:     #FFFFFF;
+  /* Accent (brass) */
+  --color-accent:       #B5852F;
+  --color-accent-deep:  #9A6B1F;
+  --color-accent-tint:  #FBF0E0;
+  /* Canvas / surface / ink */
+  --color-bg:             #E8ECE9;
+  --color-surface:        #FFFFFF;
+  --color-surface-sunken: #DFE5E1;
+  --color-border:         #D7DED8;
+  --color-border-strong:  #C2CBC4;
+  --color-text-strong:    #13241D;
+  --color-text-body:      #46524B;
+  --color-text-muted:     #56625B;
+  /* Feature dark band */
+  --color-feature-bg:    #0F3A2A;
+  --color-on-dark:       #DCE9E2;
+  --color-on-dark-muted: #AFC6BA;
+  --color-on-dark-accent:#9BE3B8;
+  /* Dark / immersive chrome (video stage + waiting room) */
+  --color-dark-bg:      #0A2C20;
+  --color-dark-surface: #0E3328;
+  --color-dark-border:  #1F5440;
+  --color-dark-deep:    #072018;
+  /* Semantic text + bg */
+  --color-success: #136B45; --color-success-bg: #E6F1EA;
+  --color-info:    #2F6E6E; --color-info-bg:    #E2EFEE;
+  --color-warning: #9A6B1F; --color-warning-bg: #FBF0E0;
+  --color-danger:  #B23A2E; --color-danger-bg:  #F7E9E6;
+  --color-danger-deep: #9A2A20;
+  --color-neutral: #56625B; --color-neutral-bg: #EAEEEA;
+
+  /* Typography */
+  --font-head: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fs-display: 30px; --fs-h1: 24px; --fs-h2: 20px; --fs-h3: 17px;
+  --fs-body-lg: 16px; --fs-body: 14px; --fs-body-sm: 13px; --fs-caption: 12px; --fs-label: 11px;
+
+  /* Spacing (4px base) */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
+  --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
+
+  /* Radius */
+  --r-sm: 3px; --r-md: 4px; --r-lg: 6px; --r-pill: 999px;
+
+  /* Border + elevation */
+  --border-1: 1px solid var(--color-border);
+  --border-strong: 1px solid var(--color-border-strong);
+  --shadow-overlay: 0 18px 44px rgba(15,33,24,.25);
+
+  /* Motion */
+  --ease: 180ms ease;
+
+  /* Layout */
+  --maxw: 1240px;
+  --sidebar-w: 240px;
+}
+@media (prefers-reduced-motion: reduce) { :root { --ease: 0ms; } }
