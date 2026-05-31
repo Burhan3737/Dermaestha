@@ -1,11 +1,11 @@
 # 2026-05-31-1700 — m0-foundation-scaffold
 
-**Status:** In Progress (Tasks 5–6 complete)
+**Status:** In Progress (Tasks 7–8 complete)
 **Goal:** Execute Milestone 0 (Foundation/Scaffold) of Dermestha — stand up a same-origin Express + React (Vite) + Prisma/Postgres skeleton with every cross-cutting seam (config, sessions, role middleware, error envelope, audit writer, vendor-adapter interfaces) in place and tested.
 **Skill(s) used:** superpowers:writing-plans (plan authoring), superpowers:subagent-driven-development (execution: fresh implementer subagent per task + spec/quality review).
 
 ## Summary
-Authored and approved the M0 implementation plan (`docs/superpowers/plans/2026-05-31-foundation-scaffold.md`, 14 tasks), then began subagent-driven execution. Task 0 (npm-workspaces scaffold + tooling + Vitest), Task 1 (Prisma init migration + the hand-added `uniq_active_slot` partial index + seed + double-booking invariant test), Task 2 (config/env.js + constants.js), Task 3 (lib/ cross-cutting primitives), and Task 4 (AppError + uniform error-envelope middleware) are complete. Task 3 created the Prisma singleton, minimal structured logger, error-tracking stub seam, and password hash/verify util — turning the double-booking keystone test green and bringing the full suite to 6/6. Task 4 added `AppError` (SCREAMING_SNAKE coded errors with HTTP status) and the Express `errorHandler` middleware mapping AppError → its status, ZodError → 400 VALIDATION_FAILED, and unknown → 500 INTERNAL, bringing the full suite to 9/9. Git history was cleaned at the developer's request to remove the Co-Authored-By trailer from this session's commits, and the per-session change-log was consolidated to this single file. Task 5 added the Postgres-backed session middleware (HTTP-only/Secure/Lax cookie, `createTableIfMissing:false` because Prisma owns the DDL). Task 6 (TDD) added the `requireRole` authorization boundary (DA6) and the `makeRateLimiter` factory, bringing the full suite to 12/12 across 5 files.
+Authored and approved the M0 implementation plan (`docs/superpowers/plans/2026-05-31-foundation-scaffold.md`, 14 tasks), then began subagent-driven execution. Task 0 (npm-workspaces scaffold + tooling + Vitest), Task 1 (Prisma init migration + the hand-added `uniq_active_slot` partial index + seed + double-booking invariant test), Task 2 (config/env.js + constants.js), Task 3 (lib/ cross-cutting primitives), and Task 4 (AppError + uniform error-envelope middleware) are complete. Task 3 created the Prisma singleton, minimal structured logger, error-tracking stub seam, and password hash/verify util — turning the double-booking keystone test green and bringing the full suite to 6/6. Task 4 added `AppError` (SCREAMING_SNAKE coded errors with HTTP status) and the Express `errorHandler` middleware mapping AppError → its status, ZodError → 400 VALIDATION_FAILED, and unknown → 500 INTERNAL, bringing the full suite to 9/9. Git history was cleaned at the developer's request to remove the Co-Authored-By trailer from this session's commits, and the per-session change-log was consolidated to this single file. Task 5 added the Postgres-backed session middleware (HTTP-only/Secure/Lax cookie, `createTableIfMissing:false` because Prisma owns the DDL). Task 6 (TDD) added the `requireRole` authorization boundary (DA6) and the `makeRateLimiter` factory, bringing the full suite to 12/12 across 5 files. Task 7 (TDD) added the append-only audit-log writer seam (`audit.service.js` — single `record()` export, no update/delete by convention, §3.6), bringing the suite to 14/14 across 6 files. Task 8 added payment/video/email vendor-adapter interface seams: `@typedef` contracts plus `NOT_IMPLEMENTED` stubs for PayFast, Daily.co, and Resend, each selected via a barrel `index.js`; stubs throw `AppError('NOT_IMPLEMENTED', ..., 501)` reusing the existing AppError primitive. Full suite now 17/17 across 7 files.
 
 ## Context / why
 Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the base every later milestone builds on. Scope is foundation-only (no business features); contract specs (`schema.prisma`, `API.md`, `CONFIG.md`, `INTEGRATIONS.md`, `.env.example`) are the build-against source of truth. Developer choices: foundation-only first plan, pragmatic TDD, subagent-driven execution, Docker Desktop for Postgres.
@@ -40,6 +40,15 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 | `server/src/middleware/requireRole.js` | Created | DA6 single server-side authorization boundary; returns 401 UNAUTHENTICATED or 403 FORBIDDEN via AppError. |
 | `server/src/middleware/rateLimit.js` | Created | `makeRateLimiter` factory for §3.6 rate limiters; routes instantiate in M1. |
 | `server/src/middleware/requireRole.test.js` | Created | TDD tests for requireRole: allowed role passes, 401 no session, 403 wrong role (3 tests). |
+| `server/src/services/audit.service.js` | Created | Append-only audit writer (§3.6); single `record()` export; no update/delete path exported by convention. |
+| `server/src/services/audit.service.test.js` | Created | TDD tests: row appended (DB write verified), no update/delete exports (2 tests). |
+| `server/src/integrations/payment/payfast.stub.js` | Created | PayFast NOT_IMPLEMENTED stub; implements `PaymentProvider` typedef; all methods throw AppError 501. |
+| `server/src/integrations/payment/index.js` | Created | Payment barrel + `PaymentProvider` typedef; exports `paymentProvider = payfastStub`. |
+| `server/src/integrations/video/daily.stub.js` | Created | Daily.co NOT_IMPLEMENTED stub; implements `VideoProvider` typedef. |
+| `server/src/integrations/video/index.js` | Created | Video barrel + `VideoProvider` typedef; exports `videoProvider = dailyStub`. |
+| `server/src/integrations/email/resend.stub.js` | Created | Resend NOT_IMPLEMENTED stub; implements `EmailProvider` typedef. |
+| `server/src/integrations/email/index.js` | Created | Email barrel + `EmailProvider` typedef; exports `emailProvider = resendStub`. |
+| `server/src/integrations/integrations.test.js` | Created | TDD tests: payment stub throws NOT_IMPLEMENTED, video exposes createRoom/issueToken, email exposes send (3 tests). |
 
 ## Decisions
 - **Prisma pinned to exactly 6.19.3** (not `^6`/`^7`) — Prisma 7 dropped in-schema `datasource.url` (CONFIG.md §7).
@@ -71,9 +80,14 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 - Tasks 5–6 — `requireRole.test.js` (red before implementation): 1 suite failed (cannot find `./requireRole.js`) — confirmed red.
 - Tasks 5–6 — `requireRole.test.js` (green after implementation): 3 passed.
 - Tasks 5–6 — `npx vitest run` (full suite): 5 files, 12 tests, all passed. Duration 889ms.
+- Task 7 — `audit.service.test.js` (red before implementation): 1 suite failed (cannot find `./audit.service.js`) — confirmed red.
+- Task 7 — `audit.service.test.js` (green after implementation): 2 passed (row appended, no mutate exports).
+- Task 8 — `integrations.test.js` (red before implementation): 1 suite failed (cannot find `./payment/index.js`) — confirmed red.
+- Task 8 — `integrations.test.js` (green after implementation): 3 passed (payment stub throws NOT_IMPLEMENTED, video + email expose correct methods).
+- Tasks 7–8 — `npx vitest run` (full suite): 7 files, 17 tests, all passed. Duration 1.05s.
 
 ## Open items / next session
-- Tasks 6–13 remaining: audit writer; adapter seams; app assembly + same-origin serving; client scaffold + ported tokens; Docker; admin bootstrap; README/runbook.
+- Tasks 9–13 remaining: app assembly + same-origin serving; client scaffold + ported tokens; Docker; admin bootstrap; README/runbook.
 - The `doubleBooking.test.js` is now green — keystone invariant proven end-to-end through the Prisma client.
 - Native `postgresql-x64-18` is stopped (Manual or just stopped) — restart it later if needed for other work; the Docker dev DB owns 5432 for now.
 - Decide whether to add `.gitattributes` for line-ending normalization before the Docker build (Task 11).
