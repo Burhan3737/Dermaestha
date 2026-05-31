@@ -5,7 +5,7 @@
 **Skill(s) used:** superpowers:writing-plans (plan authoring), superpowers:subagent-driven-development (execution: fresh implementer subagent per task + spec/quality review).
 
 ## Summary
-Authored and approved the M0 implementation plan (`docs/superpowers/plans/2026-05-31-foundation-scaffold.md`, 14 tasks), then began subagent-driven execution. Task 0 (npm-workspaces scaffold + tooling + Vitest) is complete and verified. Git history was cleaned at the developer's request to remove the Co-Authored-By trailer from this session's commits, and the per-session change-log was consolidated to this single file.
+Authored and approved the M0 implementation plan (`docs/superpowers/plans/2026-05-31-foundation-scaffold.md`, 14 tasks), then began subagent-driven execution. Task 0 (npm-workspaces scaffold + tooling + Vitest) and Task 1 (Prisma init migration + the hand-added `uniq_active_slot` partial index + seed + double-booking invariant test) are complete and verified — the migration was proven self-sufficient via `prisma migrate deploy` on a fresh DB, and the zero-double-booking invariant proven at the SQL level. Git history was cleaned at the developer's request to remove the Co-Authored-By trailer from this session's commits, and the per-session change-log was consolidated to this single file.
 
 ## Context / why
 Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the base every later milestone builds on. Scope is foundation-only (no business features); contract specs (`schema.prisma`, `API.md`, `CONFIG.md`, `INTEGRATIONS.md`, `.env.example`) are the build-against source of truth. Developer choices: foundation-only first plan, pragmatic TDD, subagent-driven execution, Docker Desktop for Postgres.
@@ -22,6 +22,10 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 | `.eslintrc.json` | Created | eslint:recommended base. |
 | `vitest.config.js` | Created | Vitest (node env) targeting `server/src/**/*.test.js`. |
 | `package-lock.json` | Created | npm install lockfile (336 packages). |
+| `prisma/migrations/20260531163617_init/migration.sql` | Created | Full schema DDL + hand-appended `uniq_active_slot` partial index (PRD #1). |
+| `prisma/migrations/migration_lock.toml` | Created | Prisma migration lock (postgresql). |
+| `prisma/seed.js` | Created | Seeds the single `settings` row + 3 demo medicines. |
+| `server/src/test/doubleBooking.test.js` | Created | Keystone invariant test; red until `lib/prisma.js` (Task 3). |
 | `agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md` | Created | This single session change log. |
 | `agentChangeLogs/index.md` | Modified | One-line session entry. |
 
@@ -32,6 +36,8 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 - **`.gitignore`**: restored `.claude/` + `.superpowers/` that the plan's minimal spec had dropped (protects local agent state).
 - **Commits recreated without the Co-Authored-By trailer** per developer instruction (soft/mixed reset of unpushed branch, recommitted by pathspec).
 - **Single session change log**: removed the redundant per-task log the implementer subagent created (`...1730-m0-task0-scaffold.md`); change-log ownership stays with the controller per CLAUDE.md.
+- **Dev DB on Docker, native PG18 stopped**: a native Windows `postgresql-x64-18` service occupied `localhost:5432` and shadowed the Docker container; the developer stopped it (elevated) so port 5432 matches the plan/`.env.example`/compose. Dev DB = `dermestha-pg` Postgres 16 container.
+- **Migration applied via `migrate deploy` on a fresh DB** to normalize Prisma's checksum after the hand-edit and to prove the migration file reproduces the partial index by itself (rather than only a manual `psql` apply).
 
 ## Notable findings
 - argon2 ^0.41.0 builds cleanly on Windows 11 / Node v22.12.0 (prebuilt binary) — no native toolchain needed.
@@ -46,5 +52,7 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 - `git log`: three session commits (plan, scaffold, change-log) confirmed with empty Co-Authored-By trailer.
 
 ## Open items / next session
-- Tasks 1–13 remaining: Prisma migrate + `uniq_active_slot` partial index + seed + double-booking test (Task 1, keystone); config loader; lib (prisma/logger/error-tracking/password); error envelope; session; requireRole + rate-limit; audit writer; adapter seams; app assembly + same-origin serving; client scaffold + ported tokens; Docker; admin bootstrap; README/runbook.
+- Tasks 2–13 remaining: config loader (in progress); lib (prisma/logger/error-tracking/password) — turns the double-booking test green; error envelope; session; requireRole + rate-limit; audit writer; adapter seams; app assembly + same-origin serving; client scaffold + ported tokens; Docker; admin bootstrap; README/runbook.
+- The `doubleBooking.test.js` is intentionally red (module-not-found) until Task 3 adds `lib/prisma.js`.
+- Native `postgresql-x64-18` is stopped (Manual or just stopped) — restart it later if needed for other work; the Docker dev DB owns 5432 for now.
 - Decide whether to add `.gitattributes` for line-ending normalization before the Docker build (Task 11).
