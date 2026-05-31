@@ -1,11 +1,11 @@
 # 2026-05-31-1700 — m0-foundation-scaffold
 
-**Status:** In Progress (Task 4 complete)
+**Status:** In Progress (Tasks 5–6 complete)
 **Goal:** Execute Milestone 0 (Foundation/Scaffold) of Dermestha — stand up a same-origin Express + React (Vite) + Prisma/Postgres skeleton with every cross-cutting seam (config, sessions, role middleware, error envelope, audit writer, vendor-adapter interfaces) in place and tested.
 **Skill(s) used:** superpowers:writing-plans (plan authoring), superpowers:subagent-driven-development (execution: fresh implementer subagent per task + spec/quality review).
 
 ## Summary
-Authored and approved the M0 implementation plan (`docs/superpowers/plans/2026-05-31-foundation-scaffold.md`, 14 tasks), then began subagent-driven execution. Task 0 (npm-workspaces scaffold + tooling + Vitest), Task 1 (Prisma init migration + the hand-added `uniq_active_slot` partial index + seed + double-booking invariant test), Task 2 (config/env.js + constants.js), Task 3 (lib/ cross-cutting primitives), and Task 4 (AppError + uniform error-envelope middleware) are complete. Task 3 created the Prisma singleton, minimal structured logger, error-tracking stub seam, and password hash/verify util — turning the double-booking keystone test green and bringing the full suite to 6/6. Task 4 added `AppError` (SCREAMING_SNAKE coded errors with HTTP status) and the Express `errorHandler` middleware mapping AppError → its status, ZodError → 400 VALIDATION_FAILED, and unknown → 500 INTERNAL, bringing the full suite to 9/9. Git history was cleaned at the developer's request to remove the Co-Authored-By trailer from this session's commits, and the per-session change-log was consolidated to this single file.
+Authored and approved the M0 implementation plan (`docs/superpowers/plans/2026-05-31-foundation-scaffold.md`, 14 tasks), then began subagent-driven execution. Task 0 (npm-workspaces scaffold + tooling + Vitest), Task 1 (Prisma init migration + the hand-added `uniq_active_slot` partial index + seed + double-booking invariant test), Task 2 (config/env.js + constants.js), Task 3 (lib/ cross-cutting primitives), and Task 4 (AppError + uniform error-envelope middleware) are complete. Task 3 created the Prisma singleton, minimal structured logger, error-tracking stub seam, and password hash/verify util — turning the double-booking keystone test green and bringing the full suite to 6/6. Task 4 added `AppError` (SCREAMING_SNAKE coded errors with HTTP status) and the Express `errorHandler` middleware mapping AppError → its status, ZodError → 400 VALIDATION_FAILED, and unknown → 500 INTERNAL, bringing the full suite to 9/9. Git history was cleaned at the developer's request to remove the Co-Authored-By trailer from this session's commits, and the per-session change-log was consolidated to this single file. Task 5 added the Postgres-backed session middleware (HTTP-only/Secure/Lax cookie, `createTableIfMissing:false` because Prisma owns the DDL). Task 6 (TDD) added the `requireRole` authorization boundary (DA6) and the `makeRateLimiter` factory, bringing the full suite to 12/12 across 5 files.
 
 ## Context / why
 Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the base every later milestone builds on. Scope is foundation-only (no business features); contract specs (`schema.prisma`, `API.md`, `CONFIG.md`, `INTEGRATIONS.md`, `.env.example`) are the build-against source of truth. Developer choices: foundation-only first plan, pragmatic TDD, subagent-driven execution, Docker Desktop for Postgres.
@@ -36,6 +36,10 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 | `server/src/http/AppError.js` | Created | Coded application error class: SCREAMING_SNAKE `code` + HTTP `status` + optional `details` (API.md §1.1). |
 | `server/src/http/errorHandler.js` | Created | Express error middleware: maps AppError → its status, ZodError → 400 VALIDATION_FAILED, unknown → 500 INTERNAL (never leaks internals). |
 | `server/src/http/errorHandler.test.js` | Created | TDD tests: AppError envelope, ZodError 400, unknown 500 no-leak (3 tests). |
+| `server/src/middleware/session.js` | Created | Postgres-backed Express session middleware; HTTP-only/Secure/Lax cookie; `createTableIfMissing:false` (Prisma owns DDL). |
+| `server/src/middleware/requireRole.js` | Created | DA6 single server-side authorization boundary; returns 401 UNAUTHENTICATED or 403 FORBIDDEN via AppError. |
+| `server/src/middleware/rateLimit.js` | Created | `makeRateLimiter` factory for §3.6 rate limiters; routes instantiate in M1. |
+| `server/src/middleware/requireRole.test.js` | Created | TDD tests for requireRole: allowed role passes, 401 no session, 403 wrong role (3 tests). |
 
 ## Decisions
 - **Prisma pinned to exactly 6.19.3** (not `^6`/`^7`) — Prisma 7 dropped in-schema `datasource.url` (CONFIG.md §7).
@@ -63,9 +67,13 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 - Task 3 — `npx vitest run` (full suite): 3 files, 6 tests, all passed. Duration 938ms.
 - Task 4 — `errorHandler.test.js`: 3 passed (AppError envelope, ZodError 400, unknown 500 no-leak).
 - Task 4 — `npx vitest run` (full suite): 4 files, 9 tests, all passed. Duration 856ms.
+- Tasks 5–6 — `session.js` import check: `node --env-file=.env -e "import('./server/src/middleware/session.js').then(()=>console.log('session.js loads ok'))"` → "session.js loads ok".
+- Tasks 5–6 — `requireRole.test.js` (red before implementation): 1 suite failed (cannot find `./requireRole.js`) — confirmed red.
+- Tasks 5–6 — `requireRole.test.js` (green after implementation): 3 passed.
+- Tasks 5–6 — `npx vitest run` (full suite): 5 files, 12 tests, all passed. Duration 889ms.
 
 ## Open items / next session
-- Tasks 4–13 remaining: error envelope; session; requireRole + rate-limit; audit writer; adapter seams; app assembly + same-origin serving; client scaffold + ported tokens; Docker; admin bootstrap; README/runbook.
+- Tasks 6–13 remaining: audit writer; adapter seams; app assembly + same-origin serving; client scaffold + ported tokens; Docker; admin bootstrap; README/runbook.
 - The `doubleBooking.test.js` is now green — keystone invariant proven end-to-end through the Prisma client.
 - Native `postgresql-x64-18` is stopped (Manual or just stopped) — restart it later if needed for other work; the Docker dev DB owns 5432 for now.
 - Decide whether to add `.gitattributes` for line-ending normalization before the Docker build (Task 11).
