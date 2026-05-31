@@ -1,0 +1,14 @@
+{
+  "name": "@dermestha/server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "connect-pg-simple": "^9.0.1",
+    "express-rate-limit": "^7.4.0",
+    "zod": "^3.23.0",
+    "argon2": "^0.41.0",
+    "bcryptjs": "^2.4.3"
+  }
+}

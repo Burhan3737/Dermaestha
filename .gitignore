@@ -1,2 +1,9 @@
-.superpowers/
+node_modules/
+client/dist/
+.env
+coverage/
+*.log
+
+# local agent state
 .claude/
+.superpowers/

@@ -1,0 +1,30 @@
+{
+  "name": "dermestha",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "workspaces": ["server", "client"],
+  "scripts": {
+    "dev:server": "node --watch server/src/index.js",
+    "dev:client": "npm --workspace client run dev",
+    "build:client": "npm --workspace client run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "db:seed": "node prisma/seed.js",
+    "bootstrap:admin": "node prisma/scripts/bootstrap-admin.js"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "supertest": "^7.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "prisma": "6.19.3"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
+  }
+}
