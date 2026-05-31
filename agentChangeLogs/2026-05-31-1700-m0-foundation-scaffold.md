@@ -129,3 +129,8 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 - The `doubleBooking.test.js` is now green — keystone invariant proven end-to-end through the Prisma client.
 - Native `postgresql-x64-18` is stopped (Manual or just stopped) — restart it later if needed for other work; the Docker dev DB owns 5432 for now.
 - Decide whether to add `.gitattributes` for line-ending normalization before the Docker build.
+- **Next-session / local-env notes (re-detect; don't trust blindly):**
+  - **DB on `localhost:5432`:** the native Windows `postgresql-x64-18` service is stopped so the Docker Postgres owns 5432, BUT it may **auto-restart on reboot** and re-shadow the port. Symptom: `password authentication failed for user "user"`. Fix: stop PG18 again (elevated `Stop-Service postgresql-x64-18`) or `Set-Service postgresql-x64-18 -StartupType Manual`. Bring the dev DB up with `docker compose up -d db`.
+  - **Keep the client on Vite 5 (esbuild) — do NOT run `npm create vite@latest` or bump `vite`/`@vitejs/plugin-react`/`vitest` in `client/`.** Vite 8 (rolldown) reintroduces the lightningcss Linux native-binary failure that breaks the Docker build. Versions are pinned in `client/package.json` deliberately.
+  - After any clean `npm install`, run `npx prisma generate` before seeding/testing locally (the Dockerfile already does this).
+  - Dev admin already seeded: `admin@dermestha.test` / `temp-rotate-me-now` (rotate or ignore).
