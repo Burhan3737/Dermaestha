@@ -1,6 +1,6 @@
 # 2026-05-31-1700 — m0-foundation-scaffold
 
-**Status:** In Progress (Tasks 7–8 complete; Task 9 complete; Task 10 complete; Task 11 BLOCKED — Linux native binary)
+**Status:** In Progress (Tasks 0–11 complete; Tasks 12–13 remaining)
 **Goal:** Execute Milestone 0 (Foundation/Scaffold) of Dermestha — stand up a same-origin Express + React (Vite) + Prisma/Postgres skeleton with every cross-cutting seam (config, sessions, role middleware, error envelope, audit writer, vendor-adapter interfaces) in place and tested.
 **Skill(s) used:** superpowers:writing-plans (plan authoring), superpowers:subagent-driven-development (execution: fresh implementer subagent per task + spec/quality review).
 
@@ -115,7 +115,8 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 
 ## Open items / next session
 - Tasks 12–13 remaining: admin bootstrap; README/runbook.
-- Task 11 (Docker) is **BLOCKED** on a Linux native binary issue — see Verification for details and the required fix.
+- Task 11 (Docker) RESOLVED. Root cause: `npm create vite@latest` scaffolded **Vite 8 (rolldown)**, whose **lightningcss** CSS minifier needs a Linux native binary absent from the Windows-generated lockfile → `npm ci` in the Linux image failed. Fix: pinned the client to **stable Vite 5 + @vitejs/plugin-react 4 + Vitest 2** (esbuild minifier, no native binaries) and removed the lightningcss optional dep. Verified: Docker image builds on Linux; `docker compose up` runs `app`+`db`; `/api/health` returns `{status:'ok',db:'up'}` from the container; client build 15.9 kB; RoleRoute 2/2; full server suite **20/20**.
+- Note: a clean `npm install` does NOT auto-generate the Prisma client locally — run `npx prisma generate` before `npm run db:seed`/tests (the Dockerfile already runs it). Capture in the README/runbook (Task 13).
 - The `doubleBooking.test.js` is now green — keystone invariant proven end-to-end through the Prisma client.
 - Native `postgresql-x64-18` is stopped (Manual or just stopped) — restart it later if needed for other work; the Docker dev DB owns 5432 for now.
 - Decide whether to add `.gitattributes` for line-ending normalization before the Docker build.
