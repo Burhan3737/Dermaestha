@@ -30,7 +30,9 @@
     "vitest": "^2.1.0"
   },
   "dependencies": {
-    "@prisma/client": "6.19.3",
+    "@prisma/client": "6.19.3"
+  },
+  "optionalDependencies": {
     "lightningcss-win32-x64-msvc": "^1.32.0"
   }
 }
