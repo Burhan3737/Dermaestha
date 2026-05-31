@@ -12,7 +12,8 @@
 //     WHERE state IN ('slot_locked','confirmed','in_progress','completed',
 //                     'prescription_issued','cancelled_no_refund');
 //
-// Releasing states (cancelled_refunded, doctor_cancelled) are excluded so a freed slot rebooks.
+// Releasing/terminal states (cancelled_refunded, doctor_cancelled, patient_no_show, doctor_no_show)
+// are excluded so a freed slot rebooks.
 // A second insert for a held slot then fails at WRITE time, not validation time.
 // See docs/engineering/CONFIG.md → "Migration caveats".
 // ───────────────────────────────────────────────────────────────────────────────────────────

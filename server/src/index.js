@@ -15,6 +15,9 @@ const CLIENT_DIST = path.resolve(__dirname, '../../client/dist');
 
 export function createApp() {
   const app = express();
+  // Behind a TLS-terminating proxy in prod (Railway/PaaS): required so express-session sets the
+  // Secure cookie and express-rate-limit keys on the real client IP, not the proxy.
+  app.set('trust proxy', 1);
   app.use(express.json());
   app.use(sessionMiddleware);
 
