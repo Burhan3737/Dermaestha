@@ -1,6 +1,6 @@
 # 2026-05-31-1700 — m0-foundation-scaffold
 
-**Status:** In Progress (Tasks 7–8 complete; Task 9 complete; Task 10 complete)
+**Status:** In Progress (Tasks 7–8 complete; Task 9 complete; Task 10 complete; Task 11 BLOCKED — Linux native binary)
 **Goal:** Execute Milestone 0 (Foundation/Scaffold) of Dermestha — stand up a same-origin Express + React (Vite) + Prisma/Postgres skeleton with every cross-cutting seam (config, sessions, role middleware, error envelope, audit writer, vendor-adapter interfaces) in place and tested.
 **Skill(s) used:** superpowers:writing-plans (plan authoring), superpowers:subagent-driven-development (execution: fresh implementer subagent per task + spec/quality review).
 
@@ -66,6 +66,9 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 | `client/vitest.config.js` | Created | Vitest config: jsdom, globals:true, @vitejs/plugin-react, include src/**/*.test.jsx. |
 | `package.json` | Modified | npm reformatted; `lightningcss-win32-x64-msvc` added to deps (Vite 8 CSS minification binary — Windows-specific optional). |
 | `package-lock.json` | Modified | Updated for client workspace deps + lightningcss-win32-x64-msvc. |
+| `Dockerfile` | Created | Multi-stage image: client-build (node:22-slim, npm ci, vite build) + runtime (npm ci with devDeps for prisma generate, copy built SPA, run server). |
+| `.dockerignore` | Created | Excludes node_modules, client/dist, .env, coverage, .git from Docker build context. |
+| `docker-compose.yml` | Created | Two-service compose: postgres:16 db with healthcheck + app waiting on db healthy; env injected; dermestha_pg named volume. |
 
 ## Decisions
 - **Prisma pinned to exactly 6.19.3** (not `^6`/`^7`) — Prisma 7 dropped in-schema `datasource.url` (CONFIG.md §7).
@@ -108,9 +111,11 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 - Task 10 — `npm --workspace client run test`: vitest 4.1.7, 2 passed (RoleRoute: children when role matches, redirects when mismatches). jsdom environment.
 - Task 10 — `npm run build:client`: vite 8.0.14, 20 modules transformed, `client/dist/index.html` + assets produced in 119ms. `client/dist/` correctly gitignored.
 - Task 10 — `node --env-file=.env server/src/index.js` + `curl http://localhost:3000/` → HTTP 200, body contains `<div id="root">` (SPA HTML). `curl http://localhost:3000/api/health` → `{"status":"ok","db":"up"}`. Server stopped.
+- Task 11 — `docker compose up --build -d`: **BLOCKED**. The `client-build` stage's `npm ci` succeeds (357 packages, Linux binaries resolved from lockfile's optional deps), but `npm run build:client` → `vite build` fails with `Error: [lightningcss minify] Cannot find module '../lightningcss.linux-x64-gnu.node'`. Root cause: the lockfile was generated on Windows and contains `lightningcss-win32-x64-msvc` as the resolved optional binary. The `lightningcss-linux-x64-gnu` package is NOT present in the lockfile at all, so `npm ci` on Linux has no entry to install it, and lightningcss (required by Vite 8 for CSS minification) cannot load its native module. Per task guardrails, no lockfile or dependency edits were made. Three Docker files committed as-is. Controller decision required: likely pin client to stable esbuild-based Vite (e.g. Vite 6) or run `npm install` on Linux to regenerate the lockfile with both platforms, then commit.
 
 ## Open items / next session
-- Tasks 11–13 remaining: Docker; admin bootstrap; README/runbook.
+- Tasks 12–13 remaining: admin bootstrap; README/runbook.
+- Task 11 (Docker) is **BLOCKED** on a Linux native binary issue — see Verification for details and the required fix.
 - The `doubleBooking.test.js` is now green — keystone invariant proven end-to-end through the Prisma client.
 - Native `postgresql-x64-18` is stopped (Manual or just stopped) — restart it later if needed for other work; the Docker dev DB owns 5432 for now.
-- Decide whether to add `.gitattributes` for line-ending normalization before the Docker build (Task 11).
+- Decide whether to add `.gitattributes` for line-ending normalization before the Docker build.
