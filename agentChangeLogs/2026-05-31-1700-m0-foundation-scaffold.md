@@ -1,11 +1,11 @@
 # 2026-05-31-1700 — m0-foundation-scaffold
 
-**Status:** In Progress
+**Status:** In Progress (Task 3 complete)
 **Goal:** Execute Milestone 0 (Foundation/Scaffold) of Dermestha — stand up a same-origin Express + React (Vite) + Prisma/Postgres skeleton with every cross-cutting seam (config, sessions, role middleware, error envelope, audit writer, vendor-adapter interfaces) in place and tested.
 **Skill(s) used:** superpowers:writing-plans (plan authoring), superpowers:subagent-driven-development (execution: fresh implementer subagent per task + spec/quality review).
 
 ## Summary
-Authored and approved the M0 implementation plan (`docs/superpowers/plans/2026-05-31-foundation-scaffold.md`, 14 tasks), then began subagent-driven execution. Task 0 (npm-workspaces scaffold + tooling + Vitest) and Task 1 (Prisma init migration + the hand-added `uniq_active_slot` partial index + seed + double-booking invariant test) are complete and verified — the migration was proven self-sufficient via `prisma migrate deploy` on a fresh DB, and the zero-double-booking invariant proven at the SQL level. Git history was cleaned at the developer's request to remove the Co-Authored-By trailer from this session's commits, and the per-session change-log was consolidated to this single file.
+Authored and approved the M0 implementation plan (`docs/superpowers/plans/2026-05-31-foundation-scaffold.md`, 14 tasks), then began subagent-driven execution. Task 0 (npm-workspaces scaffold + tooling + Vitest), Task 1 (Prisma init migration + the hand-added `uniq_active_slot` partial index + seed + double-booking invariant test), Task 2 (config/env.js + constants.js), and Task 3 (lib/ cross-cutting primitives) are complete. Task 3 created the Prisma singleton, minimal structured logger, error-tracking stub seam, and password hash/verify util — turning the double-booking keystone test green and bringing the full suite to 6/6. Git history was cleaned at the developer's request to remove the Co-Authored-By trailer from this session's commits, and the per-session change-log was consolidated to this single file.
 
 ## Context / why
 Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the base every later milestone builds on. Scope is foundation-only (no business features); contract specs (`schema.prisma`, `API.md`, `CONFIG.md`, `INTEGRATIONS.md`, `.env.example`) are the build-against source of truth. Developer choices: foundation-only first plan, pragmatic TDD, subagent-driven execution, Docker Desktop for Postgres.
@@ -28,6 +28,11 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 | `server/src/test/doubleBooking.test.js` | Created | Keystone invariant test; red until `lib/prisma.js` (Task 3). |
 | `agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md` | Created | This single session change log. |
 | `agentChangeLogs/index.md` | Modified | One-line session entry. |
+| `server/src/lib/prisma.js` | Created | Prisma client singleton (prevents connection exhaustion on --watch); turns doubleBooking.test.js green. |
+| `server/src/lib/logger.js` | Created | Minimal structured JSON logger (info/warn/error) using console.*. |
+| `server/src/lib/errorTracking.js` | Created | Error-tracking init seam; no-op until DSN configured; A3 fills in M4. |
+| `server/src/lib/password.js` | Created | argon2id hash/verify util (memoryCost 19456, timeCost 2, parallelism 1). |
+| `server/src/lib/password.test.js` | Created | TDD tests for hashPassword + verifyPassword (correct + wrong password cases). |
 
 ## Decisions
 - **Prisma pinned to exactly 6.19.3** (not `^6`/`^7`) — Prisma 7 dropped in-schema `datasource.url` (CONFIG.md §7).
@@ -50,9 +55,12 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 - `npm install`: 336 packages added, no errors.
 - `npm test`: Vitest v2.1.9 ran against the include glob, reported "No test files found" — runner verified.
 - `git log`: three session commits (plan, scaffold, change-log) confirmed with empty Co-Authored-By trailer.
+- Task 3 — `npx vitest run server/src/test/doubleBooking.test.js`: 1 passed (green — P2002 rejected as expected).
+- Task 3 — `npx vitest run server/src/lib/password.test.js`: 2 passed (argon2id hash+verify).
+- Task 3 — `npx vitest run` (full suite): 3 files, 6 tests, all passed. Duration 938ms.
 
 ## Open items / next session
-- Tasks 2–13 remaining: config loader (in progress); lib (prisma/logger/error-tracking/password) — turns the double-booking test green; error envelope; session; requireRole + rate-limit; audit writer; adapter seams; app assembly + same-origin serving; client scaffold + ported tokens; Docker; admin bootstrap; README/runbook.
-- The `doubleBooking.test.js` is intentionally red (module-not-found) until Task 3 adds `lib/prisma.js`.
+- Tasks 4–13 remaining: error envelope; session; requireRole + rate-limit; audit writer; adapter seams; app assembly + same-origin serving; client scaffold + ported tokens; Docker; admin bootstrap; README/runbook.
+- The `doubleBooking.test.js` is now green — keystone invariant proven end-to-end through the Prisma client.
 - Native `postgresql-x64-18` is stopped (Manual or just stopped) — restart it later if needed for other work; the Docker dev DB owns 5432 for now.
 - Decide whether to add `.gitattributes` for line-ending normalization before the Docker build (Task 11).
