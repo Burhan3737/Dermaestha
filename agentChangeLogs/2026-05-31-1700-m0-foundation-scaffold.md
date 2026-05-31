@@ -1,6 +1,6 @@
 # 2026-05-31-1700 — m0-foundation-scaffold
 
-**Status:** In Progress (Tasks 0–11 complete; Tasks 12–13 remaining)
+**Status:** In Progress (Tasks 0–12 complete; Task 12 complete; Task 13 remaining)
 **Goal:** Execute Milestone 0 (Foundation/Scaffold) of Dermestha — stand up a same-origin Express + React (Vite) + Prisma/Postgres skeleton with every cross-cutting seam (config, sessions, role middleware, error envelope, audit writer, vendor-adapter interfaces) in place and tested.
 **Skill(s) used:** superpowers:writing-plans (plan authoring), superpowers:subagent-driven-development (execution: fresh implementer subagent per task + spec/quality review).
 
@@ -69,6 +69,7 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 | `Dockerfile` | Created | Multi-stage image: client-build (node:22-slim, npm ci, vite build) + runtime (npm ci with devDeps for prisma generate, copy built SPA, run server). |
 | `.dockerignore` | Created | Excludes node_modules, client/dist, .env, coverage, .git from Docker build context. |
 | `docker-compose.yml` | Created | Two-service compose: postgres:16 db with healthcheck + app waiting on db healthy; env injected; dermestha_pg named volume. |
+| `prisma/scripts/bootstrap-admin.js` | Created | DA4 one-off idempotent admin bootstrap: hashes password with argon2id, creates a single `role:'admin'` user, no-ops if any admin already exists. Standalone (no server-workspace module resolution needed). |
 
 ## Decisions
 - **Prisma pinned to exactly 6.19.3** (not `^6`/`^7`) — Prisma 7 dropped in-schema `datasource.url` (CONFIG.md §7).
@@ -114,9 +115,12 @@ Greenfield repo: only docs/specs and mockups existed (no app code). M0 is the ba
 - Task 11 — `docker compose up --build -d`: **BLOCKED**. The `client-build` stage's `npm ci` succeeds (357 packages, Linux binaries resolved from lockfile's optional deps), but `npm run build:client` → `vite build` fails with `Error: [lightningcss minify] Cannot find module '../lightningcss.linux-x64-gnu.node'`. Root cause: the lockfile was generated on Windows and contains `lightningcss-win32-x64-msvc` as the resolved optional binary. The `lightningcss-linux-x64-gnu` package is NOT present in the lockfile at all, so `npm ci` on Linux has no entry to install it, and lightningcss (required by Vite 8 for CSS minification) cannot load its native module. Per task guardrails, no lockfile or dependency edits were made. Three Docker files committed as-is. Controller decision required: likely pin client to stable esbuild-based Vite (e.g. Vite 6) or run `npm install` on Linux to regenerate the lockfile with both platforms, then commit.
 
 ## Open items / next session
-- Tasks 12–13 remaining: admin bootstrap; README/runbook.
+- Task 13 remaining: README/runbook.
 - Task 11 (Docker) RESOLVED. Root cause: `npm create vite@latest` scaffolded **Vite 8 (rolldown)**, whose **lightningcss** CSS minifier needs a Linux native binary absent from the Windows-generated lockfile → `npm ci` in the Linux image failed. Fix: pinned the client to **stable Vite 5 + @vitejs/plugin-react 4 + Vitest 2** (esbuild minifier, no native binaries) and removed the lightningcss optional dep. Verified: Docker image builds on Linux; `docker compose up` runs `app`+`db`; `/api/health` returns `{status:'ok',db:'up'}` from the container; client build 15.9 kB; RoleRoute 2/2; full server suite **20/20**.
 - Note: a clean `npm install` does NOT auto-generate the Prisma client locally — run `npx prisma generate` before `npm run db:seed`/tests (the Dockerfile already runs it). Capture in the README/runbook (Task 13).
+- Task 12 — First run: `ADMIN_EMAIL=admin@dermestha.test ADMIN_PASSWORD=temp-rotate-me-now node --env-file=.env prisma/scripts/bootstrap-admin.js` → `Admin created: admin@dermestha.test. Rotate this password now.`
+- Task 12 — Second run (idempotency): same command → `Admin already exists — no-op.`
+- Task 12 — DB count: `docker exec dermestha-db-1 psql -U user -d dermestha -c "SELECT count(*) FROM users WHERE role='admin';"` → `1` (exactly one admin row).
 - The `doubleBooking.test.js` is now green — keystone invariant proven end-to-end through the Prisma client.
 - Native `postgresql-x64-18` is stopped (Manual or just stopped) — restart it later if needed for other work; the Docker dev DB owns 5432 for now.
 - Decide whether to add `.gitattributes` for line-ending normalization before the Docker build.
