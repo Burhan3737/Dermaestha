@@ -1,7 +1,7 @@
 # Dermestha — Visual Design Specification (v1)
 
 **Document type:** Visual / UX design system + screen spec
-**Pairs with:** `docs/PRD.md` (what to build) and the forthcoming `docs/ARCHITECTURE.md` (how it's wired). This document defines *what it looks like and how it behaves visually*.
+**Pairs with:** `docs/product/PRD.md` (what to build) and `docs/engineering/ARCHITECTURE.md` (how it's wired). This document defines *what it looks like and how it behaves visually*.
 **Status:** Locked (design language approved). Per-screen layouts are the build brief for the static mockups.
 **Date:** 2026-05-29
 

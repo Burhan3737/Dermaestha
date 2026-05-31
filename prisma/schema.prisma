@@ -1,0 +1,313 @@
+// Dermestha — Prisma schema
+// Source of truth: docs/engineering/ARCHITECTURE.md §5 (Data Model) + docs/product/PRD.md §3.3 (invariants).
+// Conventions: money is Int PKR-paisa (no floats); all instants are timestamptz/UTC,
+// rendered Asia/Karachi (no DST) in the UI. Models are PascalCase; tables are snake_case via @@map.
+//
+// ───────────────────────────────────────────────────────────────────────────────────────────
+// CRITICAL — NO-DOUBLE-BOOKING (PRD §3.3 #1) IS NOT IN THIS FILE.
+// The invariant is a *partial* unique index that Prisma's DSL cannot express (no WHERE clause on
+// @@unique). After `prisma migrate dev`, hand-edit the generated migration.sql and append:
+//
+//   CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
+//     WHERE state IN ('slot_locked','confirmed','in_progress','completed',
+//                     'prescription_issued','cancelled_no_refund');
+//
+// Releasing states (cancelled_refunded, doctor_cancelled) are excluded so a freed slot rebooks.
+// A second insert for a held slot then fails at WRITE time, not validation time.
+// See docs/engineering/CONFIG.md → "Migration caveats".
+// ───────────────────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  patient
+  doctor
+  admin
+}
+
+enum DoctorStatus {
+  pending
+  active
+}
+
+/// Stored appointment states. NOTE: `slot_available` from PRD §4.3 is intentionally
+/// NOT a value here — availability is the ABSENCE of a row for (doctor, slot). The first
+/// persisted state is `slot_locked`. Keeps the partial unique index small and makes
+/// lock-release a state transition / row-removal rather than a status flip.
+enum AppointmentState {
+  slot_locked
+  confirmed
+  in_progress
+  completed
+  prescription_issued
+  cancelled_refunded
+  cancelled_no_refund
+  doctor_cancelled
+  patient_no_show
+  doctor_no_show
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+}
+
+enum RefundStatus {
+  initiated
+  retrying
+  settled
+  failed
+}
+
+enum AuditActorType {
+  patient
+  doctor
+  admin
+  system
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+/// All humans: patients, doctors, admin. One table, discriminated by `role` (DA2).
+model User {
+  id                 String    @id @default(cuid())
+  role               Role
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  phone              String?
+  fullName           String    @map("full_name")
+  /// Mandatory ToS/Privacy consent recorded at sign-up (P2, §3.6).
+  tosAcceptedAt      DateTime? @map("tos_accepted_at") @db.Timestamptz(6)
+  /// Forced first-login change gate for doctors (DA3/DA5).
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  doctor             Doctor?
+  appointments       Appointment[] @relation("PatientAppointments")
+
+  @@map("users")
+}
+
+/// Doctor profile, 1:1 with a User of role=doctor.
+/// IMMUTABILITY (PRD §3.3 #8): pmcNumber and the linked User.email must never be updated
+/// post-create — enforced in doctor.service (no field in any update DTO), NOT by the DB.
+model Doctor {
+  id             String       @id @default(cuid())
+  userId         String       @unique @map("user_id")
+  user           User         @relation(fields: [userId], references: [id])
+  pmcNumber      String       @unique @map("pmc_number")
+  specialization String
+  /// Consultation fee in PKR paisa. Snapshotted to Appointment.feeAtBooking at confirm (#6).
+  fee            Int
+  bio            String?
+  photoUrl       String?      @map("photo_url")
+  /// Gates public-listing visibility + new-booking eligibility ONLY — never login (#9).
+  isActive       Boolean      @default(true) @map("is_active")
+  status         DoctorStatus @default(pending)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  availabilityBlocks AvailabilityBlock[]
+  appointments       Appointment[]
+
+  @@map("doctors")
+}
+
+/// Recurring weekly availability windows (D1). 30-min slots are GENERATED from these
+/// at read time; individual slots are not stored.
+model AvailabilityBlock {
+  id        String @id @default(cuid())
+  doctorId  String @map("doctor_id")
+  doctor    Doctor @relation(fields: [doctorId], references: [id])
+  /// 0=Sunday … 6=Saturday.
+  weekday   Int
+  /// "HH:mm", Asia/Karachi local time-of-day.
+  startTime String @map("start_time")
+  endTime   String @map("end_time")
+
+  @@index([doctorId])
+  @@map("availability_blocks")
+}
+
+/// The core record + state machine (PRD §4.3). Doctor name is NEVER denormalized here (#3);
+/// historical identity is captured in Prescription.doctorSnapshot instead.
+model Appointment {
+  id            String           @id @default(cuid())
+  doctorId      String           @map("doctor_id")
+  doctor        Doctor           @relation(fields: [doctorId], references: [id])
+  patientUserId String           @map("patient_user_id")
+  patient       User             @relation("PatientAppointments", fields: [patientUserId], references: [id])
+  slotStart     DateTime         @map("slot_start") @db.Timestamptz(6)
+  slotEnd       DateTime         @map("slot_end") @db.Timestamptz(6)
+  state         AppointmentState @default(slot_locked)
+  /// Fee snapshot captured on transition to `confirmed` (#6). Null while slot_locked.
+  feeAtBooking  Int?             @map("fee_at_booking")
+  /// "Who is this for?" (P8). When false, subject* describe the third party.
+  forSelf         Boolean        @default(true) @map("for_self")
+  subjectName     String?        @map("subject_name")
+  subjectAge      Int?           @map("subject_age")
+  subjectRelation String?        @map("subject_relation")
+  /// Support-workflow marker, orthogonal to the state machine (§3.6). Admin-set via A5.
+  disputed      Boolean          @default(false)
+  /// now()+10min while slot_locked; the lock-release worker reads this.
+  lockExpiresAt DateTime?        @map("lock_expires_at") @db.Timestamptz(6)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  payments      Payment[]
+  prescriptions Prescription[]
+
+  // The UNIQUE no-double-booking guarantee is the partial index added in the migration
+  // (see file header). These are plain query indexes only.
+  @@index([doctorId, slotStart])
+  @@index([patientUserId])
+  @@index([state])
+  @@map("appointments")
+}
+
+/// One row per booking attempt. Idempotency lives here (#7, #10).
+model Payment {
+  id                   String        @id @default(cuid())
+  appointmentId        String        @map("appointment_id")
+  appointment          Appointment   @relation(fields: [appointmentId], references: [id])
+  /// Denormalized for the intent-idempotency key below; FK-less by design (scalar only).
+  patientUserId        String        @map("patient_user_id")
+  slotStart            DateTime      @map("slot_start") @db.Timestamptz(6)
+  providerRef          String?       @map("provider_ref")
+  status               PaymentStatus @default(pending)
+  /// Charged amount in PKR paisa.
+  amount               Int
+  /// Gateway-reported fee (paisa); drives refund math + cancellation estimate (policy #5).
+  gatewayFee           Int?          @map("gateway_fee")
+  refundIdempotencyKey String?       @unique @map("refund_idempotency_key")
+  refundRef            String?       @map("refund_ref")
+  refundStatus         RefundStatus? @map("refund_status")
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Payment-intent idempotency on (patient, slot) (#7): a retry/double-submit cannot
+  /// open two parallel intents for the same booking attempt.
+  @@unique([patientUserId, slotStart], name: "intent_key")
+  @@index([appointmentId])
+  @@map("payments")
+}
+
+/// Immutable once written (#4). No update/delete service method or route exists; a correction
+/// is a NEW prescription row linked to the same appointment.
+model Prescription {
+  id                String   @id @default(cuid())
+  appointmentId     String   @map("appointment_id")
+  appointment       Appointment @relation(fields: [appointmentId], references: [id])
+  issuedAt          DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
+  /// Durable doctor identity at issue-time (#3): name, pmcNumber, specialization, signature.
+  doctorSnapshot    Json     @map("doctor_snapshot")
+  /// Durable patient/subject identity at issue-time (P8): for_self, name, age, relation.
+  patientIdSnapshot Json     @map("patient_id_snapshot")
+  notes             String?
+  followUpDate      DateTime? @map("follow_up_date") @db.Date
+
+  items PrescriptionItem[]
+
+  @@index([appointmentId])
+  @@map("prescriptions")
+}
+
+/// Line items with a PRICE SNAPSHOT (#5): catalogue renames/repricing/deactivation never
+/// alter what an existing prescription shows or totals. Null price = free-text "not priced".
+model PrescriptionItem {
+  id             String       @id @default(cuid())
+  prescriptionId String       @map("prescription_id")
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id])
+  medicineName   String       @map("medicine_name")
+  dosage         String
+  duration       String
+  instructions   String?
+  /// PKR paisa, snapshotted. Null → displayed as "not priced", excluded from the total.
+  price          Int?
+
+  @@index([prescriptionId])
+  @@map("prescription_items")
+}
+
+/// Admin catalogue (A2). The source of suggested prices; snapshotted at prescribe-time.
+model Medicine {
+  id          String   @id @default(cuid())
+  name        String
+  genericName String?  @map("generic_name")
+  dosageForms String[] @map("dosage_forms")
+  /// Suggested unit price in PKR paisa.
+  unitPrice   Int      @map("unit_price")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("medicines")
+}
+
+/// Append-only event log (§3.6). Written ONLY via audit.service.record(); no update/delete
+/// path is exposed at the service or route layer (convention, not a DB trigger).
+model AuditLog {
+  id        String         @id @default(cuid())
+  at        DateTime       @default(now()) @db.Timestamptz(6)
+  eventType String         @map("event_type")
+  actorType AuditActorType @map("actor_type")
+  actorId   String?        @map("actor_id")
+  targetRef String?        @map("target_ref")
+  reason    String?
+  meta      Json?
+
+  @@index([eventType])
+  @@index([actorType])
+  @@index([at])
+  @@map("audit_log")
+}
+
+/// KPI telemetry (PRD §1 #1/#3). `networkType` supports the 3G-success KPI.
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  at          DateTime @default(now()) @db.Timestamptz(6)
+  type        String
+  networkType String?  @map("network_type")
+  meta        Json?
+
+  @@index([type])
+  @@index([at])
+  @@map("analytics_events")
+}
+
+/// Single-row platform config (A6). Enforce one row in application code (always read/write id=1).
+model Settings {
+  id                    Int      @id @default(1)
+  /// Floor 30 (PRD); default 60. Booking lead-time filter.
+  minBookingLeadMinutes Int      @default(60) @map("min_booking_lead_minutes")
+  /// Fallback gateway-fee model when PayFast reports no fee (policy #5).
+  /// Percentage in basis points (e.g. 250 = 2.50%) + a fixed component in PKR paisa.
+  fallbackFeePctBps     Int      @default(0) @map("fallback_fee_pct_bps")
+  fallbackFeeFixed      Int      @default(0) @map("fallback_fee_fixed")
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("settings")
+}
+
+/// Server sessions for connect-pg-simple. The store's default table shape.
+/// NOTE: configure connect-pg-simple with `createTableIfMissing: false` so Prisma migrations
+/// own this DDL and the two don't race on table creation.
+model Session {
+  sid    String   @id
+  sess   Json
+  expire DateTime @db.Timestamptz(6)
+
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
+}
