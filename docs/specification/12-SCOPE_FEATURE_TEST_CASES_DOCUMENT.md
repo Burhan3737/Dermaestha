@@ -1,0 +1,277 @@
+# 12 — Scope Feature Test Cases Document
+
+| Field | Value |
+|---|---|
+| Document ID | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
+| Status | Canonical |
+| Version | 1.0 |
+| Last updated | 2026-06-01 |
+| Sources absorbed | `docs/specification/02, 08, 09` |
+| Related docs | 02, 08, 09 |
+
+---
+
+## Index
+
+1. [Purpose & references](#1-purpose--references)
+2. [Test case format](#2-test-case-format)
+3. [Common preconditions](#3-common-preconditions)
+4. [Functional test cases](#4-functional-test-cases)
+5. [Security test cases](#5-security-test-cases)
+6. [Execution & reporting notes](#6-execution--reporting-notes)
+7. [Deferred — Medicine Ordering test cases (NOT in v1 build)](#7-deferred--medicine-ordering-test-cases-not-in-v1-build)
+
+---
+
+## 1. Purpose & references
+
+This document enumerates the concrete, executable test cases for Dermestha v1. Every case is derived strictly from an already-documented acceptance criterion, named rule, edge case, or security control — no new product behaviour is introduced here.
+
+Functional cases trace to the canonical features F01–F16 and the 40-item edge-case catalogue in [doc 02 — Scope & Feature Document](02-SCOPE_FEATURE_DOCUMENT.md). Security cases trace to the OWASP-framed controls in [doc 08 — Security & Compliance Document](08-SECURITY_COMPLIANCE_DOCUMENT.md). The ID format, priority convention, and release criteria follow [doc 09 — Dev Testing & QA Testing Document](09-DEVTESTING_QATESTING_DOCUMENT.md).
+
+---
+
+## 2. Test case format
+
+Every test case carries the six fields mandated by doc 09 §5:
+
+| Field | Description |
+|---|---|
+| ID | `TC-FNN-NNN` for functional cases (feature ID without the `F` prefix, zero-padded to two digits, then a three-digit sequence) or `TC-SEC-NNN` for security cases. |
+| Feature | The doc 02 feature (and sub-feature / named rule) the case verifies. |
+| Preconditions | The system and data state required before execution. References the labelled fixtures in §3 where possible. |
+| Steps | Numbered action sequence. |
+| Expected result | The observable outcome that constitutes a pass — always traceable to a doc 02 acceptance criterion or a doc 08 control. |
+| Priority | Critical / High / Medium / Low, per doc 09 §5 priority mapping. |
+
+Per doc 09 §5, the core booking (F03), payment and webhook (F04), video join (F05), cancellation and refund (F06), prescription (F08 creation/download), data-integrity invariants (#1–#10), and role-boundary enforcement (F15) paths are **Critical** — these are the load-bearing flows. Priorities below are assigned from that mapping.
+
+---
+
+## 3. Common preconditions
+
+The following labelled fixtures form the shared test-data baseline. Cases reference them by label rather than re-describing state.
+
+| Label | Fixture |
+|---|---|
+| `D` | An **active** doctor (`active=true`) onboarded by admin, with a saved weekly availability template generating future 30-minute slots. |
+| `D2` | A second active doctor, distinct from `D` (used for cross-doctor isolation and overlap cases). |
+| `Dpending` | A doctor account in `pending` state (created but not yet toggled active). |
+| `Ddeact` | A previously active doctor who has been deactivated by admin but still has existing `confirmed` future appointments. |
+| `P` | A registered patient account (sign-up complete, `tos_accepted_at` set). |
+| `P2` | A second registered patient, distinct from `P` (used for cross-account isolation). |
+| `A` | The bootstrapped admin account (single admin per DA4). |
+| `M` | A catalogue medicine with an admin-set unit price in PKR. |
+| `Mfree` | A free-text medicine name not present in the catalogue. |
+| `CA` | A confirmed appointment fixture: patient `P`, doctor `D`, a future slot, payment confirmed, `feeAtBooking` snapshotted, state `confirmed`. |
+| `LEAD` | The platform minimum booking lead time setting (default 1 hour; configurable down to 30 minutes per F14.01). |
+
+Environment baseline (doc 09 §3): PayFast, Daily, and Resend run in sandbox/test mode; `Asia/Karachi` display, UTC storage.
+
+---
+
+## 4. Functional test cases
+
+Cases are grouped by feature. Each case lists all six fields. IDs are sequential within a feature.
+
+### F01 — Patient authentication & account
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F01-001 | F01.01 Consent Gate Rule (happy path) | No account for the email used | 1. Open sign-up. 2. Fill name, email, phone, password. 3. Tick the ToS/Privacy acceptance checkbox. 4. Submit. | Account is created; `tos_accepted_at` is recorded with a timestamp; the patient lands authenticated. | High |
+| TC-F01-002 | F01.01 Consent Gate Rule (validation failure) | No account for the email used | 1. Fill all sign-up fields. 2. Leave the ToS/Privacy checkbox **unchecked**. 3. Submit. | Sign-up is rejected; no account is created; the consent checkbox is flagged as required. | High |
+| TC-F01-003 | F01.01 Email Uniqueness Rule | Patient `P` already registered | 1. Attempt sign-up with `P`'s email. 2. Submit. | Registration fails with a clear duplicate-email error; no second account is created. | High |
+| TC-F01-004 | F01.02 Session Rule | Patient `P` exists | 1. Log in at `/login` with `P`'s email + password. 2. Close and reopen the browser. | Login succeeds; session persists via a Secure, HTTP-only, SameSite=Lax cookie; `P` remains authenticated on return. | High |
+| TC-F01-005 | F01.03 Enumeration-Safe Reset Rule | Patient `P` exists; one unknown email | 1. Submit forgot-password for `P`'s email. 2. Submit forgot-password for an unknown email. | Both requests return an identical response; a reset link (1-hour expiry) is dispatched only for the known address; the response does not reveal which email exists. | High |
+
+### F02 — Doctor discovery (public listing & profile)
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F02-001 | F02.01 No-Auth Rule (happy path) | Doctor `D` active; no session | 1. Visit the doctor listing page while logged out. | The listing loads without authentication and shows `D`'s card (photo, name, specialization, fee in PKR, next-available slot). | Low |
+| TC-F02-002 | F02.01 Active-Only Rule | `Dpending` exists; `Ddeact` deactivated | 1. Load the public listing. | Neither the `pending` doctor nor the deactivated doctor appears; only active doctors are listed. | Low |
+| TC-F02-003 | F02.01 Performance Rule | Doctor `D` active; throttled 3G profile | 1. Load the listing page over a simulated 3G connection. | The listing page completes loading in ≤2 seconds. | Low |
+
+### F03 — Slot booking & slot-lock
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F03-001 | F03.01 Future-Slots-Only Rule (happy path) | `P` logged in; `D` has availability | 1. Open `D`'s slot picker. | Only future 30-minute slots within `D`'s weekly availability are shown; past slots do not appear. | Critical |
+| TC-F03-002 | F03.01 Lead-Time Rule (A6) | `LEAD` set; a slot starts within `LEAD` | 1. Open the picker. 2. Inspect slots whose start is within `LEAD`. | Slots starting within the configured lead time are not bookable (disabled); slots beyond `LEAD` are bookable. | Critical |
+| TC-F03-003 | F03.01 Disabled-Slot Rule | A slot is locked during another patient's payment | 1. Open the picker as `P`. 2. Inspect the in-flight slot. | The booked / in-flight (locked) slot is visually disabled. | High |
+| TC-F03-004 | F03.02 Identity Snapshot Rule (booked-for-someone-else) | `P` logged in | 1. Choose a slot. 2. Select "Someone else". 3. Enter patient name, age, relation. 4. Confirm & Pay. | The actual-patient identity (name + age + relation) is stored on the appointment record for later auto-pull by F08. | High |
+| TC-F03-005 | F03.03 Slot-Lock Rule (lock expiry) | `P` picks a slot, starts checkout | 1. Click "Confirm & Pay". 2. Do not complete payment; wait past 10 minutes. | The slot is locked for 10 minutes during checkout; on expiry the slot is released and no booking record persists (Edge #2 / #3). | Critical |
+| TC-F03-006 | F03.03 Double-Booking Rule (#1) | Two patients target the same `(D, slot)` | 1. `P` and `P2` both click "book" on the same slot near-simultaneously. 2. Both proceed. | Storage-layer uniqueness allows only one booking; the second attempt fails fast at write time with a "slot just taken" error (Edge #1). | Critical |
+| TC-F03-007 | F03.03 Single-Lock Rule | `P` holds one active slot lock | 1. With one lock held, `P` attempts to lock a second slot. | `P` cannot hold multiple slot locks simultaneously; the second lock attempt is refused. | High |
+| TC-F03-008 | F03.03 No-Overlap Rule | `P` confirmed on a slot with `D` | 1. `P` attempts to book an overlapping slot with `D2`. | `P` cannot book overlapping slots with the same or a different doctor; the overlapping attempt is rejected. | High |
+
+### F04 — Payment
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F04-001 | F04.01 Payment-at-Booking Rule (happy path) | `P` locked a slot with `D` | 1. Complete payment on the aggregator hosted page. | On payment success the slot is confirmed and a confirmation email is sent; the platform never sees card/wallet credentials. | Critical |
+| TC-F04-002 | F04.02 Webhook-Truth Rule | `P` paid; browser closed mid-redirect | 1. Close the browser during the redirect. 2. Deliver a signature-verified `payment.success` webhook. | The slot is marked `confirmed`, the confirmation email is sent within 60 seconds, regardless of browser state (Edge #8). | Critical |
+| TC-F04-003 | F04.02 Atomic-Commit Rule (#2) | A confirmation in progress | 1. Trigger booking confirmation + payment-record commit. 2. Simulate a fault mid-commit. | Booking confirmation and the payment record commit atomically — either both persist or neither does. | Critical |
+| TC-F04-004 | F04.02 Idempotent-Intent Rule (#7) | `P` on a locked `(P, slot)` | 1. Double-click "Pay" / refresh the success page. | Payment-intent creation is idempotent on `(patient, slot)`; no two parallel intents are created; no double charge (Edge #5 / #9). | Critical |
+| TC-F04-005 | F04.02 Webhook-Auth Rule | Webhook endpoint reachable | 1. Send a `payment.success` webhook with a missing/invalid/expired signature. | The webhook is rejected (`401`); no state change occurs; the event is logged to the admin alert feed. | Critical |
+| TC-F04-006 | F04.01 feeAtBooking Snapshot (#6) | `CA` confirmed at fee X; `D`'s fee later changed | 1. Admin changes `D`'s consultation fee. 2. Inspect `CA`. | `CA`'s billed amount, refund basis, and revenue accounting remain at the snapshotted fee X; the fee change does not affect the existing appointment. | Critical |
+| TC-F04-007 | F04.03 Reconciliation safety net (Edge #6a) | `P` pays late; slot already confirmed to another patient | 1. A late webhook / reconciliation arrives for a slot already confirmed to someone else. | No second appointment is created; the paying patient is auto-refunded in **full** (platform-caused, not net-of-fee); an admin alert is raised and the patient is emailed (Edge #6 / #6a). | Critical |
+
+### F05 — Appointment lifecycle & video consultation
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F05-001 | F05.01 Patient upcoming view (happy path) | `CA` confirmed | 1. `P` opens the dashboard "Upcoming" section. | The appointment is listed with doctor name/photo, slot date/time in `Asia/Karachi`, fee paid, a "Join Call" button, and a "Cancel" link (shown because state is `confirmed`). | High |
+| TC-F05-002 | F05.01 Empty-State Rule | `P` has no upcoming appointments | 1. `P` opens "Upcoming". | "No upcoming appointments — Browse doctors" is shown, linking to the public listing (F02). | Low |
+| TC-F05-003 | F05.03 Join-Activation Rule | `CA` with slot start time known | 1. View the "Join Call" button at >10 min before start. 2. View again at ≤10 min before start. | The button is inactive earlier and activates exactly 10 minutes before slot start; it opens the room in the current tab (no install). | Critical |
+| TC-F05-004 | F05.03 Room-Isolation Rule (Edge #25) | `CA`; `P` and `D` both eligible | 1. `P` joins; `D` joins. 2. Attempt to join a different appointment's room. | Patient and doctor share the same appointment-scoped room ID and cannot join the wrong room; tokens are time-bound (start−10 min through end+5 min). | Critical |
+| TC-F05-005 | F05.03 Patient-joins-early waiting screen (Edge #17) | `CA`; only `P` joined | 1. `P` joins before `D`. | `P` sees the "Doctor will be with you shortly" waiting screen until the doctor joins. | High |
+| TC-F05-006 | F05.03 Hard-Cutoff Rule (Edge #23) | `CA` in `in_progress` | 1. Stay in the call until slot-end + 5 min. | The room expires at slot-end + 5 minutes (hard cutoff); a soft warning was shown to the doctor at 5 minutes remaining. | High |
+| TC-F05-007 | §3 mid-call drop does not finalise (Edge #22) | `CA` in `in_progress`; both joined once | 1. A party drops mid-call. 2. The same party rejoins before slot-end + 5 min. | A transient disconnect does not finalise completion; either party may rejoin the same room until slot-end + 5 min; completion finalises at the cutoff. | High |
+| TC-F05-008 | §3 no-show evaluation (Edge #25a — neither joins) | `CA`; neither party joins by slot+15 | 1. Let the grace window (slot+15) elapse with no joins. | The appointment resolves to `doctor_no_show` (doctor-absence precedence); refund initiated net of gateway fee + apology email; the appointment never remains `in_progress` past slot-end + 5 min. | Critical |
+| TC-F05-009 | §3 no-show evaluation (patient absent, Edge #20) | `CA`; only `D` joined by slot+15 | 1. Doctor joins; patient never joins by slot+15. | Marked `patient_no_show`; no refund. | High |
+
+### F06 — Cancellation & refund
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F06-001 | F06.01 Free-Cancel Window Rule (Edge #11) | `CA` confirmed, ≥2h before start | 1. `P` clicks Cancel ≥2h before slot start. 2. Confirm. | Refund initiated to the original method; UI shows "Refund initiated, expected within 5–7 working days"; appointment → `cancelled_refunded`; slot released. | Critical |
+| TC-F06-002 | F06.01 Late-Cancel Rule (Edge #12) | `CA` confirmed, <2h before start | 1. `P` clicks Cancel <2h before start. 2. Confirm in the "No refund available" modal. | Appointment → `cancelled_no_refund`; the slot stays blocked on the doctor's calendar; no refund issued. | Critical |
+| TC-F06-003 | F06.01 Net-of-Fee Refund Rule (policy #5) | `CA` eligible for refund | 1. Open the cancel modal. 2. Note the shown refund amount. 3. After cancel, open the dashboard refund-status view. | Refund amount = amount paid − gateway transaction fee; the modal shows this number plus the "Refund excludes the payment-gateway fee" line; the dashboard shows the **identical** number. | Critical |
+| TC-F06-004 | F05.01 / F06 Cancel link hidden once in_progress | `CA` transitioned to `in_progress` | 1. `P` opens the appointment row. | No Cancel link is shown for an `in_progress` appointment (no cancellation path from `in_progress`). | High |
+| TC-F06-005 | F06.02 Doctor cancel / No-Window Rule (Edge #13) | `CA`; doctor `D` logged in, <2h before start | 1. `D` cancels with a required reason. | No time-window restriction applies; appointment → `doctor_cancelled`; refund auto-initiated net of gateway fee; apology email with rebook offer sent. | Critical |
+| TC-F06-006 | F06.03 Refund Idempotency Rule (#10) | An appointment refunded; a retry/reconciliation/admin out-of-band action follows | 1. Trigger an automatic retry and an out-of-band gateway settlement for the same appointment. | The single `refund_idempotency_key` prevents a second settlement; the refund settles exactly once (Edge #30). | Critical |
+
+### F07 — Reminders & notifications
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F07-001 | F07.02 Reminder cadence (happy path) | `CA` confirmed >24h before start | 1. Let time advance through the 24h and 1h marks. | Confirmation email sent immediately on `confirmed`; a 24-hour reminder and a 1-hour reminder are each sent at the right time, in `Asia/Karachi`. | High |
+| TC-F07-002 | F07.02 Short-Lead Skip Rule | Appointment confirmed <1h before start (lead time at 30 min) | 1. Confirm a booking <1h before slot start. | The 24-hour and 1-hour reminders are skipped; only the confirmation email is sent. | High |
+| TC-F07-003 | F07.03 Reminder-Invalidation Rule (Edge #15-adjacent) | `CA` with an undispatched reminder, then cancelled | 1. Cancel `CA` before the reminder dispatch time. 2. Reach the dispatch time. | The notification worker re-checks state at dispatch and suppresses the reminder because the appointment is no longer `confirmed`/`in_progress`; no reminder is delivered. | High |
+| TC-F07-004 | F07.03 Retry Rule (Edge #15) | Email provider made to fail | 1. Force a send failure. | The system retries 3× with exponential backoff; on final failure the admin alert feed is notified. | High |
+
+### F08 — Prescription
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F08-001 | F08.02 Completed-Gate Rule | Appointment with `D` in `completed` state | 1. `D` opens the appointment row. 2. Open the prescription builder. | The builder is accessible only after the consultation is `completed`. | High |
+| TC-F08-002 | F08.02 Read-Only Patient-ID Header (P8) | A completed appointment booked for "Someone else" | 1. `D` opens the builder. | A read-only header shows the captured actual-patient identity (name + age + relation); the doctor does not type the patient name. | High |
+| TC-F08-003 | F08.02 Running-Total Rule / Itemised-Total Rule | Catalogue medicine `M` and free-text `Mfree` | 1. Add `M` (priced) and `Mfree` (free-text) with dosage, duration, instructions. | The running total includes `M`'s admin-set price; `Mfree` is flagged "not priced", excluded from the total, with an "N item(s) not priced" note. | High |
+| TC-F08-004 | F08.02 Immutability Rule (#4) | A submitted prescription exists | 1. Attempt to update/delete it via any UI or internal API. | No update or delete path exists for doctor, admin, or internal API; the record is immutable. | Critical |
+| TC-F08-005 | F08.02 Medicine Snapshot Rule (#5) | A prescription issued with `M`; `M` later renamed/repriced/deactivated | 1. Admin renames/reprices/deactivates `M`. 2. Re-open the existing prescription. | The prescription's medicine name, dosage, and price (and its total) are unchanged — snapshotted at issue-time. | Critical |
+| TC-F08-006 | F08.01 Client-Render Rule (download, Edge #29) | An appointment in `prescription_issued`; `P` logged in | 1. `P` opens "Past appointments". 2. Click "Download Prescription". | A PDF renders client-side from stored JSON and a browser download triggers; it is re-downloadable indefinitely. | High |
+| TC-F08-007 | F08.01 Chronological Corrections Rule (policy #9, Edge #27) | Doctor issues a second prescription for the same appointment | 1. `D` issues an additional prescription. 2. `P` views "Past appointments". | All prescriptions for the appointment are visible chronologically; each is downloadable separately; originals remain immutable. | High |
+
+### F09 — Doctor weekly availability
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F09-001 | F09.01 Slot-Generation Rule (happy path) | Doctor `D` logged in | 1. Set a time block (e.g., Mon 6pm–9pm). 2. Save. | Slots are auto-generated in 30-minute increments within the block, back-to-back, with no inter-slot buffer; the schedule recurs weekly. | High |
+| TC-F09-002 | F09.01 Block-Lock Rule (Edge #14) | `D` has a block containing a confirmed future booking | 1. Attempt to delete/modify that block. | A warning is shown; the block cannot be removed until each contained booking is cancelled individually. | High |
+| TC-F09-003 | F09.01 Recurring Rule | `D` saved availability last week | 1. View next week's bookable slots. | The saved availability applies every week until changed (recurring). | Medium |
+
+### F10 — Admin: doctor onboarding, edit, (de)activation
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F10-001 | F10.01 Pending-State Rule (happy path) | Admin `A` logged in | 1. Add a doctor with all required fields + initial password. 2. Save. | The doctor is created in `pending` state and does not appear publicly until `A` toggles to `active`. | High |
+| TC-F10-002 | F10.01 Photo format constraint | Admin `A` on the add-doctor form | 1. Upload an SVG (or >2MB) profile photo. | The upload is rejected; only JPEG/PNG/WebP ≤2MB is accepted. | High |
+| TC-F10-003 | F10.02 PMC/Email Immutability (#8) | Doctor `D` exists | 1. `A` attempts to change `D`'s PMC number and email via the edit page / API. | Both fields are immutable post-creation; the change is rejected through any API. | Critical |
+| TC-F10-004 | F10.03 Deactivation-Preserves-Appointments Rule (#9, Edge #39) | `D` active with an existing `confirmed` future appointment | 1. `A` deactivates `D`. | `active=false`; `D` removed from public listing; new bookings blocked; the existing confirmed appointment is kept and honoured (no cancel/refund cascade); `D` can still log in, view it, join, and submit a prescription. | Critical |
+| TC-F10-005 | F10.03 Deactivation-Warning Rule | `D` active with N upcoming confirmed appointments | 1. `A` clicks deactivate. | The confirmation modal shows the count of upcoming `confirmed` appointments that will remain on the calendar. | Medium |
+
+### F11 — Admin: medicine catalogue
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F11-001 | F11.02 Add medicine (happy path) | Admin `A` logged in | 1. Add a medicine with name, dosage forms, unit price in PKR. 2. Save. | The medicine appears in the searchable catalogue and is available in the prescription-builder dropdown. | Medium |
+| TC-F11-002 | F11.03 Propagation Rule (vs immutability) | Medicine `M` used on an existing prescription | 1. `A` renames/reprices `M`. 2. Check the builder vs. the existing prescription. | The edit propagates to the builder view but does not change the existing (immutable) prescription's stored snapshot. | Medium |
+| TC-F11-003 | F11.03 Deactivate Rule | Medicine `M` active and in catalogue | 1. `A` deactivates `M`. | `M` is removed from the builder dropdown; existing prescriptions referencing it are unaffected. | Medium |
+
+### F12 — Admin: system-health alerts
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F12-001 | F12.01 Alert feed (happy path) | An appointment `completed` >12h with no prescription | 1. Let 12h elapse post-completion. 2. `A` opens the alert feed. | An `awaiting_prescription` alert is shown, linking to the relevant appointment record. | Medium |
+| TC-F12-002 | F12.02 Email-Only Re-Trigger Rule | An alert with a failed email | 1. `A` uses the remediation action. | The admin can re-trigger emails only; the action is permitted. | Medium |
+| TC-F12-003 | F12.02 No-Manual-Refund Rule | A refund-API failure alert present | 1. `A` inspects the refund alert. | No in-app refund re-trigger is offered; the platform auto-retries then alerts, and the admin resolves out-of-band (idempotency keeps this safe). | Medium |
+
+### F13 — Admin: records & audit log (unified)
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F13-001 | F13.01 Single-Surface Rule (happy path) | Records exist; `A` logged in | 1. `A` opens the Records & Audit Log page. 2. Filter by appointment ID / event type / actor type / date range. | One unified surface returns matching records and audit entries with the documented columns. | Medium |
+| TC-F13-002 | F13.02 Detail view + Mark disputed | A terminal-state appointment | 1. `A` opens a record. 2. Click "Mark disputed". | The state-transition history and linked prescriptions are shown; the `disputed` flag is set without altering the state machine; the action is audit-logged as an admin entry. | Medium |
+| TC-F13-003 | F13.03 Read-Only Rule | `A` on the records page | 1. Look for any record update/delete UI. | The view is read-only on records (append-only); only email re-trigger and mark-disputed mutations exist and are themselves audited; no refund re-trigger is offered. | Medium |
+
+### F14 — Admin: platform settings
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F14-001 | F14.01 Minimum lead time / Future-Only Rule | `CA` confirmed; `A` logged in | 1. `A` changes the minimum booking lead time. | The change applies to future booking attempts only; the existing `confirmed` appointment `CA` is unaffected. | Medium |
+| TC-F14-002 | F14.02 Fallback-Fee Rule | Aggregator reports no per-transaction fee | 1. Set the fallback fee %/fixed PKR. 2. Process a refund where no aggregator fee is reported. | The admin-configured fallback fee feeds the refund amount, cancel-modal estimate, and dashboard breakdown identically; when the aggregator does report a fee, that reported figure wins. | Medium |
+| TC-F14-003 | F14.03 Audit | `A` logged in | 1. `A` changes a platform setting. | The change is recorded in the audit log as an admin-actor entry. | Medium |
+
+### F15 — Doctor & admin authentication & roles
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F15-001 | F15.02 Shared login & role routing (happy path) | `P`, `D`, `A` accounts exist | 1. Log in at `/login` as each role in turn. | Each session routes by `role`: patient → patient dashboard, doctor → doctor panel, admin → admin panel. | Critical |
+| TC-F15-002 | F15.03 Forced first-login change (DA3) | `D` just created by admin (`mustChangePassword=true`) | 1. `D` logs in for the first time. 2. Attempt to reach the doctor panel. | `D` is blocked from non-auth routes until the password is changed; on successful change the flag clears and the panel is reachable. | Critical |
+| TC-F15-003 | F15.06 Single-Middleware Rule (role boundary) | `P` logged in | 1. `P` requests an `/api/admin/*` route. | The request is rejected by the single `requireRole` middleware (out-of-role); the server is the enforcement boundary. | Critical |
+| TC-F15-004 | F15.05 Doctor recovery is admin-mediated (DA5) | `D` exists | 1. Look for a self-service reset for `D`. 2. `A` resets `D`'s password from the edit page. | No self-service doctor reset exists; after admin reset `mustChangePassword` is set to true. | High |
+
+### F16 — Legal content (ToS / Privacy)
+
+| ID | Feature | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-F16-001 | F16.01 Legal pages linked from sign-up | None | 1. Open the sign-up consent checkbox label links. | `/legal/terms` and `/legal/privacy` pages load and are linked from the consent checkbox. | Low |
+| TC-F16-002 | F16.02 Consent record | A completed sign-up | 1. Sign up with consent ticked. 2. Inspect the user record. | A single mandatory acceptance with timestamp (`tos_accepted_at`) is recorded at sign-up. | Low |
+
+---
+
+## 5. Security test cases
+
+These cases trace directly to doc 08 controls. Per doc 09 §5, access-control and role-boundary cases are **Critical**.
+
+| ID | Control (doc 08) | Preconditions | Steps | Expected result | Priority |
+|---|---|---|---|---|---|
+| TC-SEC-001 | A01 — Role enforcement (DA6) | `P` logged in | 1. `P` calls a `/api/admin/*` route. 2. `D` (doctor) calls an admin route. | Both are rejected by `requireRole`; admin-only surfaces are unreachable by patient/doctor sessions. | Critical |
+| TC-SEC-002 | A01 — 404-not-403 existence-leak prevention | `D` logged in | 1. `D` requests an appointment assigned to another doctor (`D2`). | The response is `404` (not `403`), avoiding confirmation that the resource exists; `D` cannot read another doctor's appointments. | Critical |
+| TC-SEC-003 | A07 — Login lockout | `P` exists | 1. Submit 5 failed logins for `P`'s account within 15 min. 2. Attempt a 6th. | After 5 failures the account is locked (`429 ACCOUNT_LOCKED`, 15-min rolling); the lockout is audit-logged (`login_lockout`). | Critical |
+| TC-SEC-004 | A07 — Enumeration-safe forgot-password | `P` exists; one unknown email | 1. Submit forgot-password for known and unknown emails. | Both return an identical enumeration-safe `200`; failures are counted silently; no account existence is revealed. | High |
+| TC-SEC-005 | A07 — Forced first-login change (DA3) | `D` with `must_change_password=true` | 1. `D` logs in and attempts any non-auth route before changing the password. | The middleware gate blocks all non-auth routes until `POST /api/auth/change-password` clears the flag. | Critical |
+| TC-SEC-006 | §2.1 — Payment data never stored | A completed booking payment | 1. Inspect stored payment records. | Only gateway reference, gateway-reported fee, refund reference, and refund status are stored; no card numbers or wallet credentials touch the platform. | Critical |
+| TC-SEC-007 | §2.5 — PII cross-account isolation (Edge #40) | `P` and `P2` each have appointments | 1. `P` attempts to read `P2`'s appointment/prescription. | Access is denied; account-level auth prevents any cross-account access. | Critical |
+| TC-SEC-008 | A08 — Webhook signature rejection | Webhook endpoint reachable | 1. Send a `payment.success` webhook with a missing/invalid/expired signature. | Rejected with `401`; no state change; logged to the admin alert feed before any state is applied. | Critical |
+| TC-SEC-009 | A09 — Audit-log completeness (state transition) | `CA` cancellable | 1. `P` cancels `CA` (a `confirmed → cancelled_refunded` transition). 2. `A` queries the audit log. | An audit entry is recorded for the state transition (with actor type, target ref, timestamp); the log is append-only with no update/delete path. | Critical |
+| TC-SEC-010 | A09 — Audit-log completeness (admin settings change) | `A` logged in | 1. `A` changes a platform setting (F14). 2. Query the audit log. | An admin-actor audit entry is recorded for the settings change. | Medium |
+| TC-SEC-011 | A02 — Session cookie attributes | `P` logs in | 1. Inspect the session cookie. | The cookie is HTTP-only, Secure, SameSite=Lax (7-day rolling TTL). | High |
+| TC-SEC-012 | A04 / #10 — Refund double-settlement impossible | An appointment refunded once | 1. Force an automatic retry plus an out-of-band gateway settlement for the same appointment. | The `refund_idempotency_key` UNIQUE constraint prevents a second settlement; exactly one refund settles. | Critical |
+
+---
+
+## 6. Execution & reporting notes
+
+- **Tagging.** Each executed case is tagged with its result (Pass / Fail / Blocked) and the priority above. Critical and High cases must reach a Verified pass before release (doc 09 §7 exit criteria); do not duplicate the full criteria here.
+- **Evidence capture.** Each functional case records evidence appropriate to its surface — screenshot or screen capture for UI flows, captured response/status for API and webhook cases, and the relevant audit-log entry for cases that assert audit coverage (TC-SEC-009/010). Data-integrity cases (#1–#10) record the storage-level outcome (e.g., the rejected second insert for #1).
+- **Mapping.** Every case maps to a doc 02 feature/rule or doc 08 control; defects filed against a failing case carry the affected feature ID (F01–F16) per the doc 09 §9 defect summary format, and Critical defects note any data-integrity invariant involved.
+- **Release readiness.** Release-gate and Definition-of-Done criteria are owned by doc 09 §7–§8 — including Verified status for all Critical/High cases, exercised coverage of all ten invariants, and the minimum audit-log confirmations. This document supplies the cases that those criteria are evaluated against; it does not restate the gate.
+
+---
+
+## 7. Deferred — Medicine Ordering test cases (NOT in v1 build)
+
+The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build** and its test cases are deferred with the module — not enumerated here. One line per feature, clearly flagged out-of-v1:
+
+- **F-MO1 (Order medicines from a prescription — patient):** order-entry, free-text-exclusion, delivery/payment, and confirm-before-charge cases are **deferred — out of v1** (no `orders`/`order_items` tables in the v1 schema per doc 09 §2).
+- **F-MO2 (Manage and fulfil orders — admin):** orders-list, fulfilment (dispatch/deliver), pre-dispatch cancel/refund, and COD-reconciliation cases are **deferred — out of v1**.
+
+---
+
+## Revision footer
+
+| Date | Change | Why |
+|---|---|---|
+| 2026-06-01 | Initial creation | Derived from docs 02 (scope) + 08 (security) |
