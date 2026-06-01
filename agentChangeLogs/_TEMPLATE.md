@@ -10,6 +10,11 @@ in. Update it AS YOU WORK, not just at the end. Keep EVERY section below even wh
 **Status:** Completed | Partial | Blocked
 **Goal:** <one sentence — what this session set out to do>
 **Skill(s) used:** <skill name + "(opted in)" note, or None>
+**Ticket / issue:** <link or ID, or None>
+**Branch:** <working branch, or N/A>
+**Commits / PR:** <commit range or PR link, or None>
+**Last updated:** <YYYY-MM-DD-HHmm — refresh as you work; distinct from the filename's start time>
+**Tags:** <#feature #bugfix #refactor #migration #infra … or None>
 
 ## Summary
 <2–4 sentence executive summary of what changed and why.>
@@ -22,6 +27,9 @@ in. Update it AS YOU WORK, not just at the end. Keep EVERY section below even wh
 |---|---|---|
 | `path/to/file` | Created / Modified / Moved / Deleted | <what changed and the reason> |
 
+## Dependencies / config / schema
+<Non-file changes the table above misses: package add/remove/upgrade (+ lockfile churn), env vars, feature flags, DB/schema migrations. "None" if none.>
+
 ## Decisions
 <Key decisions (by developer or agent) and the reasoning. "None" if none.>
 
@@ -30,6 +38,9 @@ in. Update it AS YOU WORK, not just at the end. Keep EVERY section below even wh
 
 ## Verification
 <Commands / tests / checks run and their result. "Not verified" if none.>
+
+## Risk / rollback
+<Breaking changes, irreversible migrations, blast radius, and how to revert this session's work. "None" if none.>
 
 ## Open items / next session
 <Follow-ups, out-of-scope items, things to confirm. "None" if none.>
