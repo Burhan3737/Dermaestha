@@ -19,6 +19,7 @@ The repo already holds rich engineering docs (PRD, ARCHITECTURE, API, DESIGN, CO
 | File | Action | What & why |
 |---|---|---|
 | `docs/superpowers/specs/2026-06-01-documentation-suite-design.md` | Created | The approved design spec for the documentation suite. |
+| `docs/superpowers/plans/2026-06-01-documentation-suite.md` | Created | Implementation plan: 18 tasks across 7 dependency-tier phases, one doc per task with per-doc verification + commit. |
 | `agentChangeLogs/2026-06-01-2321-documentation-suite-design.md` | Created | This session change log. |
 | `agentChangeLogs/index.md` | Modified | Added one-line entry for this session. |
 
