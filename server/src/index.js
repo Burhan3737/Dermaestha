@@ -7,6 +7,8 @@ import { sessionMiddleware } from './middleware/session.js';
 import { errorHandler } from './http/errorHandler.js';
 import { AppError } from './http/AppError.js';
 import { healthRouter } from './routes/health.js';
+import { authRouter } from './routes/auth.js';
+import { mustChangePasswordGate } from './middleware/mustChangePassword.js';
 import { initErrorTracking } from './lib/errorTracking.js';
 import { logger } from './lib/logger.js';
 
@@ -22,6 +24,8 @@ export function createApp() {
   app.use(sessionMiddleware);
 
   // API routes first.
+  app.use('/api', mustChangePasswordGate);   // DA3 gate, after session, before feature routers
+  app.use('/api/auth', authRouter);
   app.use('/api', healthRouter);
   // Unknown /api path → JSON 404 envelope (never the SPA HTML).
   app.use('/api', (_req, _res, next) => next(new AppError('NOT_FOUND', 'Not found.', 404)));
