@@ -1,12 +1,12 @@
 # 2026-06-03-0006 — slice-a-identity-access
 
-**Status:** Partial
+**Status:** Partial (Slice A of 4 complete; M1+M2 journey ongoing)
 **Goal:** Drive M1+M2 ("full patient journey") development as 4 vertical slices; brainstorm + spec + plan + build Slice A (Identity & Access) first.
 **Skill(s) used:** superpowers:brainstorming (user-invoked); will hand off to superpowers:writing-plans
 **Ticket / issue:** None
 **Branch:** main (code work will move to a feature branch before any commit)
-**Commits / PR:** None
-**Last updated:** 2026-06-03-0040
+**Commits / PR:** 18 commits on `feat/slice-a-identity-access` (`8d828d2`…`9195772`); not yet merged
+**Last updated:** 2026-06-03-0340
 **Tags:** #feature #auth #frontend #migration
 
 ## Summary
@@ -49,12 +49,21 @@ Planned (not yet applied, pending approval):
 - No password-reset token storage existed in the schema — gap closed by the columns decision above.
 
 ## Verification
-Not verified (no code yet). Existing baseline per doc 13: server 20/20, client 2/2.
+Slice A implemented inline (subagent spawning hit a session limit, so the controller executed the plan directly with per-task TDD red→green + spec check).
+- **Server suite:** 44/44 passing (13 files) via `npm test` — M0 baseline (20) + new auth suites (validate 2, resetToken 2, auth.service 10, mustChangePassword 5, auth.integration 5).
+- **Client suite:** 13/13 passing (6 files) via `npm --workspace client test` — baseline RoleRoute (2) + apiClient 3, session 2, components 2, SignUp 2, Login 2.
+- **Build:** `npm --workspace client run build` succeeds (98 modules; no unresolved imports).
+- **Migration:** `20260602221542_add_reset_token_columns` applied to the live dev DB (additive, no partial-index edit needed).
+- **Prettier:** all slice files normalized (`prettier --write`).
+- **Root lint:** `npm run lint` fails — PRE-EXISTING: repo has `.eslintrc.json` but ESLint 9 needs flat `eslint.config.js`; present on `main` too, not a Slice A regression.
 
 ## Risk / rollback
 Schema migration (additive columns) and a new client dependency are the only non-reversible-ish items, both pending approval. Revert = drop the two columns + remove the dependency + delete created files. Design/changelog docs are non-breaking.
 
 ## Open items / next session
-- Get approval on the spec-doc update list (04, 11, 03, 05, 08, 12, 13) before editing any spec or code.
-- Run writing-plans to produce the Slice A implementation plan.
-- Implement Slice A on a feature branch (TDD), then proceed to Slices B→C→D.
+- **Slice A complete.** Decide branch disposition (PR / merge to main / keep) — controller did not merge or push (awaiting user).
+- **Slices B → C → D remain** for the full M1+M2 journey; each needs its own brainstorm → spec → plan → build cycle.
+- Subagent spawning was blocked by a session limit (resets ~3:10am Asia/Karachi); future slices can use subagent-driven execution once available.
+- doc 13 status tracker: build-status rows still show Slice A items as "Not started" (only the screen-IDs were corrected). A focused status sweep (M1 milestone, module 1 Auth, F01, F15, frontend rows) is recommended as the immediate next doc action.
+- M2 video screen-IDs in doc 13 still need alignment to doc 06 (deferred to Slice C/D, per the doc-13 revision note).
+- Pre-existing infra gap: root ESLint flat-config (`eslint.config.js`) missing — `npm run lint` is broken at root (not Slice A scope).
