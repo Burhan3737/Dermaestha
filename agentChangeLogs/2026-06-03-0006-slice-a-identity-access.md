@@ -64,6 +64,6 @@ Schema migration (additive columns) and a new client dependency are the only non
 - **Slice A complete.** Decide branch disposition (PR / merge to main / keep) — controller did not merge or push (awaiting user).
 - **Slices B → C → D remain** for the full M1+M2 journey; each needs its own brainstorm → spec → plan → build cycle.
 - Subagent spawning was blocked by a session limit (resets ~3:10am Asia/Karachi); future slices can use subagent-driven execution once available.
-- doc 13 status tracker: build-status rows still show Slice A items as "Not started" (only the screen-IDs were corrected). A focused status sweep (M1 milestone, module 1 Auth, F01, F15, frontend rows) is recommended as the immediate next doc action.
+- doc 13 status tracker: focused status sweep DONE post-merge (M1 milestone, module 1 Auth, F01, F15, frontend rows: views/layouts/components/apiClient/session, Zod seam; v1.2). M2 video screen-IDs still pending (Slices C/D).
 - M2 video screen-IDs in doc 13 still need alignment to doc 06 (deferred to Slice C/D, per the doc-13 revision note).
 - Pre-existing infra gap: root ESLint flat-config (`eslint.config.js`) missing — `npm run lint` is broken at root (not Slice A scope).
