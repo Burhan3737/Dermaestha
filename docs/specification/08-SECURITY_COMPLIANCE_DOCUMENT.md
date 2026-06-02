@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.0                                                                                                     |
-| Last updated     | 2026-06-01                                                                                              |
+| Version          | 1.1                                                                                                     |
+| Last updated     | 2026-06-03                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
 
@@ -103,7 +103,7 @@ Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_l
 
 **Admin bootstrap (DA4):** a single admin account is created via a one-off bootstrap script run on first deploy. No admin self-signup and no admin-creates-admin UI exist in v1. The admin account has no email-based password reset path; the admin password is rotated immediately after the bootstrap run (PRD DA4; PRD §5.2 risk row).
 
-**Password reset token:** patient self-service reset tokens expire in **1 hour** and are single-use (PRD P2; CONFIG §1).
+**Password reset token:** patient self-service reset tokens expire in **1 hour** and are single-use (PRD P2; CONFIG §1). They are stored as a SHA-256 hash in `users.reset_token_hash` (the raw token appears only in the email link), with expiry in `users.reset_token_expires_at`; both columns are cleared on use (single-use) and on expiry.
 
 ---
 
@@ -266,3 +266,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | Date       | Change           | Why                                                               |
 | ---------- | ---------------- | ----------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD §3.6 + ARCH §7/§11 + CONFIG §2/§5 |
+| 2026-06-03 | Noted reset token hashed + single-use on `users` (A07) | Slice A reset-token storage decision |

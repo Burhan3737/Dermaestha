@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.0                                                                                                |
-| Last updated     | 2026-06-01                                                                                         |
+| Version          | 1.1                                                                                                |
+| Last updated     | 2026-06-03                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -33,6 +33,7 @@
 18. [ADR-17 — Prisma pinned to 6.x (not 7+)](#adr-17--prisma-pinned-to-6x-not-7)
 19. [ADR-18 — Vite 5 (esbuild) pinned over Vite 8 (rolldown)](#adr-18--vite-5-esbuild-pinned-over-vite-8-rolldown)
 20. [ADR-19 — Documentation suite: sole source of truth / faithful re-presentation only](#adr-19--documentation-suite-sole-source-of-truth--faithful-re-presentation-only)
+21. [ADR-20 — Frontend state: React Context (session) + TanStack Query (server cache)](#adr-20--frontend-state-react-context-session--tanstack-query-server-cache)
 
 ---
 
@@ -282,8 +283,21 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-20 — Frontend state: React Context (session) + TanStack Query (server cache)
+
+**Date:** 2026-06-03
+
+**Context:** The frontend (patient/doctor/admin SPA) has three distinct kinds of state: session/identity (who is logged in — global, changes rarely), server-cache data (doctor listings, appointments, refund status, slot availability — owned by the backend, must be cached/refetched/invalidated), and local UI state (form fields, modal open/closed). The canonical stack (ADR-04/ADR-06) was deliberately lean — `react`, `react-dom`, `react-router-dom`, no state library. Edge case #4 (doc 02) requires the frontend to refresh stale data on window focus. Conflating these three state kinds into one store causes re-render churn and manual cache invalidation as the dashboards grow. (docs/superpowers/specs/2026-06-03-slice-a-identity-access-design.md)
+
+**Decision:** Session/identity is held in a hand-rolled **React Context** (`SessionProvider` + `useSession`), hydrated from `GET /api/auth/me`. Server-cache data is managed by **TanStack Query** (`@tanstack/react-query`), added as the one new client dependency, with `refetchOnWindowFocus` enabled to satisfy edge #4. Local UI state uses `useState`/`useReducer`. All network calls — for both Context and Query — route through the single `apiClient` seam.
+
+**Consequences:** Clean separation of concerns: Context owns identity, Query owns server data (cache keys, dedup, loading/error states, focus refetch), and `apiClient` stays the single network seam so fetch internals or interceptors change in one place. Auth mutations via `useMutation` give free pending/error states and `queryClient.invalidateQueries()` after login/logout. The trade-off is one added client dependency against the lean-scaffold principle (ADR-16); it is justified by the number of data-driven views across M1–M4 and the explicit edge-#4 focus-refetch requirement. Redux/Zustand/MobX and a single global app store were considered and rejected (churn + manual invalidation at this app's size).
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
 | ---------- | ---------------- | ------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Extracted from ARCHITECTURE.md decisions + changelogs + specs |
+| 2026-06-03 | Added ADR-20 (frontend state: Context + TanStack Query) | Slice A frontend-state decision; new client dependency `@tanstack/react-query` |

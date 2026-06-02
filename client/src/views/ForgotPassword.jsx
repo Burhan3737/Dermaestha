@@ -15,22 +15,40 @@ export function ForgotPassword() {
   async function onSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
-    try { await api.post('/auth/forgot-password', { email }); } finally { setSent(true); setSubmitting(false); }
+    try {
+      await api.post('/auth/forgot-password', { email });
+    } finally {
+      setSent(true);
+      setSubmitting(false);
+    }
   }
 
   return (
     <AuthSplitLayout headline="Reset your password">
       <form className="section-card" onSubmit={onSubmit} noValidate>
         <h2>Forgot password</h2>
-        {sent
-          ? <Alert variant="success">If an account exists for that email, a reset link is on its way.</Alert>
-          : (
-            <>
-              <Field id="email" label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <Button type="submit" block isLoading={submitting}>Send reset link</Button>
-            </>
-          )}
-        <p className="help"><Link to="/login">Back to log in</Link></p>
+        {sent ? (
+          <Alert variant="success">
+            If an account exists for that email, a reset link is on its way.
+          </Alert>
+        ) : (
+          <>
+            <Field
+              id="email"
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <Button type="submit" block isLoading={submitting}>
+              Send reset link
+            </Button>
+          </>
+        )}
+        <p className="help">
+          <Link to="/login">Back to log in</Link>
+        </p>
       </form>
     </AuthSplitLayout>
   );

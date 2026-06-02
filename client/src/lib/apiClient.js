@@ -18,7 +18,12 @@ async function request(method, path, body) {
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const e = data?.error ?? {};
-    throw new ApiError(e.code ?? 'INTERNAL', e.message ?? 'Something went wrong.', res.status, e.details);
+    throw new ApiError(
+      e.code ?? 'INTERNAL',
+      e.message ?? 'Something went wrong.',
+      res.status,
+      e.details,
+    );
   }
   return data;
 }

@@ -6,7 +6,11 @@ import { SessionProvider } from '../lib/session.jsx';
 
 function setup() {
   return render(
-    <MemoryRouter><SessionProvider><SignUp /></SessionProvider></MemoryRouter>,
+    <MemoryRouter>
+      <SessionProvider>
+        <SignUp />
+      </SessionProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -19,6 +23,8 @@ describe('P-04 Sign up', () => {
   it('links to the legal pages from the consent label', () => {
     setup();
     expect(screen.getByRole('link', { name: /terms/i }).getAttribute('href')).toBe('/legal/terms');
-    expect(screen.getByRole('link', { name: /privacy/i }).getAttribute('href')).toBe('/legal/privacy');
+    expect(screen.getByRole('link', { name: /privacy/i }).getAttribute('href')).toBe(
+      '/legal/privacy',
+    );
   });
 });

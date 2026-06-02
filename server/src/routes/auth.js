@@ -7,10 +7,17 @@ import { makeRateLimiter } from '../middleware/rateLimit.js';
 import { requireRole } from '../middleware/requireRole.js';
 import * as audit from '../services/audit.service.js';
 import {
-  signupSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema,
+  signupSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
 } from '../../../shared/schemas/index.js';
 import {
-  LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_MIN, SIGNUP_MAX_PER_IP_HOUR, FORGOT_MAX_PER_ACCOUNT_HOUR,
+  LOGIN_MAX_ATTEMPTS,
+  LOGIN_LOCKOUT_MIN,
+  SIGNUP_MAX_PER_IP_HOUR,
+  FORGOT_MAX_PER_ACCOUNT_HOUR,
 } from '../config/constants.js';
 
 const MIN = 60 * 1000;
@@ -28,7 +35,9 @@ const loginAccountLimiter = makeRateLimiter({
   keyGenerator: emailKey,
   skipSuccessfulRequests: true,
   onBlocked: (req) => {
-    audit.record({ eventType: 'login_lockout', actorType: 'system', meta: { email: emailKey(req) } }).catch(() => {});
+    audit
+      .record({ eventType: 'login_lockout', actorType: 'system', meta: { email: emailKey(req) } })
+      .catch(() => {});
   },
 });
 
@@ -48,6 +57,16 @@ authRouter.post('/signup', signupLimiter, validate(signupSchema), c.signup);
 authRouter.post('/login', loginIpLimiter, loginAccountLimiter, validate(loginSchema), c.login);
 authRouter.post('/logout', c.logout);
 authRouter.get('/me', c.me);
-authRouter.post('/forgot-password', forgotLimiter, validate(forgotPasswordSchema), c.forgotPassword);
+authRouter.post(
+  '/forgot-password',
+  forgotLimiter,
+  validate(forgotPasswordSchema),
+  c.forgotPassword,
+);
 authRouter.post('/reset-password', validate(resetPasswordSchema), c.resetPassword);
-authRouter.post('/change-password', requireRole('patient', 'doctor', 'admin'), validate(changePasswordSchema), c.changePassword);
+authRouter.post(
+  '/change-password',
+  requireRole('patient', 'doctor', 'admin'),
+  validate(changePasswordSchema),
+  c.changePassword,
+);

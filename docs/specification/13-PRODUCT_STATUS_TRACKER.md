@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Document ID      | `13-PRODUCT_STATUS_TRACKER`                                                                                                                           |
 | Status           | Canonical                                                                                                                                             |
-| Version          | 1.0                                                                                                                                                   |
-| Last updated     | 2026-06-01                                                                                                                                            |
+| Version          | 1.1                                                                                                                                                   |
+| Last updated     | 2026-06-03                                                                                                                                            |
 | Sources absorbed | `server/src + client/src inspection; agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md; ARCHITECTURE.md §5b; docs/specification/02; PRD §5.1` |
 | Related docs     | 02, 03, 05                                                                                                                                            |
 
@@ -217,8 +217,8 @@ Everything below is absent from `server/src` and `client/src` as of 2026-06-01. 
 - [ ] Booking routes: `POST /api/bookings/lock`, `DELETE /api/bookings/:id/lock`
 - [ ] Notification service: booking-confirmation email trigger (Resend integration replacing stub)
 - [ ] Shared Zod DTOs: sign-up, login, slot-lock request, doctor list response
-- [ ] Patient views (client): P-01 doctor listing, P-02 doctor profile, P-03 slot picker, P-04 sign-up, P-05 login, P-06 forgot-password
-- [ ] Doctor views (client): D-01 availability grid
+- [ ] Patient views (client): P-02 doctor listing, P-03 doctor profile, P-06 booking (slot + who-for), P-04 sign-up, P-05 login + password recovery (screen IDs per doc 06)
+- [ ] Doctor views (client): D-03 weekly availability grid; D-01 forced first-login password change
 - [ ] Layout chromes: `TopNavLayout`, `BottomTabsLayout` (patient), `SidebarLayout` (doctor/admin)
 - [ ] Shared design components (~16 from `_component-reference.html`): `Button`, `Card`, `Input`, `Modal`, slot-grid, etc.
 - [ ] Typed API client (`client/src/lib/apiClient.js` or equivalent)
@@ -279,3 +279,4 @@ Everything below is absent from `server/src` and `client/src` as of 2026-06-01. 
 | Date       | Change           | Why                                                                     |
 | ---------- | ---------------- | ----------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Snapshot of build state vs. ARCH §5b module inventory + doc 02 features |
+| 2026-06-03 | Corrected M1 patient/doctor view screen IDs to doc 06 canon | Slice A; M2 video screen IDs still to be aligned in Slices C/D |

@@ -1,6 +1,10 @@
 // @ts-check
 export function Card({ className = '', children, ...props }) {
-  return <div className={`card ${className}`.trim()} {...props}>{children}</div>;
+  return (
+    <div className={`card ${className}`.trim()} {...props}>
+      {children}
+    </div>
+  );
 }
 export function SectionCard({ title, children }) {
   return (

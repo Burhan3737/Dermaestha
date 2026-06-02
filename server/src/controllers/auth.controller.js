@@ -17,7 +17,9 @@ export async function signup(req, res, next) {
     const user = await authService.signup(req.body);
     setSession(req, user);
     res.status(201).json(user);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export async function login(req, res, next) {
@@ -25,7 +27,9 @@ export async function login(req, res, next) {
     const user = await authService.login(req.body);
     setSession(req, user);
     res.json(user);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export function logout(req, res, next) {
@@ -40,9 +44,14 @@ export async function me(req, res, next) {
   try {
     if (!req.session?.userId) throw new AppError('UNAUTHENTICATED', 'Sign in to continue.', 401);
     const user = await authService.getById(req.session.userId);
-    if (!user) return req.session.destroy(() => next(new AppError('UNAUTHENTICATED', 'Sign in to continue.', 401)));
+    if (!user)
+      return req.session.destroy(() =>
+        next(new AppError('UNAUTHENTICATED', 'Sign in to continue.', 401)),
+      );
     res.json(user);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export async function forgotPassword(req, res, next) {
@@ -63,14 +72,18 @@ export async function forgotPassword(req, res, next) {
       }
     }
     res.json({ ok: true }); // identical response whether or not the account exists
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export async function resetPassword(req, res, next) {
   try {
     await authService.resetPassword(req.body);
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export async function changePassword(req, res, next) {
@@ -78,5 +91,7 @@ export async function changePassword(req, res, next) {
     const user = await authService.changePassword(req.session.userId, req.body);
     req.session.mustChangePassword = false;
     res.json(user);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }

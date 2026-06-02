@@ -5,7 +5,9 @@ import { mustChangePasswordGate } from './mustChangePassword.js';
 function ctx(session, path) {
   let err;
   const req = { session, path };
-  const next = (e) => { err = e; };
+  const next = (e) => {
+    err = e;
+  };
   return { req, next, getErr: () => err };
 }
 
@@ -20,9 +22,12 @@ describe('mustChangePassword gate (DA3)', () => {
     mustChangePasswordGate(req, {}, next);
     expect(getErr()).toMatchObject({ code: 'MUST_CHANGE_PASSWORD', status: 403 });
   });
-  it.each(['/auth/me', '/auth/change-password', '/auth/logout'])('allows %s even when flagged', (path) => {
-    const { req, next, getErr } = ctx({ userId: 'u1', mustChangePassword: true }, path);
-    mustChangePasswordGate(req, {}, next);
-    expect(getErr()).toBeUndefined();
-  });
+  it.each(['/auth/me', '/auth/change-password', '/auth/logout'])(
+    'allows %s even when flagged',
+    (path) => {
+      const { req, next, getErr } = ctx({ userId: 'u1', mustChangePassword: true }, path);
+      mustChangePasswordGate(req, {}, next);
+      expect(getErr()).toBeUndefined();
+    },
+  );
 });

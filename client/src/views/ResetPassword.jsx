@@ -34,9 +34,21 @@ export function ResetPassword() {
       <form className="section-card" onSubmit={onSubmit} noValidate>
         <h2>Set a new password</h2>
         {error && <Alert variant="danger">{error}</Alert>}
-        <Field id="newPassword" label="New password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required help="At least 8 characters." />
-        <Button type="submit" block isLoading={submitting} disabled={!token}>Update password</Button>
-        <p className="help"><Link to="/login">Back to log in</Link></p>
+        <Field
+          id="newPassword"
+          label="New password"
+          type="password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          required
+          help="At least 8 characters."
+        />
+        <Button type="submit" block isLoading={submitting} disabled={!token}>
+          Update password
+        </Button>
+        <p className="help">
+          <Link to="/login">Back to log in</Link>
+        </p>
       </form>
     </AuthSplitLayout>
   );

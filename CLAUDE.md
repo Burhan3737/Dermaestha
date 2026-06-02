@@ -1,21 +1,19 @@
 # CLAUDE.md
 
 ## Project Rules
+
 Refer to PROJECT_RULES.md on every load. It contains project specific rules that must be followed.
 
 ## RULES YOU MUST FOLLOW (RULES CAN ONLY BE EDITED BY HUMANS)
+
 - ONLY IF you are activating a skill ALWAYS inform the user about it and give them an option to opt out of it.
 - After completing a plan, give a executive summary and list of changes to be made in the plan as well.
-- If there's something new you learned about the project (rules, developer SOPs etc.) and you would need it for future sessions add it in the PROJECT_RULES.md file in the relevant section heading after getting it approved by the user
+- The canonical documentation suite is `docs/specification/` (`00`–`15`) — the **sole source of truth**. The older `docs/product/`, `docs/engineering/`, and `docs/design/` files are **deprecated-by-policy**; do not treat them as canon. 
+- Based on `docs/specification/00-INDEX_AND_GOVERNANCE.md`, stay alert for a change that requires updates in the documentation suite `docs/specification/` (`00`–`15`), **DO NOT SKIP**. When editing any spec, follow the change protocol and change-impact matrix in `docs/specification/00-INDEX_AND_GOVERNANCE.md`. Inform and list down the update recommendations to the user and make changes after their approval.
 - Maintain a **single combined change log per working session** in the `agentChangeLogs/` folder. Create it as `${YYYY-MM-DD-HHmm}-${kebab-session-name}.md` (ISO date + 24-hour time first so files sort chronologically; no colon — Windows-safe) by copying `agentChangeLogs/_TEMPLATE.md`, and **update it as you make changes — not only at the end**. Follow the template's section order **exactly**: keep every section, writing "None"/"N/A"/"Not verified" rather than omitting one. A single doc covers both the narrative (status, goal, context, decisions, findings, verification, next steps) and the file-level change table (each file changed + the reason).
 - Keep `agentChangeLogs/index.md` current with one line per session, newest last, in the format `${YYYY-MM-DD-HHmm}-${kebab-session-name}: <one-line summary>`.
-- The canonical documentation suite is `docs/specification/` (`00`–`15`) — the **sole source of truth**. The older `docs/product/`, `docs/engineering/`, and `docs/design/` files are **deprecated-by-policy**; do not treat them as canon. When editing any spec, follow the change protocol and change-impact matrix in `docs/specification/00-INDEX_AND_GOVERNANCE.md`.
 - Per CLAUDE.md, a working session keeps **one** combined changelog. When dispatching subagents for a multi-document or multi-file task, the **controller owns** that single session changelog and its `agentChangeLogs/index.md` entry. Subagents must **not** create per-task changelog files or edit anything under `agentChangeLogs/` — instruct them explicitly, because they otherwise infer the CLAUDE.md changelog rule and fragment the log.
-- Always stay alert for a change that requires updates in the docs directory, DO NOT SKIP. Inform and list down the update recommendations to the user and make changes after their approval.
-- You are NOT allowed to commit, you need approval from the user.
 - You are NOT allowed to perform deployment actions, you need approval from the user and need to clearly inform them.
-
-
 
 ## Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 

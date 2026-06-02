@@ -37,11 +37,31 @@ export function Login() {
       <form className="section-card" onSubmit={onSubmit} noValidate>
         <h2>Log in</h2>
         {error && <Alert variant="danger">{error}</Alert>}
-        <Field id="email" label="Email" type="email" value={form.email} onChange={set('email')} required />
-        <Field id="password" label="Password" type="password" value={form.password} onChange={set('password')} required />
-        <Button type="submit" block isLoading={submitting}>Log in</Button>
-        <p className="help"><Link to="/forgot-password">Forgot password?</Link></p>
-        <p className="help">New here? <Link to="/signup">Create an account</Link></p>
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          value={form.email}
+          onChange={set('email')}
+          required
+        />
+        <Field
+          id="password"
+          label="Password"
+          type="password"
+          value={form.password}
+          onChange={set('password')}
+          required
+        />
+        <Button type="submit" block isLoading={submitting}>
+          Log in
+        </Button>
+        <p className="help">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </p>
+        <p className="help">
+          New here? <Link to="/signup">Create an account</Link>
+        </p>
       </form>
     </AuthSplitLayout>
   );

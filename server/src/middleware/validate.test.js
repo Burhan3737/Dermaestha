@@ -7,7 +7,9 @@ const schema = z.object({ email: z.string().email() });
 function ctx(body) {
   let nextArg;
   const req = { body };
-  const next = (e) => { nextArg = e; };
+  const next = (e) => {
+    nextArg = e;
+  };
   return { req, next, getNext: () => nextArg };
 }
 

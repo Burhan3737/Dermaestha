@@ -10,7 +10,9 @@ const ALLOWLIST = new Set(['/auth/logout', '/auth/change-password', '/auth/me'])
  */
 export function mustChangePasswordGate(req, _res, next) {
   if (req.session?.mustChangePassword && !ALLOWLIST.has(req.path)) {
-    return next(new AppError('MUST_CHANGE_PASSWORD', 'You must change your password before continuing.', 403));
+    return next(
+      new AppError('MUST_CHANGE_PASSWORD', 'You must change your password before continuing.', 403),
+    );
   }
   next();
 }
