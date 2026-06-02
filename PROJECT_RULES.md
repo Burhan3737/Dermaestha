@@ -62,6 +62,13 @@ Coding rules for Dermestha. Load before writing any code. Values (timing windows
 
 ---
 
+## Documentation & changelogs
+
+- The canonical documentation suite is `docs/specification/` (`00`–`15`) — the **sole source of truth**. The older `docs/product/`, `docs/engineering/`, and `docs/design/` files are **deprecated-by-policy**; do not treat them as canon. When editing any spec, follow the change protocol and change-impact matrix in `docs/specification/00-INDEX_AND_GOVERNANCE.md`.
+- Per CLAUDE.md, a working session keeps **one** combined changelog. When dispatching subagents for a multi-document or multi-file task, the **controller owns** that single session changelog and its `agentChangeLogs/index.md` entry. Subagents must **not** create per-task changelog files or edit anything under `agentChangeLogs/` — instruct them explicitly, because they otherwise infer the CLAUDE.md changelog rule and fragment the log.
+
+---
+
 ## Module Context
 
 Per-module notes added here after a module is worked on, with user approval.
