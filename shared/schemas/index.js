@@ -1,3 +1,3 @@
 // @ts-check
-// Shared Zod DTOs (client↔server) live here. Feature plans add schemas; empty seam for M0.
-export {};
+// Shared Zod DTOs (client↔server). Slice A adds the auth schemas.
+export * from './auth.js';
