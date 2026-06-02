@@ -1,5 +1,8 @@
 # Dermestha — Documentation Index
 
+> **⚠️ Canonical source of truth moved to [`specification/`](specification/).**
+> As of 2026-06-02 the numbered suite **[`docs/specification/`](specification/)** (`00`–`15`) is the single source of truth — it faithfully re-presents and consolidates the documents indexed below. Those documents are now **deprecated-by-policy**: retained for history, not maintained as canon. Start at **[`specification/00-INDEX_AND_GOVERNANCE.md`](specification/00-INDEX_AND_GOVERNANCE.md)** and follow its change protocol + change-impact matrix before editing any spec.
+
 Docs are grouped by **lifecycle stage**: discovery → product spec → engineering contracts → design. Paths below are stable; tools and cross-references rely on them.
 
 ## product/ — discovery & requirements
