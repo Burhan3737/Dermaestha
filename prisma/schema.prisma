@@ -91,6 +91,10 @@ model User {
   tosAcceptedAt      DateTime? @map("tos_accepted_at") @db.Timestamptz(6)
   /// Forced first-login change gate for doctors (DA3/DA5).
   mustChangePassword Boolean   @default(false) @map("must_change_password")
+  /// Password-reset (F01.03): SHA-256 hash of the single-use token (raw token only in the email link).
+  resetTokenHash      String?   @map("reset_token_hash")
+  /// Reset-token expiry (now + RESET_TOKEN_TTL_MIN); cleared with the hash on use/expiry.
+  resetTokenExpiresAt DateTime? @map("reset_token_expires_at") @db.Timestamptz(6)
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
