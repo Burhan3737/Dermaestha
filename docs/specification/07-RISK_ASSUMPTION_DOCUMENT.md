@@ -1,13 +1,13 @@
 # 07 — Risk & Assumption Document
 
-| Field | Value |
-|---|---|
-| Document ID | `07-RISK_ASSUMPTION_DOCUMENT` |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                                             |
+| ---------------- | ----------------------------------------------------------------- |
+| Document ID      | `07-RISK_ASSUMPTION_DOCUMENT`                                     |
+| Status           | Canonical                                                         |
+| Version          | 1.0                                                               |
+| Last updated     | 2026-06-01                                                        |
 | Sources absorbed | `docs/product/PRD.md §5.2, §2.3, §3; server/ + client/ TODO scan` |
-| Related docs | 01, 02, 08 |
+| Related docs     | 01, 02, 08                                                        |
 
 ---
 
@@ -63,22 +63,22 @@ The following assumptions are in force for v1. Each is grounded in an explicit P
 
 Every row below is taken verbatim from PRD §5.2.
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Payment-aggregator merchant KYC delay (1–2 weeks) | High | High — blocks M2 milestone | Client starts merchant application immediately in parallel with dev; documented as Week 1 client deliverable |
-| Video quality poor on 3G | Medium | High — breaks core promise | Explicit mobile-network testing in M2; vendor selected partly for known 3G performance |
-| Doctor onboarding bottleneck — launch needs 3–5 derms | High | Critical — no launch without doctors | Client deliverable due Week 1: doctor profiles + availability for 3–5 derms |
-| DRAP/PMDC regulatory exposure | Medium | High legally | Explicitly out of scope per §2.3; flagged as deferred risk; not mitigated in v1 |
-| Indefinite patient PII / prescription retention with no in-app deletion path in v1 | Medium | Medium — privacy and PR risk; potential pressure from a data-protection regime | Documented as a v1.1 deliverable; client informed during onboarding via the Privacy Policy text |
-| Prescription format has no clinical validation | Medium | Medium — patient safety | Free-text fields allow flexibility but no validation; doctor's clinical judgment is the sole safeguard in v1. Acceptable as MVP risk. |
-| Refund delay (5–7 days) causes patient complaints | Medium | Low | Patient dashboard shows transparent refund status + gateway reference. Wallet (v1.2+) would mitigate. |
-| Net-of-gateway-fee refund causes patient pushback | Low | Low | Cancellation modal and refund-status view explicitly explain the deduction. Reviewed post-launch; switchable to gross refund without architectural change if complaint rate is meaningful. |
-| Video provider outage during peak hours | Low | High when it occurs | Status banner + reschedule offer. Known gap — no fallback video provider in v1. |
-| Payment webhook delivery failures | Medium | High if undetected | Hourly reconciliation query against the aggregator; admin alerted on mismatch |
-| Single-service deploy = no redundancy | Medium | Medium | Acceptable at v1 scale (~100/week); platform auto-restarts on crash; revisited when traffic justifies |
-| Admin password / bootstrap compromise | Low | Critical | Bootstrap script is run once on first deploy; admin password is rotated immediately after bootstrap; admin account does not have an email-based password reset path in v1 |
-| Out-of-band initial-password sharing for doctors leaks credentials | Medium | Medium | Forced password change on first login (DA3) limits exposure window to the doctor's first session |
-| Video free-tier minutes insufficient at launch scale | Medium | Medium — breaks the "<USD 50/month" §3.2 constraint | ~100 consults/week × 30 min × 2 participants ≈ 26k participant-min/month likely exceeds a 10k-minute free tier. Architecture must confirm the chosen provider's billing unit (room-minutes vs participant-minutes) and paid-tier cost against the §3.2 budget before selection. |
+| Risk                                                                               | Likelihood | Impact                                                                         | Mitigation                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Payment-aggregator merchant KYC delay (1–2 weeks)                                  | High       | High — blocks M2 milestone                                                     | Client starts merchant application immediately in parallel with dev; documented as Week 1 client deliverable                                                                                                                                                                    |
+| Video quality poor on 3G                                                           | Medium     | High — breaks core promise                                                     | Explicit mobile-network testing in M2; vendor selected partly for known 3G performance                                                                                                                                                                                          |
+| Doctor onboarding bottleneck — launch needs 3–5 derms                              | High       | Critical — no launch without doctors                                           | Client deliverable due Week 1: doctor profiles + availability for 3–5 derms                                                                                                                                                                                                     |
+| DRAP/PMDC regulatory exposure                                                      | Medium     | High legally                                                                   | Explicitly out of scope per §2.3; flagged as deferred risk; not mitigated in v1                                                                                                                                                                                                 |
+| Indefinite patient PII / prescription retention with no in-app deletion path in v1 | Medium     | Medium — privacy and PR risk; potential pressure from a data-protection regime | Documented as a v1.1 deliverable; client informed during onboarding via the Privacy Policy text                                                                                                                                                                                 |
+| Prescription format has no clinical validation                                     | Medium     | Medium — patient safety                                                        | Free-text fields allow flexibility but no validation; doctor's clinical judgment is the sole safeguard in v1. Acceptable as MVP risk.                                                                                                                                           |
+| Refund delay (5–7 days) causes patient complaints                                  | Medium     | Low                                                                            | Patient dashboard shows transparent refund status + gateway reference. Wallet (v1.2+) would mitigate.                                                                                                                                                                           |
+| Net-of-gateway-fee refund causes patient pushback                                  | Low        | Low                                                                            | Cancellation modal and refund-status view explicitly explain the deduction. Reviewed post-launch; switchable to gross refund without architectural change if complaint rate is meaningful.                                                                                      |
+| Video provider outage during peak hours                                            | Low        | High when it occurs                                                            | Status banner + reschedule offer. Known gap — no fallback video provider in v1.                                                                                                                                                                                                 |
+| Payment webhook delivery failures                                                  | Medium     | High if undetected                                                             | Hourly reconciliation query against the aggregator; admin alerted on mismatch                                                                                                                                                                                                   |
+| Single-service deploy = no redundancy                                              | Medium     | Medium                                                                         | Acceptable at v1 scale (~100/week); platform auto-restarts on crash; revisited when traffic justifies                                                                                                                                                                           |
+| Admin password / bootstrap compromise                                              | Low        | Critical                                                                       | Bootstrap script is run once on first deploy; admin password is rotated immediately after bootstrap; admin account does not have an email-based password reset path in v1                                                                                                       |
+| Out-of-band initial-password sharing for doctors leaks credentials                 | Medium     | Medium                                                                         | Forced password change on first login (DA3) limits exposure window to the doctor's first session                                                                                                                                                                                |
+| Video free-tier minutes insufficient at launch scale                               | Medium     | Medium — breaks the "<USD 50/month" §3.2 constraint                            | ~100 consults/week × 30 min × 2 participants ≈ 26k participant-min/month likely exceeds a 10k-minute free tier. Architecture must confirm the chosen provider's billing unit (room-minutes vs participant-minutes) and paid-tier cost against the §3.2 budget before selection. |
 
 ### 2.2 Code TODO/FIXME scan
 
@@ -106,6 +106,6 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                           |
+| ---------- | ---------------- | ------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §5.2/§2.3 + code TODO scan |

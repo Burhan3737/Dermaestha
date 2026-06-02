@@ -1,13 +1,13 @@
 # 04 — Database Document
 
-| Field | Value |
-|---|---|
-| Document ID | 04-DATABASE_DOCUMENT |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                                         |
+| ---------------- | ------------------------------------------------------------- |
+| Document ID      | 04-DATABASE_DOCUMENT                                          |
+| Status           | Canonical                                                     |
+| Version          | 1.0                                                           |
+| Last updated     | 2026-06-01                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
-| Related docs | 02, 03, 05, 08, 15 |
+| Related docs     | 02, 03, 05, 08, 15                                            |
 
 ---
 
@@ -93,7 +93,7 @@ enum AuditActorType {
 }
 ```
 
-**Key note on `AppointmentState`:** `slot_available` is intentionally absent. Availability is the *absence* of a row for a `(doctor, slot)` pair. The first persisted state is `slot_locked`. This design keeps the partial unique index (`uniq_active_slot`) small and makes slot release a row-removal rather than a status flip.
+**Key note on `AppointmentState`:** `slot_available` is intentionally absent. Availability is the _absence_ of a row for a `(doctor, slot)` pair. The first persisted state is `slot_locked`. This design keeps the partial unique index (`uniq_active_slot`) small and makes slot release a row-removal rather than a status flip.
 
 ---
 
@@ -470,15 +470,15 @@ erDiagram
 
 **FK links:**
 
-| Child table | FK column | Parent table | Notes |
-|---|---|---|---|
-| `doctors` | `user_id` | `users` | `@unique` — enforces 1:1 |
-| `availability_blocks` | `doctor_id` | `doctors` | Many blocks per doctor |
-| `appointments` | `doctor_id` | `doctors` | Many appointments per doctor |
-| `appointments` | `patient_user_id` | `users` | Named relation `PatientAppointments` |
-| `payments` | `appointment_id` | `appointments` | Many payments per appointment (retries) |
-| `prescriptions` | `appointment_id` | `appointments` | 1..n per appointment (immutable; correction = new row) |
-| `prescription_items` | `prescription_id` | `prescriptions` | Many items per prescription |
+| Child table           | FK column         | Parent table    | Notes                                                  |
+| --------------------- | ----------------- | --------------- | ------------------------------------------------------ |
+| `doctors`             | `user_id`         | `users`         | `@unique` — enforces 1:1                               |
+| `availability_blocks` | `doctor_id`       | `doctors`       | Many blocks per doctor                                 |
+| `appointments`        | `doctor_id`       | `doctors`       | Many appointments per doctor                           |
+| `appointments`        | `patient_user_id` | `users`         | Named relation `PatientAppointments`                   |
+| `payments`            | `appointment_id`  | `appointments`  | Many payments per appointment (retries)                |
+| `prescriptions`       | `appointment_id`  | `appointments`  | 1..n per appointment (immutable; correction = new row) |
+| `prescription_items`  | `prescription_id` | `prescriptions` | Many items per prescription                            |
 
 **Why doctor name is not on `appointments` (invariant #3):** The `appointments` table stores only `doctor_id` (a FK), never the doctor's name, specialization, or fee. If a doctor's display name were stored directly on the appointment and the doctor's profile were later updated, historical records would either change (incorrect) or diverge (inconsistent). Historical doctor identity is instead captured at the moment of prescription issuance in `Prescription.doctorSnapshot` (a jsonb snapshot of name, pmcNumber, specialization, signature). The appointment row itself is only the booking record; the prescription is the legal document that needs the durable identity.
 
@@ -492,13 +492,13 @@ erDiagram
 
 ### 4a. Declared unique constraints (from schema)
 
-| Table | Constraint | Columns | Invariant |
-|---|---|---|---|
-| `users` | `@@unique` | `email` | Email uniqueness (DA2) |
-| `doctors` | `@@unique` | `user_id` | 1:1 user↔doctor |
-| `doctors` | `@@unique` | `pmc_number` | PMC number uniqueness |
+| Table      | Constraint                      | Columns                         | Invariant                       |
+| ---------- | ------------------------------- | ------------------------------- | ------------------------------- |
+| `users`    | `@@unique`                      | `email`                         | Email uniqueness (DA2)          |
+| `doctors`  | `@@unique`                      | `user_id`                       | 1:1 user↔doctor                 |
+| `doctors`  | `@@unique`                      | `pmc_number`                    | PMC number uniqueness           |
 | `payments` | `@@unique` (name: `intent_key`) | `(patient_user_id, slot_start)` | Payment-intent idempotency (#7) |
-| `payments` | `@unique` | `refund_idempotency_key` | Refund idempotency (#10) |
+| `payments` | `@unique`                       | `refund_idempotency_key`        | Refund idempotency (#10)        |
 
 ### 4b. The no-double-booking partial unique index (invariant #1)
 
@@ -516,38 +516,38 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 
 ### 4c. Query indexes (non-unique)
 
-| Table | Index | Columns | Purpose |
-|---|---|---|---|
-| `availability_blocks` | `@@index` | `doctor_id` | Slot-generation query for a given doctor |
-| `appointments` | `@@index` | `(doctor_id, slot_start)` | Slot lookup; feeds availability/booking screen filters |
-| `appointments` | `@@index` | `patient_user_id` | Patient appointment history screen (P-06) |
-| `appointments` | `@@index` | `state` | Worker state-sweep queries (evaluation worker, reconciliation worker) |
-| `payments` | `@@index` | `appointment_id` | Payment lookup per appointment |
-| `prescriptions` | `@@index` | `appointment_id` | Prescription list per appointment |
-| `prescription_items` | `@@index` | `prescription_id` | Item list per prescription |
-| `audit_log` | `@@index` | `event_type` | Admin audit search filter (A5) |
-| `audit_log` | `@@index` | `actor_type` | Admin audit search filter (A5) |
-| `audit_log` | `@@index` | `at` | Time-range queries on audit log (A5) |
-| `analytics_events` | `@@index` | `type` | KPI aggregation by event type |
-| `analytics_events` | `@@index` | `at` | Time-range KPI queries |
-| `session` | `@@index` (map: `IDX_session_expire`) | `expire` | Session store cleanup sweep |
+| Table                 | Index                                 | Columns                   | Purpose                                                               |
+| --------------------- | ------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
+| `availability_blocks` | `@@index`                             | `doctor_id`               | Slot-generation query for a given doctor                              |
+| `appointments`        | `@@index`                             | `(doctor_id, slot_start)` | Slot lookup; feeds availability/booking screen filters                |
+| `appointments`        | `@@index`                             | `patient_user_id`         | Patient appointment history screen (P-06)                             |
+| `appointments`        | `@@index`                             | `state`                   | Worker state-sweep queries (evaluation worker, reconciliation worker) |
+| `payments`            | `@@index`                             | `appointment_id`          | Payment lookup per appointment                                        |
+| `prescriptions`       | `@@index`                             | `appointment_id`          | Prescription list per appointment                                     |
+| `prescription_items`  | `@@index`                             | `prescription_id`         | Item list per prescription                                            |
+| `audit_log`           | `@@index`                             | `event_type`              | Admin audit search filter (A5)                                        |
+| `audit_log`           | `@@index`                             | `actor_type`              | Admin audit search filter (A5)                                        |
+| `audit_log`           | `@@index`                             | `at`                      | Time-range queries on audit log (A5)                                  |
+| `analytics_events`    | `@@index`                             | `type`                    | KPI aggregation by event type                                         |
+| `analytics_events`    | `@@index`                             | `at`                      | Time-range KPI queries                                                |
+| `session`             | `@@index` (map: `IDX_session_expire`) | `expire`                  | Session store cleanup sweep                                           |
 
 ---
 
 ## 5. Naming conventions
 
-| Convention | Rule | Example |
-|---|---|---|
-| Table names | `snake_case` via `@@map(...)` | `availability_blocks`, `audit_log` |
-| Model names | PascalCase (Prisma DSL) | `AvailabilityBlock`, `AuditLog` |
-| Column names | `snake_case` via `@map(...)` | `patient_user_id`, `fee_at_booking` |
-| Field names | `camelCase` (Prisma DSL) | `patientUserId`, `feeAtBooking` |
-| ID fields | `id` on every model; type `String @id @default(cuid())` except `Settings.id Int @id @default(1)` | `id String @id @default(cuid())` |
-| Timestamp columns | `created_at` (`@default(now())`), `updated_at` (`@updatedAt`); both `@db.Timestamptz(6)` UTC | `created_at`, `updated_at` |
-| Status enums | lowercase values, underscore-separated | `slot_locked`, `cancelled_refunded` |
-| Boolean flags | `is_` prefix for state toggles; direct name for workflow markers | `is_active`, `must_change_password`, `disputed`, `for_self` |
-| Money fields | Integer PKR paisa | `fee`, `amount`, `unit_price`, `fee_at_booking` |
-| Append-only / no-soft-delete | `audit_log` and `prescriptions` are append-only by service-layer convention; no `deleted_at` column exists on any table | — |
+| Convention                   | Rule                                                                                                                    | Example                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Table names                  | `snake_case` via `@@map(...)`                                                                                           | `availability_blocks`, `audit_log`                          |
+| Model names                  | PascalCase (Prisma DSL)                                                                                                 | `AvailabilityBlock`, `AuditLog`                             |
+| Column names                 | `snake_case` via `@map(...)`                                                                                            | `patient_user_id`, `fee_at_booking`                         |
+| Field names                  | `camelCase` (Prisma DSL)                                                                                                | `patientUserId`, `feeAtBooking`                             |
+| ID fields                    | `id` on every model; type `String @id @default(cuid())` except `Settings.id Int @id @default(1)`                        | `id String @id @default(cuid())`                            |
+| Timestamp columns            | `created_at` (`@default(now())`), `updated_at` (`@updatedAt`); both `@db.Timestamptz(6)` UTC                            | `created_at`, `updated_at`                                  |
+| Status enums                 | lowercase values, underscore-separated                                                                                  | `slot_locked`, `cancelled_refunded`                         |
+| Boolean flags                | `is_` prefix for state toggles; direct name for workflow markers                                                        | `is_active`, `must_change_password`, `disputed`, `for_self` |
+| Money fields                 | Integer PKR paisa                                                                                                       | `fee`, `amount`, `unit_price`, `fee_at_booking`             |
+| Append-only / no-soft-delete | `audit_log` and `prescriptions` are append-only by service-layer convention; no `deleted_at` column exists on any table | —                                                           |
 
 ---
 
@@ -555,24 +555,24 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 
 The feature IDs below are the canonical IDs defined in `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md`.
 
-| Feature | Primary tables | Notes |
-|---|---|---|
-| F01 — Patient authentication & account | `users`, `session` | Sign-up/login/reset; `tos_accepted_at` consent; `must_change_password`; sessions stored in `session` |
-| F02 — Doctor discovery (listing & profile) | `doctors`, `users`, `availability_blocks` | `is_active` + `status = active` gate the public listing; blocks feed the next-available slot |
-| F03 — Slot booking & slot-lock | `appointments`, `availability_blocks` | Slots generated at read time; `slot_locked` + `lock_expires_at`; partial unique index prevents double-lock |
-| F04 — Payment | `payments`, `appointments` | Atomic confirm; `intent_key` unique (#7); `fee_at_booking` snapshot (#6); `gateway_fee`, `provider_ref` |
-| F05 — Appointment lifecycle & video | `appointments` | State machine hub; video room/token lifecycle managed by the Daily adapter against `appointment.id` (no dedicated table) |
-| F06 — Cancellation & refund | `appointments`, `payments` | Transitions to `cancelled_refunded` / `cancelled_no_refund` / `doctor_cancelled`; `refund_idempotency_key` (#10), `refund_ref`, `refund_status` |
-| F07 — Reminders & notifications | `appointments` (read) | No dedicated table; the notification worker re-checks appointment state before dispatch |
-| F08 — Prescription | `prescriptions`, `prescription_items`, `medicines` | Immutable rows (#4); price snapshot (#5); `doctor_snapshot` / `patient_id_snapshot` jsonb (#3, P8) |
-| F09 — Doctor weekly availability | `availability_blocks` | Recurring weekly windows; 30-min slots generated at read time |
-| F10 — Admin: doctor onboarding, edit, (de)activation | `doctors`, `users` | Admin CRUD; `pmc_number` + email immutability (#8); `is_active` / `status` |
-| F11 — Admin: medicine catalogue | `medicines` | Admin CRUD; `is_active`; `unit_price` snapshotted to `prescription_items.price` |
-| F12 — Admin: system-health alerts | `audit_log`, `payments`, `appointments` (read) | Derived from existing records; no dedicated alerts table in v1 |
-| F13 — Admin: records & audit log (unified) | `audit_log`, `appointments`, `payments` | Unified read-only search over records + the append-only audit log |
-| F14 — Admin: platform settings | `settings` | Single row (`id = 1`); `min_booking_lead_minutes`; fallback fee model |
-| F15 — Doctor & admin authentication & roles | `users`, `session` | `role` discriminator; `must_change_password`; role middleware reads the session |
-| F16 — Legal content (ToS / Privacy) | — (no table) | Static `/legal/*` pages; acceptance timestamp recorded on `users.tos_accepted_at` (see F01) |
+| Feature                                              | Primary tables                                     | Notes                                                                                                                                           |
+| ---------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| F01 — Patient authentication & account               | `users`, `session`                                 | Sign-up/login/reset; `tos_accepted_at` consent; `must_change_password`; sessions stored in `session`                                            |
+| F02 — Doctor discovery (listing & profile)           | `doctors`, `users`, `availability_blocks`          | `is_active` + `status = active` gate the public listing; blocks feed the next-available slot                                                    |
+| F03 — Slot booking & slot-lock                       | `appointments`, `availability_blocks`              | Slots generated at read time; `slot_locked` + `lock_expires_at`; partial unique index prevents double-lock                                      |
+| F04 — Payment                                        | `payments`, `appointments`                         | Atomic confirm; `intent_key` unique (#7); `fee_at_booking` snapshot (#6); `gateway_fee`, `provider_ref`                                         |
+| F05 — Appointment lifecycle & video                  | `appointments`                                     | State machine hub; video room/token lifecycle managed by the Daily adapter against `appointment.id` (no dedicated table)                        |
+| F06 — Cancellation & refund                          | `appointments`, `payments`                         | Transitions to `cancelled_refunded` / `cancelled_no_refund` / `doctor_cancelled`; `refund_idempotency_key` (#10), `refund_ref`, `refund_status` |
+| F07 — Reminders & notifications                      | `appointments` (read)                              | No dedicated table; the notification worker re-checks appointment state before dispatch                                                         |
+| F08 — Prescription                                   | `prescriptions`, `prescription_items`, `medicines` | Immutable rows (#4); price snapshot (#5); `doctor_snapshot` / `patient_id_snapshot` jsonb (#3, P8)                                              |
+| F09 — Doctor weekly availability                     | `availability_blocks`                              | Recurring weekly windows; 30-min slots generated at read time                                                                                   |
+| F10 — Admin: doctor onboarding, edit, (de)activation | `doctors`, `users`                                 | Admin CRUD; `pmc_number` + email immutability (#8); `is_active` / `status`                                                                      |
+| F11 — Admin: medicine catalogue                      | `medicines`                                        | Admin CRUD; `is_active`; `unit_price` snapshotted to `prescription_items.price`                                                                 |
+| F12 — Admin: system-health alerts                    | `audit_log`, `payments`, `appointments` (read)     | Derived from existing records; no dedicated alerts table in v1                                                                                  |
+| F13 — Admin: records & audit log (unified)           | `audit_log`, `appointments`, `payments`            | Unified read-only search over records + the append-only audit log                                                                               |
+| F14 — Admin: platform settings                       | `settings`                                         | Single row (`id = 1`); `min_booking_lead_minutes`; fallback fee model                                                                           |
+| F15 — Doctor & admin authentication & roles          | `users`, `session`                                 | `role` discriminator; `must_change_password`; role middleware reads the session                                                                 |
+| F16 — Legal content (ToS / Privacy)                  | — (no table)                                       | Static `/legal/*` pages; acceptance timestamp recorded on `users.tos_accepted_at` (see F01)                                                     |
 
 **KPI instrumentation (PRD §1 #1/#3):** the `analytics_events` table (`type`, `network_type`, `meta`) backs the KPI funnel and 3G video-join telemetry. This is platform telemetry, not a numbered v1 feature in doc 02; it supports the KPI table in doc 01.
 
@@ -582,6 +582,6 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                                       |
+| ---------- | ---------------- | ------------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of `prisma/schema.prisma` + `ARCHITECTURE.md §5` |

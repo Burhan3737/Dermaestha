@@ -1,13 +1,13 @@
 # 09 — Dev Testing & QA Testing Document
 
-| Field | Value |
-|---|---|
-| Document ID | `09-DEVTESTING_QATESTING_DOCUMENT` |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                             |
+| ---------------- | ------------------------------------------------- |
+| Document ID      | `09-DEVTESTING_QATESTING_DOCUMENT`                |
+| Status           | Canonical                                         |
+| Version          | 1.0                                               |
+| Last updated     | 2026-06-01                                        |
 | Sources absorbed | `docs/specification/02, 04, 08; vitest.config.js` |
-| Related docs | 02, 04, 08, 12 |
+| Related docs     | 02, 04, 08, 12                                    |
 
 ---
 
@@ -116,18 +116,18 @@ Deployment details are cross-referenced in doc 10; this document does not duplic
 
 **Data-integrity testing** exercises the ten invariants enumerated in doc 04 (tracing to PRD §3.3). Each invariant maps to one or more test cases:
 
-| Invariant | Description |
-|---|---|
-| #1 | Slot double-booking is impossible — partial unique index `uniq_active_slot` rejects the second insert |
-| #2 | Booking confirmation and payment record commit atomically — either both persist or neither |
-| #3 | Doctor rename never alters historical appointments or prescriptions |
-| #4 | Prescription immutability — no update or delete path exists; corrections are new rows |
-| #5 | Medicine name, dosage, and price are snapshotted on the prescription at issue-time |
-| #6 | `feeAtBooking` is snapshotted at confirmation; later doctor fee changes do not affect existing appointments |
-| #7 | Payment-intent creation is idempotent on `(patient_user_id, slot_start)` — `intent_key` unique constraint |
-| #8 | `pmcNumber` and `User.email` are immutable post-creation for a doctor record |
-| #9 | Deactivating a doctor preserves existing confirmed appointments; login is not revoked |
-| #10 | Each appointment carries one `refund_idempotency_key`; a second refund settlement for the same appointment is impossible |
+| Invariant | Description                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| #1        | Slot double-booking is impossible — partial unique index `uniq_active_slot` rejects the second insert                    |
+| #2        | Booking confirmation and payment record commit atomically — either both persist or neither                               |
+| #3        | Doctor rename never alters historical appointments or prescriptions                                                      |
+| #4        | Prescription immutability — no update or delete path exists; corrections are new rows                                    |
+| #5        | Medicine name, dosage, and price are snapshotted on the prescription at issue-time                                       |
+| #6        | `feeAtBooking` is snapshotted at confirmation; later doctor fee changes do not affect existing appointments              |
+| #7        | Payment-intent creation is idempotent on `(patient_user_id, slot_start)` — `intent_key` unique constraint                |
+| #8        | `pmcNumber` and `User.email` are immutable post-creation for a doctor record                                             |
+| #9        | Deactivating a doctor preserves existing confirmed appointments; login is not revoked                                    |
+| #10       | Each appointment carries one `refund_idempotency_key`; a second refund settlement for the same appointment is impossible |
 
 ---
 
@@ -146,25 +146,25 @@ Examples: `TC-F03-001` (slot picker, future-slots-only rule), `TC-F04-002` (webh
 
 Each test case in doc 12 must carry the following fields:
 
-| Field | Description |
-|---|---|
-| ID | `TC-<Feature>-<Seq>` |
+| Field           | Description                                                           |
+| --------------- | --------------------------------------------------------------------- |
+| ID              | `TC-<Feature>-<Seq>`                                                  |
 | Feature mapping | The doc 02 feature ID and sub-feature (e.g., `F03.03 Slot-Lock Rule`) |
-| Preconditions | System and data state required before execution |
-| Steps | Numbered action sequence |
-| Expected result | Observable outcome that constitutes a pass |
-| Priority | Critical / High / Medium / Low |
+| Preconditions   | System and data state required before execution                       |
+| Steps           | Numbered action sequence                                              |
+| Expected result | Observable outcome that constitutes a pass                            |
+| Priority        | Critical / High / Medium / Low                                        |
 
 ### Priority mapping
 
 Priority is assigned based on flow criticality as defined by the doc 02 feature catalogue:
 
-| Priority | Applies to |
-|---|---|
+| Priority | Applies to                                                                                                                                                        |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Critical | Core booking (F03), payment and webhook (F04), video join (F05), cancellation and refund (F06), data-integrity invariants #1–#10, role-boundary enforcement (F15) |
-| High | Prescription creation and download (F08), doctor availability and slot generation (F09), reminders and notifications (F07), admin doctor management (F10) |
-| Medium | Medicine catalogue (F11), system-health alerts (F12), records and audit log (F13), platform settings (F14) |
-| Low | Doctor discovery and public listing (F02), legal pages (F16), UI empty states, copy and label accuracy |
+| High     | Prescription creation and download (F08), doctor availability and slot generation (F09), reminders and notifications (F07), admin doctor management (F10)         |
+| Medium   | Medicine catalogue (F11), system-health alerts (F12), records and audit log (F13), platform settings (F14)                                                        |
+| Low      | Doctor discovery and public listing (F02), legal pages (F16), UI empty states, copy and label accuracy                                                            |
 
 ---
 
@@ -190,12 +190,12 @@ stateDiagram-v2
 
 Severity reflects the impact on Dermestha v1 users and data integrity. It is distinct from priority (which determines fix order relative to the release gate).
 
-| Severity | Definition |
-|---|---|
+| Severity | Definition                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Critical | Slot double-booking (invariant #1 violation); payment confirmed but appointment not created or vice versa (invariant #2 violation); incorrect refund amount or double-refund (invariants #5, #10); prescription data mutated or lost (invariant #4); patient or doctor can access another user's data (role boundary breach, doc 08 §A01); webhook accepted without valid signature (doc 08 §A08) |
-| High | Video room accessible to the wrong participant; join button not activating at correct time; cancellation window logic incorrect; `feeAtBooking` snapshot not captured; `must_change_password` gate not enforced; rate-limit thresholds not enforced per doc 08 §A07 |
-| Medium | Reminder email sent for a cancelled appointment; incorrect appointment state label in UI; prescription PDF renders wrong patient identity; audit log entry missing for a required event; admin alert not raised on retry exhaustion |
-| Low | Cosmetic UI misalignment; copy errors; non-critical link targets wrong; timezone display off by a minute; empty-state message missing |
+| High     | Video room accessible to the wrong participant; join button not activating at correct time; cancellation window logic incorrect; `feeAtBooking` snapshot not captured; `must_change_password` gate not enforced; rate-limit thresholds not enforced per doc 08 §A07                                                                                                                               |
+| Medium   | Reminder email sent for a cancelled appointment; incorrect appointment state label in UI; prescription PDF renders wrong patient identity; audit log entry missing for a required event; admin alert not raised on retry exhaustion                                                                                                                                                               |
+| Low      | Cosmetic UI misalignment; copy errors; non-critical link targets wrong; timezone display off by a minute; empty-state message missing                                                                                                                                                                                                                                                             |
 
 ---
 
@@ -246,13 +246,13 @@ A feature is considered complete when all of the following criteria are met:
 
 Each QA cycle produces the following metrics:
 
-| Metric | Description |
-|---|---|
-| Pass rate | Percentage of test cases with Verified status (Critical, High, Medium, Low broken out separately) |
-| Total defects | Count of bugs filed in the cycle, broken out by severity (Critical / High / Medium / Low) |
-| Open defects | Count of bugs not yet at Closed or Won't Fix status at cycle end |
-| Invariant coverage | Count of doc 04 invariants #1–#10 with at least one Verified test case |
-| Regression failures | Count of previously passing test cases that failed in the current cycle |
+| Metric              | Description                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------- |
+| Pass rate           | Percentage of test cases with Verified status (Critical, High, Medium, Low broken out separately) |
+| Total defects       | Count of bugs filed in the cycle, broken out by severity (Critical / High / Medium / Low)         |
+| Open defects        | Count of bugs not yet at Closed or Won't Fix status at cycle end                                  |
+| Invariant coverage  | Count of doc 04 invariants #1–#10 with at least one Verified test case                            |
+| Regression failures | Count of previously passing test cases that failed in the current cycle                           |
 
 ### Defect summary format
 
@@ -273,6 +273,6 @@ The release recommendation is a brief document (or structured comment) that stat
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                          |
+| ---------- | ---------------- | -------------------------------------------- |
 | 2026-06-01 | Initial creation | Derived from docs 02/04/08 + repo test setup |

@@ -1,13 +1,13 @@
 # 10 — Deployment Document
 
-| Field | Value |
-|---|---|
-| Document ID | 10-DEPLOYMENT_DOCUMENT |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
+| Status           | Canonical                                                                                               |
+| Version          | 1.0                                                                                                     |
+| Last updated     | 2026-06-01                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
-| Related docs | 03, 08, 15 |
+| Related docs     | 03, 08, 15                                                                                              |
 
 ---
 
@@ -65,14 +65,14 @@ No dedicated staging environment is configured in v1. If one is added, it should
 
 Hosted on **Railway** in the **Mumbai or Singapore region** (closest to Karachi for KPI latency). Key differences from local dev:
 
-| Concern | Local dev | Production |
-|---|---|---|
-| `NODE_ENV` | `development` | `production` |
-| `APP_BASE_URL` | `http://localhost:3000` | `https://<railway-domain>` |
-| `PAYFAST_MODE` | `sandbox` | `live` |
-| `DATABASE_URL` | compose service `db` | Railway-injected managed Postgres |
-| `SESSION_SECRET` | placeholder value | Strong random secret, per-environment |
-| Integration keys | dev/sandbox keys | Live production keys |
+| Concern          | Local dev               | Production                            |
+| ---------------- | ----------------------- | ------------------------------------- |
+| `NODE_ENV`       | `development`           | `production`                          |
+| `APP_BASE_URL`   | `http://localhost:3000` | `https://<railway-domain>`            |
+| `PAYFAST_MODE`   | `sandbox`               | `live`                                |
+| `DATABASE_URL`   | compose service `db`    | Railway-injected managed Postgres     |
+| `SESSION_SECRET` | placeholder value       | Strong random secret, per-environment |
+| Integration keys | dev/sandbox keys        | Live production keys                  |
 
 Full env-var reference: **doc 15 (15-CONFIGURATION_REFERENCE_DOCUMENT)**.
 
@@ -263,14 +263,14 @@ An error-tracking integration is configured via the `ERROR_TRACKING_DSN` environ
 
 The in-app admin alert feed (view A-03) surfaces operational events that require human attention. Cross-reference **doc 08 §A09** for the security and compliance perspective. The categories surfaced are:
 
-| Alert category | Trigger |
-|---|---|
-| Webhook mismatch | PayFast IPN with invalid or missing signature |
-| Refund exhaustion | `refund.service` has exhausted all retry attempts (`REFUND_MAX_ATTEMPTS`) |
-| Email failure | Notification worker has exhausted retries for an email trigger |
-| Awaiting prescription > 12h | Appointment completed but no prescription submitted after 12 hours |
-| Sustained login abuse | Failed-login rate exceeds lockout threshold (§3.6 / doc 08) |
-| Unhandled exceptions | Caught by the global error handler and forwarded to the feed |
+| Alert category              | Trigger                                                                   |
+| --------------------------- | ------------------------------------------------------------------------- |
+| Webhook mismatch            | PayFast IPN with invalid or missing signature                             |
+| Refund exhaustion           | `refund.service` has exhausted all retry attempts (`REFUND_MAX_ATTEMPTS`) |
+| Email failure               | Notification worker has exhausted retries for an email trigger            |
+| Awaiting prescription > 12h | Appointment completed but no prescription submitted after 12 hours        |
+| Sustained login abuse       | Failed-login rate exceeds lockout threshold (§3.6 / doc 08)               |
+| Unhandled exceptions        | Caught by the global error handler and forwarded to the feed              |
 
 ### Logging
 
@@ -280,10 +280,10 @@ The Express application logs to stdout (captured by Railway). Workers log their 
 
 ## 9. Access control (who deploys)
 
-| Environment | Who can deploy | Mechanism |
-|---|---|---|
-| Local dev | Any developer | `docker compose up --build` |
-| Production | Project owner / designated operator | Push to the Railway-monitored branch; Railway dashboard |
+| Environment | Who can deploy                      | Mechanism                                               |
+| ----------- | ----------------------------------- | ------------------------------------------------------- |
+| Local dev   | Any developer                       | `docker compose up --build`                             |
+| Production  | Project owner / designated operator | Push to the Railway-monitored branch; Railway dashboard |
 
 **Admin bootstrap (DA4, one-time, first production deploy only):**
 
@@ -301,12 +301,12 @@ This script is the only path to creating an admin account; there is no admin sel
 
 Dermestha v1 follows the milestone-based release plan defined in PRD §5.1:
 
-| Milestone | Scope |
-|---|---|
-| M1 | Core booking — auth, doctor management, availability, slot-lock |
-| M2 | Payments, state machine, video, refunds, cancellations, workers |
-| M3 | Prescriptions, medicine catalogue |
-| M4 | Admin tools, notifications, analytics, legal content, launch |
+| Milestone | Scope                                                           |
+| --------- | --------------------------------------------------------------- |
+| M1        | Core booking — auth, doctor management, availability, slot-lock |
+| M2        | Payments, state machine, video, refunds, cancellations, workers |
+| M3        | Prescriptions, medicine catalogue                               |
+| M4        | Admin tools, notifications, analytics, legal content, launch    |
 
 A formal version scheme and Git tagging convention have not been established. At this stage, releases correspond to milestone completions; tagging is TBD-by-convention (e.g. `v1-M1`, `v1-M2`) and should be agreed before M4 launch. There is no automated release pipeline or changelog generation in v1.
 
@@ -314,6 +314,6 @@ A formal version scheme and Git tagging convention have not been established. At
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                                                   |
+| ---------- | ---------------- | ------------------------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of ARCH §13/§14 + Dockerfile + docker-compose + package.json |

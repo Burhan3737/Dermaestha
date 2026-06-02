@@ -1,13 +1,13 @@
 # 01 — PRD Document
 
-| Field | Value |
-|---|---|
-| Document ID | `01-PRD_DOCUMENT` |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                    |
+| ---------------- | ---------------------------------------- |
+| Document ID      | `01-PRD_DOCUMENT`                        |
+| Status           | Canonical                                |
+| Version          | 1.0                                      |
+| Last updated     | 2026-06-01                               |
 | Sources absorbed | `docs/product/PRD.md §1, §2.1, §2.3, §5` |
-| Related docs | 02, 07 |
+| Related docs     | 02, 07                                   |
 
 ---
 
@@ -92,16 +92,16 @@ The downloadable prescription is itemised with admin-configured medicine prices 
 
 ## 6. Success metrics / KPIs
 
-| # | Metric | Target | Measurement |
-|---|---|---|---|
-| 1 | Landing → booking conversion | ≥30% | Web analytics: unique visitors / completed bookings |
-| 2 | Booking → completion rate | ≥70% | Confirmed bookings / consultations marked `completed` |
-| 3 | Video call join success on 3G | ≥95% | In-app video-join telemetry, segmented by network type |
-| 4 | Payment success rate (all 4 methods) | ≥90% | Successful payment webhooks / payment intents created |
-| 5 | Prescription availability after doctor submit | ≤60s end-to-end | Time from doctor submit to first patient-side download availability |
-| 6 | Slot double-booking rate | 0 (zero) | Enforced at storage layer; verified by audit log |
-| 7 | Refund initiation latency (eligible cancellations) | ≤1 hour | Cancellation timestamp → refund-API call timestamp |
-| 8 | First-page Time-to-First-Byte (Karachi mobile, 3G) | ≤2s | Lighthouse + real-user metrics post-launch |
+| #   | Metric                                             | Target          | Measurement                                                         |
+| --- | -------------------------------------------------- | --------------- | ------------------------------------------------------------------- |
+| 1   | Landing → booking conversion                       | ≥30%            | Web analytics: unique visitors / completed bookings                 |
+| 2   | Booking → completion rate                          | ≥70%            | Confirmed bookings / consultations marked `completed`               |
+| 3   | Video call join success on 3G                      | ≥95%            | In-app video-join telemetry, segmented by network type              |
+| 4   | Payment success rate (all 4 methods)               | ≥90%            | Successful payment webhooks / payment intents created               |
+| 5   | Prescription availability after doctor submit      | ≤60s end-to-end | Time from doctor submit to first patient-side download availability |
+| 6   | Slot double-booking rate                           | 0 (zero)        | Enforced at storage layer; verified by audit log                    |
+| 7   | Refund initiation latency (eligible cancellations) | ≤1 hour         | Cancellation timestamp → refund-API call timestamp                  |
+| 8   | First-page Time-to-First-Byte (Karachi mobile, 3G) | ≤2s             | Lighthouse + real-user metrics post-launch                          |
 
 **Measurement instrumentation.** KPIs #1 (landing→booking conversion) and #3 (video-join success by network type) require funnel and video-join telemetry that is not part of the three core integrations. v1 scope must include a lightweight analytics capability that records, at minimum: landing-page visit, booking-started, booking-confirmed, and video-join-attempt/success events (the last tagged with network type where the browser exposes it). Storage and tooling are an architecture decision; the requirement is that every KPI in this table maps to a component that emits the data it needs. KPIs #4 and #6 are derived from existing payment and audit-log records and need no new instrumentation.
 
@@ -111,12 +111,12 @@ The downloadable prescription is itemised with admin-configured medicine prices 
 
 ### v1 milestones (8 weeks, ~160 dev hours)
 
-| Milestone | End of week | Deliverable |
-|---|---|---|
-| **M1 — Booking flow** | Week 2 | Patient sign-up (with ToS/Privacy acceptance), doctor listing, slot booking (no payment yet), confirmation email |
-| **M2 — Video + Payments** | Week 4 | Full video consultation end-to-end (mobile-tested on 3G); payment flow working including verified webhooks and reconciliation cron |
-| **M3 — Prescriptions** | Week 6 | Doctor builds prescription after call with read-only patient identification header; medicine catalogue carries admin-set prices and the builder shows a computed prescription total; patient downloads an itemised PDF (prices + total) from dashboard |
-| **M4 — Launch-ready** | Week 8 | Admin panel (doctor onboarding with initial-password set, medicine catalogue with admin-set prices, alert feed), landing page, email automation, `/legal/terms` and `/legal/privacy` page content, full E2E QA |
+| Milestone                 | End of week | Deliverable                                                                                                                                                                                                                                            |
+| ------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **M1 — Booking flow**     | Week 2      | Patient sign-up (with ToS/Privacy acceptance), doctor listing, slot booking (no payment yet), confirmation email                                                                                                                                       |
+| **M2 — Video + Payments** | Week 4      | Full video consultation end-to-end (mobile-tested on 3G); payment flow working including verified webhooks and reconciliation cron                                                                                                                     |
+| **M3 — Prescriptions**    | Week 6      | Doctor builds prescription after call with read-only patient identification header; medicine catalogue carries admin-set prices and the builder shows a computed prescription total; patient downloads an itemised PDF (prices + total) from dashboard |
+| **M4 — Launch-ready**     | Week 8      | Admin panel (doctor onboarding with initial-password set, medicine catalogue with admin-set prices, alert feed), landing page, email automation, `/legal/terms` and `/legal/privacy` page content, full E2E QA                                         |
 
 ### v1.1 deferred items (2–4 weeks post-launch)
 
@@ -151,6 +151,6 @@ The complete risk register (all risks with likelihood, impact, and mitigation de
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                |
+| ---------- | ---------------- | -------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §1/§2.1/§2.3/§5 |

@@ -1,13 +1,13 @@
 # 00 — Index & Governance
 
-| Field | Value |
-|---|---|
-| Document ID | `00-INDEX_AND_GOVERNANCE` |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| Document ID      | `00-INDEX_AND_GOVERNANCE`                                                                              |
+| Status           | Canonical                                                                                              |
+| Version          | 1.0                                                                                                    |
+| Last updated     | 2026-06-01                                                                                             |
 | Sources absorbed | `docs/superpowers/specs/2026-06-01-documentation-suite-design.md §7.1; docs/product/PRD.md Appendix A` |
-| Related docs | all (00–15) |
+| Related docs     | all (00–15)                                                                                            |
 
 ---
 
@@ -31,24 +31,24 @@ This document is the single entry point for the `docs/specification/` suite. It 
 
 ## 1. Suite map
 
-| # | File | Purpose |
-|---|---|---|
-| 00 | `00-INDEX_AND_GOVERNANCE.md` | Suite entry point: map, reading order, glossary, and the change protocol |
-| 01 | `01-PRD_DOCUMENT.md` | High-level product requirements for stakeholders |
-| 02 | `02-SCOPE_FEATURE_DOCUMENT.md` | Numbered feature requirements (the most-referenced doc); single source of truth for what is built |
-| 03 | `03-ARCHITECTURE_DOCUMENT.md` | System architecture, tech stack, data-flow diagrams, deployment topology |
-| 04 | `04-DATABASE_DOCUMENT.md` | Database schema, tables, relationships, indexing, naming conventions |
-| 05 | `05-API_SPECIFICATION_DOCUMENT.md` | REST endpoint inventory, auth, error format, state-machine transition table |
-| 06 | `06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Design system: screen flows, navigation, color/typography/spacing tokens, component behavior |
-| 07 | `07-RISK_ASSUMPTION_DOCUMENT.md` | Assumptions, known risks with mitigations, open questions |
-| 08 | `08-SECURITY_COMPLIANCE_DOCUMENT.md` | OWASP controls, data-handling policies, access-control strategy |
-| 09 | `09-DEVTESTING_QATESTING_DOCUMENT.md` | Testing strategy, scope, environments, test-case structure, bug lifecycle, DoD |
-| 10 | `10-DEPLOYMENT_DOCUMENT.md` | Deployment overview, environments, steps, rollback, monitoring, releases |
-| 11 | `11-ARCHITECTURE_DECISION_RECORD.md` | Log of key architectural decisions (context/decision/consequences) |
-| 12 | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT.md` | Functional + security test cases mapped to feature IDs |
-| 13 | `13-PRODUCT_STATUS_TRACKER.md` | Current build state: feature-wise and module-wise progress + roadmap |
-| 14 | `14-INTEGRATION_CONTRACTS_DOCUMENT.md` | External adapter contracts, vendor payload shapes, email merge-vars, analytics catalog |
-| 15 | `15-CONFIGURATION_REFERENCE_DOCUMENT.md` | Canonical tunable constants + environment-variable contract |
+| #   | File                                      | Purpose                                                                                           |
+| --- | ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 00  | `00-INDEX_AND_GOVERNANCE.md`              | Suite entry point: map, reading order, glossary, and the change protocol                          |
+| 01  | `01-PRD_DOCUMENT.md`                      | High-level product requirements for stakeholders                                                  |
+| 02  | `02-SCOPE_FEATURE_DOCUMENT.md`            | Numbered feature requirements (the most-referenced doc); single source of truth for what is built |
+| 03  | `03-ARCHITECTURE_DOCUMENT.md`             | System architecture, tech stack, data-flow diagrams, deployment topology                          |
+| 04  | `04-DATABASE_DOCUMENT.md`                 | Database schema, tables, relationships, indexing, naming conventions                              |
+| 05  | `05-API_SPECIFICATION_DOCUMENT.md`        | REST endpoint inventory, auth, error format, state-machine transition table                       |
+| 06  | `06-DESIGN_SYSTEM_THEME_DOCUMENT.md`      | Design system: screen flows, navigation, color/typography/spacing tokens, component behavior      |
+| 07  | `07-RISK_ASSUMPTION_DOCUMENT.md`          | Assumptions, known risks with mitigations, open questions                                         |
+| 08  | `08-SECURITY_COMPLIANCE_DOCUMENT.md`      | OWASP controls, data-handling policies, access-control strategy                                   |
+| 09  | `09-DEVTESTING_QATESTING_DOCUMENT.md`     | Testing strategy, scope, environments, test-case structure, bug lifecycle, DoD                    |
+| 10  | `10-DEPLOYMENT_DOCUMENT.md`               | Deployment overview, environments, steps, rollback, monitoring, releases                          |
+| 11  | `11-ARCHITECTURE_DECISION_RECORD.md`      | Log of key architectural decisions (context/decision/consequences)                                |
+| 12  | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT.md` | Functional + security test cases mapped to feature IDs                                            |
+| 13  | `13-PRODUCT_STATUS_TRACKER.md`            | Current build state: feature-wise and module-wise progress + roadmap                              |
+| 14  | `14-INTEGRATION_CONTRACTS_DOCUMENT.md`    | External adapter contracts, vendor payload shapes, email merge-vars, analytics catalog            |
+| 15  | `15-CONFIGURATION_REFERENCE_DOCUMENT.md`  | Canonical tunable constants + environment-variable contract                                       |
 
 ---
 
@@ -66,19 +66,19 @@ Start with what the product is and what it builds (01, 02); then understand how 
 
 All documents in this suite reference the definitions below rather than redefining terms locally; if a term appears in another doc, its authoritative meaning is the one recorded here.
 
-| Term | Meaning |
-|---|---|
-| **PMC** | Pakistan Medical Commission — official medical licensing body |
-| **DRAP** | Drug Regulatory Authority of Pakistan |
-| **Slot lock** | 10-minute reservation on a slot during the patient's payment flow |
-| **No-show grace** | 15-minute window after slot start before an appointment is marked as no-show |
-| **Immutable prescription** | A submitted prescription cannot be edited; corrections require issuing a new linked prescription |
-| **`feeAtBooking`** | Snapshot of the doctor's consultation fee taken at the moment the appointment is confirmed; never changes for that appointment thereafter |
-| **`mustChangePassword`** | Flag on a user record (doctor or admin) requiring a password change before the next protected route is reached; set on creation and on admin reset, cleared on successful change |
-| **`disputed`** | A boolean flag on an appointment record, set by admin via A5 when a chargeback or unresolved patient claim is recorded. Orthogonal to the §4.3 state machine. |
-| **Medicine price snapshot** | The unit price copied onto a prescription (and onto a medicine order) at issue/placement time; later catalogue price changes never alter it (§3.3 #5). |
-| **Refund idempotency key** | A per-appointment key ensuring a refund settles only once even across automatic retries, the reconciliation path, or an admin's out-of-band gateway action (§3.3 #10). |
-| **Minimum booking lead time** | Admin-configurable gap required between "now" and a bookable slot's start; default 1 hour, supported down to 30 minutes in v1 (§4.1 #3). |
+| Term                          | Meaning                                                                                                                                                                          |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PMC**                       | Pakistan Medical Commission — official medical licensing body                                                                                                                    |
+| **DRAP**                      | Drug Regulatory Authority of Pakistan                                                                                                                                            |
+| **Slot lock**                 | 10-minute reservation on a slot during the patient's payment flow                                                                                                                |
+| **No-show grace**             | 15-minute window after slot start before an appointment is marked as no-show                                                                                                     |
+| **Immutable prescription**    | A submitted prescription cannot be edited; corrections require issuing a new linked prescription                                                                                 |
+| **`feeAtBooking`**            | Snapshot of the doctor's consultation fee taken at the moment the appointment is confirmed; never changes for that appointment thereafter                                        |
+| **`mustChangePassword`**      | Flag on a user record (doctor or admin) requiring a password change before the next protected route is reached; set on creation and on admin reset, cleared on successful change |
+| **`disputed`**                | A boolean flag on an appointment record, set by admin via A5 when a chargeback or unresolved patient claim is recorded. Orthogonal to the §4.3 state machine.                    |
+| **Medicine price snapshot**   | The unit price copied onto a prescription (and onto a medicine order) at issue/placement time; later catalogue price changes never alter it (§3.3 #5).                           |
+| **Refund idempotency key**    | A per-appointment key ensuring a refund settles only once even across automatic retries, the reconciliation path, or an admin's out-of-band gateway action (§3.3 #10).           |
+| **Minimum booking lead time** | Admin-configurable gap required between "now" and a bookable slot's start; default 1 hour, supported down to 30 minutes in v1 (§4.1 #3).                                         |
 
 ---
 
@@ -96,14 +96,14 @@ All documents in this suite reference the definitions below rather than redefini
 
 ## 5. Change-impact matrix
 
-| Change type | Update in this order |
-|---|---|
-| New feature | 02, then 04, 05, 12, 13 |
-| Schema change | 04, then 05, 08, 12 |
-| New external integration | 14, then 03, 05, 08, 15 |
-| New tunable/config value | 15, then 08, 10 |
+| Change type                | Update in this order      |
+| -------------------------- | ------------------------- |
+| New feature                | 02, then 04, 05, 12, 13   |
+| Schema change              | 04, then 05, 08, 12       |
+| New external integration   | 14, then 03, 05, 08, 15   |
+| New tunable/config value   | 15, then 08, 10           |
 | New architectural decision | 11, then the affected doc |
-| Build progress change | 13 |
+| Build progress change      | 13                        |
 
 ---
 
@@ -123,6 +123,6 @@ The original engineering docs — `docs/product/PRD.md`, `docs/engineering/ARCHI
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                      |
+| ---------- | ---------------- | -------------------------------------------------------- |
 | 2026-06-01 | Initial creation | First version of the suite entry point + change protocol |

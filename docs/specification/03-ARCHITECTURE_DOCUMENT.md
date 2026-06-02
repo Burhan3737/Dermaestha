@@ -1,13 +1,13 @@
 # 03 — Architecture Document
 
-| Field | Value |
-|---|---|
-| **Document ID** | 03-ARCHITECTURE_DOCUMENT |
-| **Status** | Canonical |
-| **Version** | 1.0 |
-| **Last updated** | 2026-06-01 |
+| Field                | Value                              |
+| -------------------- | ---------------------------------- |
+| **Document ID**      | 03-ARCHITECTURE_DOCUMENT           |
+| **Status**           | Canonical                          |
+| **Version**          | 1.0                                |
+| **Last updated**     | 2026-06-01                         |
 | **Sources absorbed** | `docs/engineering/ARCHITECTURE.md` |
-| **Related docs** | 02, 04, 05, 10, 14, 15 |
+| **Related docs**     | 02, 04, 05, 10, 14, 15             |
 
 ---
 
@@ -48,19 +48,19 @@ Dermestha v1 is a **single-deployable, same-origin monolith**: one JavaScript Ex
 
 ## 2. Technology stack
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| **Language** | JavaScript end-to-end (ES modules), with `// @ts-check` + JSDoc type hints | No build/transpile step and no `tsconfig`. JSDoc + `@ts-check` (via a `jsconfig.json`) gives editor-level type-checking on the risky invariant modules — the state machine, slot-lock, refund math — without committing to TypeScript. Prisma's generated client still surfaces model types through JSDoc/editor hints. |
-| **App framework** | Node + Express monolith, `model → controller → service` | Team expertise; serves the SPA same-origin → satisfies no-CORS requirement, one domain, cookie auth just works. |
-| **Frontend** | Vite + React (JS) SPA, served by Express `static` | Fast builds; one deployable; host-agnostic. SSR not needed at this scale (TTFB met via region + static serving + code-splitting). |
-| **Styling / theming** | Reuse the mockups' CSS-variable tokens (`tokens.css` + `components.css`); React components wrap existing BEM classes | CSS custom properties give the most manageable theming (one var → app-wide reskin) and are pixel-faithful to the approved mockups. MUI rejected: imposes Material look conflicting with the flat/squared design and adds bundle weight. |
-| **Database** | PostgreSQL + Prisma | Relational, integrity-heavy, join-heavy data; native `UNIQUE`/FK/transactions satisfy data-integrity invariants directly; cleanest AWS path (RDS/Aurora). |
-| **Sessions / auth** | Hand-rolled cookie sessions — `express-session` + `connect-pg-simple` + `argon2` + `express-rate-limit` | PRD mandates HTTP-only session cookies (not JWT). Auth has bespoke rules; hand-rolling fits the service layer and makes per-event audit-logging trivial, with fewest dependencies. |
-| **Hosting** | Railway all-in-one (app + Postgres), Mumbai/Singapore region | Simplest managed setup; private app↔DB networking; always-on for webhooks/cron; under ~USD 50/mo budget. |
-| **Email** | Resend (free tier) | Free at ~2–3k/mo; bounce/complaint webhooks satisfy notification requirements. |
-| **Video** | Daily.co (behind adapter) | Least development; room + time-bound token primitives map 1:1 to requirements; cost scales with paid consults. |
-| **Payments** | PayFast (behind adapter) | Most established PK aggregator (first SBP commercial license, APPS-backed, PCI-DSS); one integration + KYC covers cards + JazzCash + Easypaisa + bank; hosted checkout, signed webhooks/IPN, refund API, reconciliation query. |
-| **Scaffold** | Lean scaffold, no third-party boilerplate | No maintained boilerplate matches Express + React-SPA + Prisma + cookie-session RBAC; official Vite `react` + a clean Express/Prisma backend is lower-effort and better-fit. Borrow only config (Dockerfile, ESLint/Prettier/Husky/Zod). |
+| Decision              | Choice                                                                                                               | Rationale                                                                                                                                                                                                                                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Language**          | JavaScript end-to-end (ES modules), with `// @ts-check` + JSDoc type hints                                           | No build/transpile step and no `tsconfig`. JSDoc + `@ts-check` (via a `jsconfig.json`) gives editor-level type-checking on the risky invariant modules — the state machine, slot-lock, refund math — without committing to TypeScript. Prisma's generated client still surfaces model types through JSDoc/editor hints. |
+| **App framework**     | Node + Express monolith, `model → controller → service`                                                              | Team expertise; serves the SPA same-origin → satisfies no-CORS requirement, one domain, cookie auth just works.                                                                                                                                                                                                         |
+| **Frontend**          | Vite + React (JS) SPA, served by Express `static`                                                                    | Fast builds; one deployable; host-agnostic. SSR not needed at this scale (TTFB met via region + static serving + code-splitting).                                                                                                                                                                                       |
+| **Styling / theming** | Reuse the mockups' CSS-variable tokens (`tokens.css` + `components.css`); React components wrap existing BEM classes | CSS custom properties give the most manageable theming (one var → app-wide reskin) and are pixel-faithful to the approved mockups. MUI rejected: imposes Material look conflicting with the flat/squared design and adds bundle weight.                                                                                 |
+| **Database**          | PostgreSQL + Prisma                                                                                                  | Relational, integrity-heavy, join-heavy data; native `UNIQUE`/FK/transactions satisfy data-integrity invariants directly; cleanest AWS path (RDS/Aurora).                                                                                                                                                               |
+| **Sessions / auth**   | Hand-rolled cookie sessions — `express-session` + `connect-pg-simple` + `argon2` + `express-rate-limit`              | PRD mandates HTTP-only session cookies (not JWT). Auth has bespoke rules; hand-rolling fits the service layer and makes per-event audit-logging trivial, with fewest dependencies.                                                                                                                                      |
+| **Hosting**           | Railway all-in-one (app + Postgres), Mumbai/Singapore region                                                         | Simplest managed setup; private app↔DB networking; always-on for webhooks/cron; under ~USD 50/mo budget.                                                                                                                                                                                                                |
+| **Email**             | Resend (free tier)                                                                                                   | Free at ~2–3k/mo; bounce/complaint webhooks satisfy notification requirements.                                                                                                                                                                                                                                          |
+| **Video**             | Daily.co (behind adapter)                                                                                            | Least development; room + time-bound token primitives map 1:1 to requirements; cost scales with paid consults.                                                                                                                                                                                                          |
+| **Payments**          | PayFast (behind adapter)                                                                                             | Most established PK aggregator (first SBP commercial license, APPS-backed, PCI-DSS); one integration + KYC covers cards + JazzCash + Easypaisa + bank; hosted checkout, signed webhooks/IPN, refund API, reconciliation query.                                                                                          |
+| **Scaffold**          | Lean scaffold, no third-party boilerplate                                                                            | No maintained boilerplate matches Express + React-SPA + Prisma + cookie-session RBAC; official Vite `react` + a clean Express/Prisma backend is lower-effort and better-fit. Borrow only config (Dockerfile, ESLint/Prettier/Husky/Zod).                                                                                |
 
 ---
 
@@ -176,6 +176,6 @@ There are no message queues or other third-party infrastructure services. The th
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                            |
+| ---------- | ---------------- | -------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of `docs/engineering/ARCHITECTURE.md` |

@@ -1,13 +1,13 @@
 # 06 — Design System & Theme Document
 
-| Field | Value |
-|---|---|
-| Document ID | `06-DESIGN_SYSTEM_THEME_DOCUMENT` |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
+| Status           | Canonical                                                                                 |
+| Version          | 1.0                                                                                       |
+| Last updated     | 2026-06-01                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
-| Related docs | 02, 03 |
+| Related docs     | 02, 03                                                                                    |
 
 ---
 
@@ -85,18 +85,18 @@ flowchart LR
 
 ### Three surfaces
 
-| Surface | Primary audience | Nav chrome | Breakpoint behaviour |
-|---|---|---|---|
-| Patient | Patients (responsive web) | Top nav (desktop/logged-out) + bottom tab bar (mobile/logged-in) | Bottom tabs below 767 px → top nav at ≥ 768 px |
-| Doctor | Doctors (desktop-first) | Fixed left sidebar (240 px) + content header | Collapses to off-canvas drawer (hamburger) on mobile |
-| Admin | Administrators (desktop) | Fixed left sidebar (240 px) | Collapses to drawer on mobile; tables scroll horizontally |
+| Surface | Primary audience          | Nav chrome                                                       | Breakpoint behaviour                                      |
+| ------- | ------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------- |
+| Patient | Patients (responsive web) | Top nav (desktop/logged-out) + bottom tab bar (mobile/logged-in) | Bottom tabs below 767 px → top nav at ≥ 768 px            |
+| Doctor  | Doctors (desktop-first)   | Fixed left sidebar (240 px) + content header                     | Collapses to off-canvas drawer (hamburger) on mobile      |
+| Admin   | Administrators (desktop)  | Fixed left sidebar (240 px)                                      | Collapses to drawer on mobile; tables scroll horizontally |
 
 ### Patient nav routes
 
-| Route context | Links |
-|---|---|
-| Public / logged-out | Browse, How it works, For doctors — Login (secondary button) |
-| Logged-in | Browse / Appointments / Profile (bottom tabs on mobile; top nav on desktop) |
+| Route context       | Links                                                                       |
+| ------------------- | --------------------------------------------------------------------------- |
+| Public / logged-out | Browse, How it works, For doctors — Login (secondary button)                |
+| Logged-in           | Browse / Appointments / Profile (bottom tabs on mobile; top nav on desktop) |
 
 ### Doctor sidebar links
 
@@ -108,32 +108,32 @@ Doctors — Medicines — Alerts — Records & Audit — Settings
 
 ### Screen-to-route inventory
 
-| Screen ID | Screen name | Surface | PRD ref |
-|---|---|---|---|
-| P-01 | Landing | Patient (public) | — |
-| P-02 | Doctor listing / Browse | Patient | P1 |
-| P-03 | Doctor profile | Patient | P1 |
-| P-04 | Sign up | Patient | P2 |
-| P-05 | Login + password recovery | Patient / Doctor / Admin | P2, DA2 |
-| P-06 | Booking (slot + who-for) | Patient | P3, P8 |
-| P-07 | Payment handoff & return | Patient | P3, edge #6a |
-| P-08 | Dashboard — Upcoming | Patient | P9 |
-| P-09 | Dashboard — Past appointments | Patient | P7 |
-| P-10 | Cancellation modal | Patient | P6 |
-| P-11 | Pre-call waiting room | Patient | P5 |
-| P-12 | Video consultation | Patient | P5 |
-| P-13 | Prescription view + PDF | Patient | P7, §3.5 |
-| D-01 | Forced first-login password change | Doctor | DA3 |
-| D-02 | Today's appointments + History | Doctor | D2 |
-| D-03 | Weekly availability grid | Doctor | D1 |
-| D-04 | Video consultation (doctor) | Doctor | D3 |
-| D-05 | Prescription builder | Doctor | D4 |
-| D-06 | Cancel appointment modal | Doctor | D5 |
-| A-01 | Doctors — list / add / edit / deactivate | Admin | A1, A4 |
-| A-02 | Medicine catalogue | Admin | A2 |
-| A-03 | Alert feed / system health | Admin | A3 |
-| A-04 | Records & Audit Log | Admin | A5 |
-| A-05 | Settings | Admin | A6 |
+| Screen ID | Screen name                              | Surface                  | PRD ref      |
+| --------- | ---------------------------------------- | ------------------------ | ------------ |
+| P-01      | Landing                                  | Patient (public)         | —            |
+| P-02      | Doctor listing / Browse                  | Patient                  | P1           |
+| P-03      | Doctor profile                           | Patient                  | P1           |
+| P-04      | Sign up                                  | Patient                  | P2           |
+| P-05      | Login + password recovery                | Patient / Doctor / Admin | P2, DA2      |
+| P-06      | Booking (slot + who-for)                 | Patient                  | P3, P8       |
+| P-07      | Payment handoff & return                 | Patient                  | P3, edge #6a |
+| P-08      | Dashboard — Upcoming                     | Patient                  | P9           |
+| P-09      | Dashboard — Past appointments            | Patient                  | P7           |
+| P-10      | Cancellation modal                       | Patient                  | P6           |
+| P-11      | Pre-call waiting room                    | Patient                  | P5           |
+| P-12      | Video consultation                       | Patient                  | P5           |
+| P-13      | Prescription view + PDF                  | Patient                  | P7, §3.5     |
+| D-01      | Forced first-login password change       | Doctor                   | DA3          |
+| D-02      | Today's appointments + History           | Doctor                   | D2           |
+| D-03      | Weekly availability grid                 | Doctor                   | D1           |
+| D-04      | Video consultation (doctor)              | Doctor                   | D3           |
+| D-05      | Prescription builder                     | Doctor                   | D4           |
+| D-06      | Cancel appointment modal                 | Doctor                   | D5           |
+| A-01      | Doctors — list / add / edit / deactivate | Admin                    | A1, A4       |
+| A-02      | Medicine catalogue                       | Admin                    | A2           |
+| A-03      | Alert feed / system health               | Admin                    | A3           |
+| A-04      | Records & Audit Log                      | Admin                    | A5           |
+| A-05      | Settings                                 | Admin                    | A6           |
 
 ---
 
@@ -153,6 +153,7 @@ Submit is blocked until the patient checks the ToS/Privacy consent checkbox. The
 ### Slot selection (P-06)
 
 Slots are grouped under day tabs. States:
+
 - `available` — white fill, green hairline (`color-primary-border`), cursor pointer.
 - `selected` — spruce fill (`color-primary`), white text, no shadow.
 - `disabled/booked` — sunken fill, struck-through label (`text-decoration: line-through`), not-allowed cursor.
@@ -167,6 +168,7 @@ Centered on a dimmed backdrop (`rgba(15,33,24,.45)`). A 4 px accent bar at the t
 ### Payment flow states (P-07)
 
 Returned as finished centered cards (~520 px, icon circle + title + body + single action):
+
 - **Success** — confirmed → redirect to dashboard.
 - **Failure** — retry within lock window.
 - **Lock expired** — "slot released — please pick another".
@@ -191,17 +193,17 @@ A slot timer is visible throughout the call. A soft "5 minutes remaining" warnin
 
 ### Appointment state → badge mapping
 
-| Underlying state | Patient-facing label | Badge variant |
-|---|---|---|
-| `confirmed` | Confirmed | success |
-| `in_progress` | In progress | info |
-| `completed` / `prescription_issued` | Completed · Prescription ready | success |
-| `cancelled_refunded` | Cancelled — refunded | info |
-| `cancelled_no_refund` | Cancelled — no refund | neutral |
-| `doctor_cancelled` / `doctor_no_show` | Cancelled by doctor — refund issued | danger |
-| `patient_no_show` | Missed (no-show) | warning |
-| `awaiting_prescription` (derived) | Awaiting prescription | warning |
-| `disputed` (admin only) | Disputed | danger outline marker, orthogonal to state |
+| Underlying state                      | Patient-facing label                | Badge variant                              |
+| ------------------------------------- | ----------------------------------- | ------------------------------------------ |
+| `confirmed`                           | Confirmed                           | success                                    |
+| `in_progress`                         | In progress                         | info                                       |
+| `completed` / `prescription_issued`   | Completed · Prescription ready      | success                                    |
+| `cancelled_refunded`                  | Cancelled — refunded                | info                                       |
+| `cancelled_no_refund`                 | Cancelled — no refund               | neutral                                    |
+| `doctor_cancelled` / `doctor_no_show` | Cancelled by doctor — refund issued | danger                                     |
+| `patient_no_show`                     | Missed (no-show)                    | warning                                    |
+| `awaiting_prescription` (derived)     | Awaiting prescription               | warning                                    |
+| `disputed` (admin only)               | Disputed                            | danger outline marker, orthogonal to state |
 
 ### System banner
 
@@ -223,63 +225,63 @@ All hex values are copied verbatim from `mockups/assets/css/tokens.css`.
 
 ### Brand
 
-| Token | Value | Use |
-|---|---|---|
-| `--color-primary` | `#0F3A2A` | Deep spruce — primary buttons, links, headings, brand |
-| `--color-primary-hover` | `#0A2C20` | Hover / pressed state |
-| `--color-primary-tint` | `#E6F1EA` | Subtle green fill (success bg, selected rows, sidebar active) |
-| `--color-primary-border` | `#C2D3C8` | Green hairline (e.g., available slot outline) |
-| `--color-on-primary` | `#FFFFFF` | Text/icons on spruce backgrounds |
+| Token                    | Value     | Use                                                           |
+| ------------------------ | --------- | ------------------------------------------------------------- |
+| `--color-primary`        | `#0F3A2A` | Deep spruce — primary buttons, links, headings, brand         |
+| `--color-primary-hover`  | `#0A2C20` | Hover / pressed state                                         |
+| `--color-primary-tint`   | `#E6F1EA` | Subtle green fill (success bg, selected rows, sidebar active) |
+| `--color-primary-border` | `#C2D3C8` | Green hairline (e.g., available slot outline)                 |
+| `--color-on-primary`     | `#FFFFFF` | Text/icons on spruce backgrounds                              |
 
 ### Accent (brass — use sparingly)
 
-| Token | Value | Use |
-|---|---|---|
-| `--color-accent` | `#B5852F` | Brass — next-slot highlight, small flourishes, large/bold text only |
-| `--color-accent-deep` | `#9A6B1F` | Brass for small text (meets AA on white/porcelain) |
-| `--color-accent-tint` | `#FBF0E0` | Warning/awaiting background |
+| Token                 | Value     | Use                                                                 |
+| --------------------- | --------- | ------------------------------------------------------------------- |
+| `--color-accent`      | `#B5852F` | Brass — next-slot highlight, small flourishes, large/bold text only |
+| `--color-accent-deep` | `#9A6B1F` | Brass for small text (meets AA on white/porcelain)                  |
+| `--color-accent-tint` | `#FBF0E0` | Warning/awaiting background                                         |
 
 ### Surface / canvas / ink
 
-| Token | Value | Use |
-|---|---|---|
-| `--color-bg` | `#E8ECE9` | App canvas (cool porcelain) — functional screens |
-| `--color-surface` | `#FFFFFF` | Cards, inputs, sheets |
-| `--color-surface-sunken` | `#DFE5E1` | Wells, disabled fills |
-| `--color-border` | `#D7DED8` | Default 1 px hairline |
-| `--color-border-strong` | `#C2CBC4` | Emphasised border / default input border |
-| `--color-text-strong` | `#13241D` | Headings, key values |
-| `--color-text-body` | `#46524B` | Body copy |
-| `--color-text-muted` | `#56625B` | Metadata, secondary labels |
+| Token                    | Value     | Use                                              |
+| ------------------------ | --------- | ------------------------------------------------ |
+| `--color-bg`             | `#E8ECE9` | App canvas (cool porcelain) — functional screens |
+| `--color-surface`        | `#FFFFFF` | Cards, inputs, sheets                            |
+| `--color-surface-sunken` | `#DFE5E1` | Wells, disabled fills                            |
+| `--color-border`         | `#D7DED8` | Default 1 px hairline                            |
+| `--color-border-strong`  | `#C2CBC4` | Emphasised border / default input border         |
+| `--color-text-strong`    | `#13241D` | Headings, key values                             |
+| `--color-text-body`      | `#46524B` | Body copy                                        |
+| `--color-text-muted`     | `#56625B` | Metadata, secondary labels                       |
 
 ### Feature dark band
 
-| Token | Value | Use |
-|---|---|---|
-| `--color-feature-bg` | `#0F3A2A` | Deep green section background (landing hero, footer, auth panel) |
-| `--color-on-dark` | `#DCE9E2` | Body text on green |
-| `--color-on-dark-muted` | `#AFC6BA` | Secondary text on green |
+| Token                    | Value     | Use                                                                 |
+| ------------------------ | --------- | ------------------------------------------------------------------- |
+| `--color-feature-bg`     | `#0F3A2A` | Deep green section background (landing hero, footer, auth panel)    |
+| `--color-on-dark`        | `#DCE9E2` | Body text on green                                                  |
+| `--color-on-dark-muted`  | `#AFC6BA` | Secondary text on green                                             |
 | `--color-on-dark-accent` | `#9BE3B8` | Mint highlight on green (eyebrows, accents, video "live" indicator) |
 
 ### Dark / immersive chrome (video stage + waiting room)
 
-| Token | Value | Use |
-|---|---|---|
-| `--color-dark-bg` | `#0A2C20` | Video stage / camera-preview background (deep spruce) |
-| `--color-dark-surface` | `#0E3328` | Self-tile / inset surface on dark |
-| `--color-dark-border` | `#1F5440` | Hairline on dark surfaces |
-| `--color-dark-deep` | `#072018` | Full-bleed immersive page background (video consultation screen) |
+| Token                  | Value     | Use                                                              |
+| ---------------------- | --------- | ---------------------------------------------------------------- |
+| `--color-dark-bg`      | `#0A2C20` | Video stage / camera-preview background (deep spruce)            |
+| `--color-dark-surface` | `#0E3328` | Self-tile / inset surface on dark                                |
+| `--color-dark-border`  | `#1F5440` | Hairline on dark surfaces                                        |
+| `--color-dark-deep`    | `#072018` | Full-bleed immersive page background (video consultation screen) |
 
 ### Semantic / status
 
-| Token | Text value | Background value | Use |
-|---|---|---|---|
-| success | `#136B45` | `#E6F1EA` | Confirmed, completed, prescription ready |
-| info | `#2F6E6E` | `#E2EFEE` | In progress, cancelled–refunded |
-| warning | `#9A6B1F` | `#FBF0E0` | Missed/no-show, awaiting prescription |
-| danger | `#B23A2E` | `#F7E9E6` | Doctor-cancelled, destructive actions, errors |
-| danger-deep | `#9A2A20` | — | Error text needing higher contrast |
-| neutral | `#56625B` | `#EAEEEA` | Cancelled–no-refund, generic |
+| Token       | Text value | Background value | Use                                           |
+| ----------- | ---------- | ---------------- | --------------------------------------------- |
+| success     | `#136B45`  | `#E6F1EA`        | Confirmed, completed, prescription ready      |
+| info        | `#2F6E6E`  | `#E2EFEE`        | In progress, cancelled–refunded               |
+| warning     | `#9A6B1F`  | `#FBF0E0`        | Missed/no-show, awaiting prescription         |
+| danger      | `#B23A2E`  | `#F7E9E6`        | Doctor-cancelled, destructive actions, errors |
+| danger-deep | `#9A2A20`  | —                | Error text needing higher contrast            |
+| neutral     | `#56625B`  | `#EAEEEA`        | Cancelled–no-refund, generic                  |
 
 ### Contrast guardrails
 
@@ -293,10 +295,10 @@ All hex values are copied verbatim from `mockups/assets/css/tokens.css`.
 
 ### Font stack
 
-| Role | CSS variable | Full stack |
-|---|---|---|
-| Headings / display / labels | `--font-head` | `"Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` |
-| Body / UI | `--font-body` | `"Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` |
+| Role                        | CSS variable  | Full stack                                                                   |
+| --------------------------- | ------------- | ---------------------------------------------------------------------------- |
+| Headings / display / labels | `--font-head` | `"Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`        |
+| Body / UI                   | `--font-body` | `"Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` |
 
 **Loading:** Google Fonts with `preconnect` + `display=swap`. Limit to Archivo weights 700 and 800; Hanken Grotesk weights 400, 500, 600, and 700.
 
@@ -304,17 +306,17 @@ All hex values are copied verbatim from `mockups/assets/css/tokens.css`.
 
 Values from `tokens.css`; line heights, weights, and tracking from `DESIGN.md §2.2`.
 
-| Role | CSS variable | Size | Line height | Weight | Family | Tracking |
-|---|---|---|---|---|---|---|
-| display | `--fs-display` | 30 px (→ 40 px desktop) | 1.1 | 800 | Archivo | −0.8 px |
-| h1 | `--fs-h1` | 24 px (→ 26 px desktop) | 1.15 | 800 | Archivo | −0.6 px |
-| h2 | `--fs-h2` | 20 px | 1.2 | 700 | Archivo | −0.4 px |
-| h3 | `--fs-h3` | 17 px | 1.3 | 700 | Archivo | −0.3 px |
-| body-lg | `--fs-body-lg` | 16 px | 1.55 | 400 | Hanken | 0 |
-| body | `--fs-body` | 14 px | 1.55 | 400 | Hanken | 0 |
-| body-sm | `--fs-body-sm` | 13 px | 1.5 | 400 | Hanken | 0 |
-| caption | `--fs-caption` | 12 px | 1.4 | 500 | Hanken | 0 |
-| label | `--fs-label` | 11 px | 1.2 | 700 | Archivo | +0.8 px, UPPERCASE |
+| Role    | CSS variable   | Size                    | Line height | Weight | Family  | Tracking           |
+| ------- | -------------- | ----------------------- | ----------- | ------ | ------- | ------------------ |
+| display | `--fs-display` | 30 px (→ 40 px desktop) | 1.1         | 800    | Archivo | −0.8 px            |
+| h1      | `--fs-h1`      | 24 px (→ 26 px desktop) | 1.15        | 800    | Archivo | −0.6 px            |
+| h2      | `--fs-h2`      | 20 px                   | 1.2         | 700    | Archivo | −0.4 px            |
+| h3      | `--fs-h3`      | 17 px                   | 1.3         | 700    | Archivo | −0.3 px            |
+| body-lg | `--fs-body-lg` | 16 px                   | 1.55        | 400    | Hanken  | 0                  |
+| body    | `--fs-body`    | 14 px                   | 1.55        | 400    | Hanken  | 0                  |
+| body-sm | `--fs-body-sm` | 13 px                   | 1.5         | 400    | Hanken  | 0                  |
+| caption | `--fs-caption` | 12 px                   | 1.4         | 500    | Hanken  | 0                  |
+| label   | `--fs-label`   | 11 px                   | 1.2         | 700    | Archivo | +0.8 px, UPPERCASE |
 
 ### Usage rules
 
@@ -333,27 +335,27 @@ Values from `tokens.css`; line heights, weights, and tracking from `DESIGN.md §
 
 ### Spacing scale (4 px base)
 
-| Token | Value |
-|---|---|
-| `--sp-1` | `4px` |
-| `--sp-2` | `8px` |
-| `--sp-3` | `12px` |
-| `--sp-4` | `16px` |
-| `--sp-5` | `20px` |
-| `--sp-6` | `24px` |
-| `--sp-8` | `32px` |
+| Token     | Value  |
+| --------- | ------ |
+| `--sp-1`  | `4px`  |
+| `--sp-2`  | `8px`  |
+| `--sp-3`  | `12px` |
+| `--sp-4`  | `16px` |
+| `--sp-5`  | `20px` |
+| `--sp-6`  | `24px` |
+| `--sp-8`  | `32px` |
 | `--sp-10` | `40px` |
 | `--sp-12` | `48px` |
 | `--sp-16` | `64px` |
 
 ### Border radius
 
-| Token | Value | Applied to |
-|---|---|---|
-| `--r-sm` | `3px` | Buttons, controls, badges, PMC badge, slots |
-| `--r-md` | `4px` | Cards, inputs, tables |
-| `--r-lg` | `6px` | Modals, sheets, video stage |
-| `--r-pill` | `999px` | Avatars only |
+| Token      | Value   | Applied to                                  |
+| ---------- | ------- | ------------------------------------------- |
+| `--r-sm`   | `3px`   | Buttons, controls, badges, PMC badge, slots |
+| `--r-md`   | `4px`   | Cards, inputs, tables                       |
+| `--r-lg`   | `6px`   | Modals, sheets, video stage                 |
+| `--r-pill` | `999px` | Avatars only                                |
 
 ### Borders and elevation
 
@@ -365,18 +367,18 @@ Values from `tokens.css`; line heights, weights, and tracking from `DESIGN.md §
 
 ### Layout tokens
 
-| Token | Value | Use |
-|---|---|---|
-| `--maxw` | `1240px` | Content max-width for the `.container` helper |
-| `--sidebar-w` | `240px` | Fixed left sidebar (doctor / admin layouts) |
+| Token         | Value    | Use                                           |
+| ------------- | -------- | --------------------------------------------- |
+| `--maxw`      | `1240px` | Content max-width for the `.container` helper |
+| `--sidebar-w` | `240px`  | Fixed left sidebar (doctor / admin layouts)   |
 
 ### Breakpoints
 
-| Breakpoint | Range | Patient nav | Doctor card grid |
-|---|---|---|---|
-| mobile | < 640 px | bottom tab bar | 1 column |
-| tablet | 640–1023 px | bottom tab bar (≤ 767) → top nav (≥ 768) | 2 columns |
-| desktop | ≥ 1024 px | top nav | 3 columns |
+| Breakpoint | Range       | Patient nav                              | Doctor card grid |
+| ---------- | ----------- | ---------------------------------------- | ---------------- |
+| mobile     | < 640 px    | bottom tab bar                           | 1 column         |
+| tablet     | 640–1023 px | bottom tab bar (≤ 767) → top nav (≥ 768) | 2 columns        |
+| desktop    | ≥ 1024 px   | top nav                                  | 3 columns        |
 
 Content max-width ~1100 px, centered, 16–24 px gutters. Mobile content padding collapses from `--sp-6` to `--sp-4`.
 
@@ -398,14 +400,14 @@ All components reference token variables exclusively — no raw hex in `componen
 
 Variants, sizes, and states from `components.css`:
 
-| Variant class | Background | Text color | Border |
-|---|---|---|---|
-| `.btn--primary` | `var(--color-primary)` | `var(--color-on-primary)` | none |
-| `.btn--secondary` | `var(--color-surface)` | `var(--color-primary)` | inset 1 px `var(--color-border-strong)` |
-| `.btn--ghost` | transparent | `var(--color-primary)` | none |
-| `.btn--danger` | `var(--color-danger)` | `#fff` | none |
-| `.btn--brass` | `var(--color-accent)` | `#fff` | none |
-| `[disabled]` / `.btn--disabled` | `var(--color-surface-sunken)` | `#9AA69E` | none |
+| Variant class                   | Background                    | Text color                | Border                                  |
+| ------------------------------- | ----------------------------- | ------------------------- | --------------------------------------- |
+| `.btn--primary`                 | `var(--color-primary)`        | `var(--color-on-primary)` | none                                    |
+| `.btn--secondary`               | `var(--color-surface)`        | `var(--color-primary)`    | inset 1 px `var(--color-border-strong)` |
+| `.btn--ghost`                   | transparent                   | `var(--color-primary)`    | none                                    |
+| `.btn--danger`                  | `var(--color-danger)`         | `#fff`                    | none                                    |
+| `.btn--brass`                   | `var(--color-accent)`         | `#fff`                    | none                                    |
+| `[disabled]` / `.btn--disabled` | `var(--color-surface-sunken)` | `#9AA69E`                 | none                                    |
 
 Size modifiers: `.btn--sm` (`8 px 14 px`), default (`11 px 18 px`), `.btn--lg` (`13 px 22 px`). `.btn--block` expands to full width. Radius: `--r-sm`. Label: Hanken 700. Hover: `background: var(--color-primary-hover)` on `.btn--primary`. Focus ring: `0 0 0 3px rgba(15,58,42,.30)`. Transition: `background var(--ease)`.
 
@@ -430,11 +432,11 @@ Native-styled `<select>` for simple cases; custom keyboard-navigable listbox for
 
 Circular (`border-radius: var(--r-pill)`), `object-fit: cover`. Background `var(--color-primary-tint)`, initials text `var(--color-primary)`.
 
-| Size class | Dimensions | Font size |
-|---|---|---|
-| `.avatar--sm` | 28 × 28 px | 11 px |
-| `.avatar--md` | 34 × 34 px | 12 px |
-| `.avatar--lg` | 48 × 48 px | 16 px |
+| Size class    | Dimensions | Font size |
+| ------------- | ---------- | --------- |
+| `.avatar--sm` | 28 × 28 px | 11 px     |
+| `.avatar--md` | 34 × 34 px | 12 px     |
+| `.avatar--lg` | 48 × 48 px | 16 px     |
 
 ### Doctor card (`.doc-card`) — signature component
 
@@ -453,12 +455,12 @@ Circular (`border-radius: var(--r-pill)`), `object-fit: cover`. Background `var(
 
 Radius `var(--r-sm)` (3 px), no dot, `var(--fs-label)` (11 px), Archivo 700, `4 px 9 px` padding, `letter-spacing: .2px`.
 
-| Class | Background | Text |
-|---|---|---|
+| Class             | Background                | Text                   |
+| ----------------- | ------------------------- | ---------------------- |
 | `.badge--success` | `var(--color-success-bg)` | `var(--color-success)` |
-| `.badge--info` | `var(--color-info-bg)` | `var(--color-info)` |
+| `.badge--info`    | `var(--color-info-bg)`    | `var(--color-info)`    |
 | `.badge--warning` | `var(--color-warning-bg)` | `var(--color-warning)` |
-| `.badge--danger` | `var(--color-danger-bg)` | `var(--color-danger)` |
+| `.badge--danger`  | `var(--color-danger-bg)`  | `var(--color-danger)`  |
 | `.badge--neutral` | `var(--color-neutral-bg)` | `var(--color-neutral)` |
 
 ### Modal / dialog (`.modal`)
@@ -537,6 +539,6 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                                 |
+| ---------- | ---------------- | ------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of DESIGN.md + tokens.css + components.css |

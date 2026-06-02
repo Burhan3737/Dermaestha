@@ -1,13 +1,13 @@
 # 08 — Security & Compliance Document
 
-| Field | Value |
-|---|---|
-| Document ID | `08-SECURITY_COMPLIANCE_DOCUMENT` |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
+| Status           | Canonical                                                                                               |
+| Version          | 1.0                                                                                                     |
+| Last updated     | 2026-06-01                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
-| Related docs | 02, 05, 12, 15 |
+| Related docs     | 02, 05, 12, 15                                                                                          |
 
 ---
 
@@ -87,13 +87,13 @@ Scoping rules by role (PRD §3.6):
 
 **Rate limits and lockout (CONFIG §2 — mandated to be specified per PRD §3.6):**
 
-| Surface | Limit | On breach |
-|---|---|---|
-| Login | 5 failures / account / 15 min → lockout | `429 ACCOUNT_LOCKED`; audit-logged; sustained abuse → A3 |
-| Login (per IP) | 20 / 15 min | `429 RATE_LIMITED` |
-| Sign-up | 5 / IP / hour | `429 RATE_LIMITED` |
-| Forgot-password | 5 / account / hour | Enumeration-safe `200`; counted silently |
-| Payment-intent | 10 / patient / hour | `429 RATE_LIMITED` (protects PayFast API quota beyond idempotency #7) |
+| Surface         | Limit                                   | On breach                                                             |
+| --------------- | --------------------------------------- | --------------------------------------------------------------------- |
+| Login           | 5 failures / account / 15 min → lockout | `429 ACCOUNT_LOCKED`; audit-logged; sustained abuse → A3              |
+| Login (per IP)  | 20 / 15 min                             | `429 RATE_LIMITED`                                                    |
+| Sign-up         | 5 / IP / hour                           | `429 RATE_LIMITED`                                                    |
+| Forgot-password | 5 / account / hour                      | Enumeration-safe `200`; counted silently                              |
+| Payment-intent  | 10 / patient / hour                     | `429 RATE_LIMITED` (protects PayFast API quota beyond idempotency #7) |
 
 Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_log` (`event_type=login_lockout`); sustained abuse is surfaced to the admin alert feed (A3).
 
@@ -148,13 +148,13 @@ The audit log is **append-only** — no update or delete path is exposed at the 
 
 ### 2.1 Data classification
 
-| Category | Data | Notes |
-|---|---|---|
-| PII | Patient full name, email, phone; "booked for" subject name, age, relation; prescription content (medicines, dosage, instructions, notes) | Accessible per §3 access-control rules |
-| Doctor PII | Full name, email, phone, PMC number, photo | PMC number and email are immutable post-creation (PRD §3.3 #8) |
-| Payment data | Card numbers, wallet credentials | **Never touches the platform.** Handled exclusively by PayFast's hosted checkout. The platform stores only: gateway-assigned payment reference, gateway-reported fee, refund reference, and refund status |
-| Session data | Session cookie + server-side session record in the `session` table | HTTP-only, Secure, SameSite=Lax; 7-day rolling TTL |
-| Audit log | Timestamped event records with actor identity | Admin-only; append-only; no PII beyond actor/target references |
+| Category     | Data                                                                                                                                     | Notes                                                                                                                                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PII          | Patient full name, email, phone; "booked for" subject name, age, relation; prescription content (medicines, dosage, instructions, notes) | Accessible per §3 access-control rules                                                                                                                                                                    |
+| Doctor PII   | Full name, email, phone, PMC number, photo                                                                                               | PMC number and email are immutable post-creation (PRD §3.3 #8)                                                                                                                                            |
+| Payment data | Card numbers, wallet credentials                                                                                                         | **Never touches the platform.** Handled exclusively by PayFast's hosted checkout. The platform stores only: gateway-assigned payment reference, gateway-reported fee, refund reference, and refund status |
+| Session data | Session cookie + server-side session record in the `session` table                                                                       | HTTP-only, Secure, SameSite=Lax; 7-day rolling TTL                                                                                                                                                        |
+| Audit log    | Timestamped event records with actor identity                                                                                            | Admin-only; append-only; no PII beyond actor/target references                                                                                                                                            |
 
 ### 2.2 Data minimization
 
@@ -174,14 +174,14 @@ Audit log retention is also indefinite in v1. No log rotation or purge policy is
 
 ### 2.5 Access and privacy
 
-| Resource | Patient | Doctor | Admin |
-|---|---|---|---|
-| Own appointments and PII | Read/write (own only) | — | Read all |
-| Appointments assigned to them | — | Read/write | Read all |
-| Doctor schedule and contact info | No access | Own only | Read/write all |
-| Audit log | No access | No access | Read (filtered query API, A5) |
-| Another patient's data | No access | No access | Read (via A5) |
-| Prescription content | Own only (download) | Assigned appointments only | Read (via A5) |
+| Resource                         | Patient               | Doctor                     | Admin                         |
+| -------------------------------- | --------------------- | -------------------------- | ----------------------------- |
+| Own appointments and PII         | Read/write (own only) | —                          | Read all                      |
+| Appointments assigned to them    | —                     | Read/write                 | Read all                      |
+| Doctor schedule and contact info | No access             | Own only                   | Read/write all                |
+| Audit log                        | No access             | No access                  | Read (filtered query API, A5) |
+| Another patient's data           | No access             | No access                  | Read (via A5)                 |
+| Prescription content             | Own only (download)   | Assigned appointments only | Read (via A5)                 |
 
 Consent at sign-up: a mandatory acceptance of the Terms of Service and Privacy Policy is recorded on the `users` record as `tos_accepted_at` with timestamp (PRD P2; PRD §3.6).
 
@@ -197,12 +197,12 @@ The database is a **Railway-managed PostgreSQL** instance. Railway handles autom
 
 The platform uses role-based access control (RBAC) with three user-facing roles and one system actor:
 
-| Role | Description |
-|---|---|
-| `patient` | Registered patients; self-managed accounts |
-| `doctor` | Dermatologists onboarded by admin; credentials managed by admin |
-| `admin` | Internal Dermestha staff; single bootstrap account (DA4) |
-| `system` | The three in-process background workers (reconciliation, notification, appointment-evaluation); no session, identified in audit entries by actor type |
+| Role      | Description                                                                                                                                           |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `patient` | Registered patients; self-managed accounts                                                                                                            |
+| `doctor`  | Dermatologists onboarded by admin; credentials managed by admin                                                                                       |
+| `admin`   | Internal Dermestha staff; single bootstrap account (DA4)                                                                                              |
+| `system`  | The three in-process background workers (reconciliation, notification, appointment-evaluation); no session, identified in audit entries by actor type |
 
 Roles are stored on the `users.role` enum column. A single `requireRole(...)` middleware reads the session's role and rejects any request outside the allowed roles for the route. This is the **only authorization mechanism** — it is not duplicated in route handler bodies and not enforced only on the frontend (PRD DA6; ARCH §7; ARCH §11).
 
@@ -263,6 +263,6 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                               |
+| ---------- | ---------------- | ----------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD §3.6 + ARCH §7/§11 + CONFIG §2/§5 |

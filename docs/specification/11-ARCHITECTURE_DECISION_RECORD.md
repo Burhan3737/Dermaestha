@@ -1,13 +1,13 @@
 # 11 — Architecture Decision Record
 
-| Field | Value |
-|---|---|
-| Document ID | 11-ARCHITECTURE_DECISION_RECORD |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------- |
+| Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
+| Status           | Canonical                                                                                          |
+| Version          | 1.0                                                                                                |
+| Last updated     | 2026-06-01                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
-| Related docs | 03, 04, 05, 14 |
+| Related docs     | 03, 04, 05, 14                                                                                     |
 
 ---
 
@@ -284,6 +284,6 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                           |
+| ---------- | ---------------- | ------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Extracted from ARCHITECTURE.md decisions + changelogs + specs |

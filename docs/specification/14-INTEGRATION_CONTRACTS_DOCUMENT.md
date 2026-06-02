@@ -1,13 +1,13 @@
 # 14 — Integration Contracts Document
 
-| Field | Value |
-|---|---|
-| Document ID | 14-INTEGRATION_CONTRACTS_DOCUMENT |
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Field            | Value                              |
+| ---------------- | ---------------------------------- |
+| Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
+| Status           | Canonical                          |
+| Version          | 1.0                                |
+| Last updated     | 2026-06-01                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
-| Related docs | 03, 05, 08, 15 |
+| Related docs     | 03, 05, 08, 15                     |
 
 ---
 
@@ -174,14 +174,14 @@ The worker maps join/leave to no-show resolution (doctor vs patient absent at sl
 
 Retry/backoff lives in the notification worker (`CONFIG.md §3`); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final copy is M4.
 
-| `EmailTemplate` | Trigger | Merge vars |
-|---|---|---|
-| `booking_confirmation` | `→confirmed` | `patientName, doctorName, slotStartLocal, fee, dashboardUrl` |
-| `reminder_24h` | 24 h before slot (skipped for short-lead) | `patientName, doctorName, slotStartLocal, joinUrl` |
-| `reminder_1h` | 1 h before slot (skipped for short-lead) | same as `reminder_24h` |
-| `prescription_ready` | `→prescription_issued` | `patientName, doctorName, prescriptionUrl` |
-| `refund_confirmation` | refund `settled` | `patientName, amount, refundRef, appointmentRef` |
-| `cancellation_apology` | `doctor_cancelled` / `doctor_no_show` | `patientName, doctorName, slotStartLocal, refundAmount` |
+| `EmailTemplate`        | Trigger                                   | Merge vars                                                   |
+| ---------------------- | ----------------------------------------- | ------------------------------------------------------------ |
+| `booking_confirmation` | `→confirmed`                              | `patientName, doctorName, slotStartLocal, fee, dashboardUrl` |
+| `reminder_24h`         | 24 h before slot (skipped for short-lead) | `patientName, doctorName, slotStartLocal, joinUrl`           |
+| `reminder_1h`          | 1 h before slot (skipped for short-lead)  | same as `reminder_24h`                                       |
+| `prescription_ready`   | `→prescription_issued`                    | `patientName, doctorName, prescriptionUrl`                   |
+| `refund_confirmation`  | refund `settled`                          | `patientName, amount, refundRef, appointmentRef`             |
+| `cancellation_apology` | `doctor_cancelled` / `doctor_no_show`     | `patientName, doctorName, slotStartLocal, refundAmount`      |
 
 **Reminder invalidation (§3.4):** the worker re-checks appointment state immediately before dispatch and **suppresses** any reminder for an appointment no longer `confirmed`/`in_progress`.
 
@@ -191,12 +191,12 @@ Retry/backoff lives in the notification worker (`CONFIG.md §3`); no PDF attachm
 
 Ingested at `POST /api/analytics/events` as `{ type, networkType?, meta? }`. `networkType` (e.g. `"3g"`, `"4g"`, `"wifi"`) backs the 3G-success KPI.
 
-| `type` | Fired when | `meta` |
-|---|---|---|
-| `landing_view` | P-01 loads | `{ referrer? }` |
-| `booking_started` | patient locks a slot | `{ doctorId }` |
-| `booking_confirmed` | `→confirmed` | `{ doctorId, fee }` |
-| `video_join_attempt` | Join Call clicked | `{ appointmentId, role }` |
+| `type`               | Fired when                            | `meta`                                 |
+| -------------------- | ------------------------------------- | -------------------------------------- |
+| `landing_view`       | P-01 loads                            | `{ referrer? }`                        |
+| `booking_started`    | patient locks a slot                  | `{ doctorId }`                         |
+| `booking_confirmed`  | `→confirmed`                          | `{ doctorId, fee }`                    |
+| `video_join_attempt` | Join Call clicked                     | `{ appointmentId, role }`              |
 | `video_join_success` | participant token accepted / media up | `{ appointmentId, role, networkType }` |
 
 Keep the catalog closed: adding an event = adding a row here first, so the KPI dashboard and the emitter stay in lockstep (matches the single-source discipline of ARCHITECTURE.md §6b).
@@ -217,6 +217,6 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 
 ## Revision footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                         |
+| ---------- | ---------------- | ------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of INTEGRATIONS.md |

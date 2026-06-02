@@ -1,12 +1,12 @@
 # 15 — Configuration Reference Document
 
-| Document ID | 15-CONFIGURATION_REFERENCE_DOCUMENT |
-|---|---|
-| Status | Canonical |
-| Version | 1.0 |
-| Last updated | 2026-06-01 |
+| Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
+| ---------------- | -------------------------------------------- |
+| Status           | Canonical                                    |
+| Version          | 1.0                                          |
+| Last updated     | 2026-06-01                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
-| Related docs | 03, 04, 08, 10, 14 |
+| Related docs     | 03, 04, 08, 10, 14                           |
 
 ---
 
@@ -35,29 +35,29 @@ This document is a single authoritative reference for every deploy-time constant
 
 Two tiers govern constants: **(A) Settings-tunable at runtime** live in the `settings` table (A6), no redeploy required; **(B) Deploy-time constants** live in `.env.example` or `server/src/config/constants.js`.
 
-| Constant | Value | Tier | Source |
-|---|---|---|---|
-| Slot-lock TTL | **10 min** | B | PRD §4.3 |
-| Min booking lead | **60 min** (floor 30 min) | A (`minBookingLeadMinutes`) | PRD §4.x, edge filter |
-| Slot granularity | **30 min** | B | D1 |
-| No-show grace | slot-start **+15 min** | B | PRD §4.3 |
-| Video token window | slot-start **−10 min** → slot-end **+5 min** | B | §3.4 |
-| `in_progress` hard cutoff | slot-end **+5 min** (never later) | B | §3.4, §10 |
-| Reminder offsets | **24 h** and **1 h** before slot | B | P4 |
-| Missing-Rx alert | `completed` + **12 h** → A3 alert (`awaiting_prescription`) | B | PRD §4.3 |
-| Password-reset token | **1 h**, single-use | B | P2 |
+| Constant                  | Value                                                       | Tier                        | Source                |
+| ------------------------- | ----------------------------------------------------------- | --------------------------- | --------------------- |
+| Slot-lock TTL             | **10 min**                                                  | B                           | PRD §4.3              |
+| Min booking lead          | **60 min** (floor 30 min)                                   | A (`minBookingLeadMinutes`) | PRD §4.x, edge filter |
+| Slot granularity          | **30 min**                                                  | B                           | D1                    |
+| No-show grace             | slot-start **+15 min**                                      | B                           | PRD §4.3              |
+| Video token window        | slot-start **−10 min** → slot-end **+5 min**                | B                           | §3.4                  |
+| `in_progress` hard cutoff | slot-end **+5 min** (never later)                           | B                           | §3.4, §10             |
+| Reminder offsets          | **24 h** and **1 h** before slot                            | B                           | P4                    |
+| Missing-Rx alert          | `completed` + **12 h** → A3 alert (`awaiting_prescription`) | B                           | PRD §4.3              |
+| Password-reset token      | **1 h**, single-use                                         | B                           | P2                    |
 
 **Environment variable names** (mirror the constants above for deploy-time tier B):
 
-| Variable | Default |
-|---|---|
-| `SLOT_LOCK_TTL_MIN` | `10` |
-| `SLOT_GRANULARITY_MIN` | `30` |
-| `NO_SHOW_GRACE_MIN` | `15` |
-| `VIDEO_TOKEN_PRE_MIN` | `10` |
-| `VIDEO_TOKEN_POST_MIN` | `5` |
-| `RESET_TOKEN_TTL_MIN` | `60` |
-| `SESSION_TTL_DAYS` | `7` |
+| Variable               | Default |
+| ---------------------- | ------- |
+| `SLOT_LOCK_TTL_MIN`    | `10`    |
+| `SLOT_GRANULARITY_MIN` | `30`    |
+| `NO_SHOW_GRACE_MIN`    | `15`    |
+| `VIDEO_TOKEN_PRE_MIN`  | `10`    |
+| `VIDEO_TOKEN_POST_MIN` | `5`     |
+| `RESET_TOKEN_TTL_MIN`  | `60`    |
+| `SESSION_TTL_DAYS`     | `7`     |
 
 ---
 
@@ -65,25 +65,25 @@ Two tiers govern constants: **(A) Settings-tunable at runtime** live in the `set
 
 Mandated by PRD §3.6. Library: `express-rate-limit` (memory store acceptable for single instance; see [§3 Worker Cadence](#3-worker-cadence) for single-instance note).
 
-| Surface | Limit | On Breach |
-|---|---|---|
-| Login (per account) | **5 failures / account / 15 min** → lockout | `429 ACCOUNT_LOCKED`; audit-logged; sustained → A3 |
-| Login (per IP) | **20 / 15 min** | `429 RATE_LIMITED` |
-| Sign-up | **5 / IP / hour** | `429 RATE_LIMITED` |
-| Forgot-password | **5 / account / hour** | enumeration-safe `200`; counted silently |
-| Payment-intent | **10 / patient / hour** | `429 RATE_LIMITED` (protects PayFast quota, beyond #7 idempotency) |
+| Surface             | Limit                                       | On Breach                                                          |
+| ------------------- | ------------------------------------------- | ------------------------------------------------------------------ |
+| Login (per account) | **5 failures / account / 15 min** → lockout | `429 ACCOUNT_LOCKED`; audit-logged; sustained → A3                 |
+| Login (per IP)      | **20 / 15 min**                             | `429 RATE_LIMITED`                                                 |
+| Sign-up             | **5 / IP / hour**                           | `429 RATE_LIMITED`                                                 |
+| Forgot-password     | **5 / account / hour**                      | enumeration-safe `200`; counted silently                           |
+| Payment-intent      | **10 / patient / hour**                     | `429 RATE_LIMITED` (protects PayFast quota, beyond #7 idempotency) |
 
 **Lockout duration:** 15 min rolling. Threshold breaches → `audit_log` (`event_type=login_lockout`); sustained abuse surfaced to A3.
 
 **Environment variable names:**
 
-| Variable | Default |
-|---|---|
-| `LOGIN_MAX_ATTEMPTS` | `5` |
-| `LOGIN_LOCKOUT_MIN` | `15` |
-| `SIGNUP_MAX_PER_IP_HOUR` | `5` |
-| `FORGOT_MAX_PER_ACCOUNT_HOUR` | `5` |
-| `PAYMENT_INTENT_MAX_PER_PATIENT_HOUR` | `10` |
+| Variable                              | Default |
+| ------------------------------------- | ------- |
+| `LOGIN_MAX_ATTEMPTS`                  | `5`     |
+| `LOGIN_LOCKOUT_MIN`                   | `15`    |
+| `SIGNUP_MAX_PER_IP_HOUR`              | `5`     |
+| `FORGOT_MAX_PER_ACCOUNT_HOUR`         | `5`     |
+| `PAYMENT_INTENT_MAX_PER_PATIENT_HOUR` | `10`    |
 
 ---
 
@@ -91,11 +91,11 @@ Mandated by PRD §3.6. Library: `express-rate-limit` (memory store acceptable fo
 
 Workers use `node-cron`, running in-process. **Single-instance assumption (v1):** workers run in the one app process; **no leader election** (deliberate — "don't over-engineer"). If the app ever scales horizontally, gate workers behind a Postgres advisory lock or move them to scheduled tasks — this section is the one place that changes. Memory-backed rate-limit also assumes single instance.
 
-| Worker | Schedule | Notes |
-|---|---|---|
-| Reconciliation | **hourly** (`0 * * * *`) | PayFast unconfirmed-payments query, last 24 h (edge #6/#6a) |
-| Notification | **every minute** (`* * * * *`) | Dispatch due emails; **re-check appointment state immediately before send**; suppress reminders if no longer `confirmed`/`in_progress` |
-| Appointment-evaluation | **every minute** (`* * * * *`) | `confirmed→in_progress` at slot-start; resolve `completed`/no-show in grace window; never strand `in_progress` past slot-end+5 min |
+| Worker                 | Schedule                       | Notes                                                                                                                                  |
+| ---------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Reconciliation         | **hourly** (`0 * * * *`)       | PayFast unconfirmed-payments query, last 24 h (edge #6/#6a)                                                                            |
+| Notification           | **every minute** (`* * * * *`) | Dispatch due emails; **re-check appointment state immediately before send**; suppress reminders if no longer `confirmed`/`in_progress` |
+| Appointment-evaluation | **every minute** (`* * * * *`) | `confirmed→in_progress` at slot-start; resolve `completed`/no-show in grace window; never strand `in_progress` past slot-end+5 min     |
 
 ---
 
@@ -109,31 +109,31 @@ Source: CONFIG.md §4 (Refund retry #10, edge #30).
 
 **Environment variable names:**
 
-| Variable | Default |
-|---|---|
-| `REFUND_MAX_ATTEMPTS` | `5` |
-| `REFUND_BACKOFF_BASE_SEC` | `30` |
+| Variable                  | Default |
+| ------------------------- | ------- |
+| `REFUND_MAX_ATTEMPTS`     | `5`     |
+| `REFUND_BACKOFF_BASE_SEC` | `30`    |
 
 ---
 
 ## 5. Auth & Crypto Parameters
 
-| Constant | Value | Source |
-|---|---|---|
-| Password hash algorithm | **argon2id** (bcrypt acceptable) | §7 |
-| argon2 memoryCost | **19456 KiB** | OWASP baseline |
-| argon2 timeCost | **2** | OWASP baseline |
-| argon2 parallelism | **1** (tune to host) | OWASP baseline |
-| Session cookie flags | **HttpOnly, Secure, SameSite=Lax** | §3.6 |
-| Session store | `connect-pg-simple`, `createTableIfMissing: false` (Prisma owns `session` DDL) | §7 |
-| Session TTL | **7 days rolling** | — |
+| Constant                | Value                                                                          | Source         |
+| ----------------------- | ------------------------------------------------------------------------------ | -------------- |
+| Password hash algorithm | **argon2id** (bcrypt acceptable)                                               | §7             |
+| argon2 memoryCost       | **19456 KiB**                                                                  | OWASP baseline |
+| argon2 timeCost         | **2**                                                                          | OWASP baseline |
+| argon2 parallelism      | **1** (tune to host)                                                           | OWASP baseline |
+| Session cookie flags    | **HttpOnly, Secure, SameSite=Lax**                                             | §3.6           |
+| Session store           | `connect-pg-simple`, `createTableIfMissing: false` (Prisma owns `session` DDL) | §7             |
+| Session TTL             | **7 days rolling**                                                             | —              |
 
 **Environment variable:**
 
-| Variable | Default |
-|---|---|
-| `SESSION_SECRET` | *(must be set — rotate per environment)* |
-| `SESSION_TTL_DAYS` | `7` |
+| Variable           | Default                                  |
+| ------------------ | ---------------------------------------- |
+| `SESSION_SECRET`   | _(must be set — rotate per environment)_ |
+| `SESSION_TTL_DAYS` | `7`                                      |
 
 ---
 
@@ -165,90 +165,90 @@ Source: `.env.example`. Copy to `.env` for local dev; set real values in Railway
 
 ### Core
 
-| Variable | Purpose | Example / Default |
-|---|---|---|
-| `NODE_ENV` | Runtime environment mode | `development` \| `production` |
-| `PORT` | HTTP server port | `3000` |
-| `APP_BASE_URL` | Public origin; used to build webhook notify/return URLs | `http://localhost:3000` |
+| Variable       | Purpose                                                 | Example / Default             |
+| -------------- | ------------------------------------------------------- | ----------------------------- |
+| `NODE_ENV`     | Runtime environment mode                                | `development` \| `production` |
+| `PORT`         | HTTP server port                                        | `3000`                        |
+| `APP_BASE_URL` | Public origin; used to build webhook notify/return URLs | `http://localhost:3000`       |
 
 ### Database
 
-| Variable | Purpose | Example / Default |
-|---|---|---|
+| Variable       | Purpose                               | Example / Default                                 |
+| -------------- | ------------------------------------- | ------------------------------------------------- |
 | `DATABASE_URL` | Postgres connection string via Prisma | `postgresql://user:pass@localhost:5432/dermestha` |
 
 > Pin `prisma@6.x` and `@prisma/client@6.x` (Prisma 7 dropped in-schema `datasource.url`). See [§7 Migration Caveats](#7-migration-caveats).
 
 ### Sessions / Auth
 
-| Variable | Purpose | Example / Default |
-|---|---|---|
-| `SESSION_SECRET` | Express-session signing secret | *(must be set — rotate per environment)* |
+| Variable         | Purpose                        | Example / Default                        |
+| ---------------- | ------------------------------ | ---------------------------------------- |
+| `SESSION_SECRET` | Express-session signing secret | _(must be set — rotate per environment)_ |
 
 ### PayFast (Payment Adapter)
 
-| Variable | Purpose | Example / Default |
-|---|---|---|
-| `PAYFAST_MERCHANT_ID` | PayFast merchant ID | *(set per environment)* |
-| `PAYFAST_MERCHANT_KEY` | PayFast merchant key | *(set per environment)* |
-| `PAYFAST_PASSPHRASE` | Used for IPN signature verification | *(set per environment)* |
-| `PAYFAST_MODE` | Gateway mode | `sandbox` \| `live` |
+| Variable               | Purpose                             | Example / Default       |
+| ---------------------- | ----------------------------------- | ----------------------- |
+| `PAYFAST_MERCHANT_ID`  | PayFast merchant ID                 | _(set per environment)_ |
+| `PAYFAST_MERCHANT_KEY` | PayFast merchant key                | _(set per environment)_ |
+| `PAYFAST_PASSPHRASE`   | Used for IPN signature verification | _(set per environment)_ |
+| `PAYFAST_MODE`         | Gateway mode                        | `sandbox` \| `live`     |
 
 ### Daily.co (Video Adapter)
 
-| Variable | Purpose | Example / Default |
-|---|---|---|
-| `DAILY_API_KEY` | Daily.co API key | *(set per environment)* |
-| `DAILY_DOMAIN` | Daily.co team domain | `your-team.daily.co` |
+| Variable        | Purpose              | Example / Default       |
+| --------------- | -------------------- | ----------------------- |
+| `DAILY_API_KEY` | Daily.co API key     | _(set per environment)_ |
+| `DAILY_DOMAIN`  | Daily.co team domain | `your-team.daily.co`    |
 
 ### Resend (Email Adapter)
 
-| Variable | Purpose | Example / Default |
-|---|---|---|
-| `RESEND_API_KEY` | Resend API key | *(set per environment)* |
-| `RESEND_FROM` | Verified sender address | `no-reply@dermestha.example` |
+| Variable         | Purpose                 | Example / Default            |
+| ---------------- | ----------------------- | ---------------------------- |
+| `RESEND_API_KEY` | Resend API key          | _(set per environment)_      |
+| `RESEND_FROM`    | Verified sender address | `no-reply@dermestha.example` |
 
 ### Error Tracking
 
-| Variable | Purpose | Example / Default |
-|---|---|---|
-| `ERROR_TRACKING_DSN` | Error-tracking DSN (e.g. Sentry) | *(optional in dev)* |
+| Variable             | Purpose                          | Example / Default   |
+| -------------------- | -------------------------------- | ------------------- |
+| `ERROR_TRACKING_DSN` | Error-tracking DSN (e.g. Sentry) | _(optional in dev)_ |
 
 ### Tunable Defaults
 
 These mirror `docs/engineering/CONFIG.md`; runtime A6 `settings` table entries override `minBookingLeadMinutes` and other booking-lead values without a redeploy.
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `SLOT_LOCK_TTL_MIN` | Slot-lock TTL in minutes | `10` |
-| `SLOT_GRANULARITY_MIN` | Slot granularity in minutes | `30` |
-| `NO_SHOW_GRACE_MIN` | No-show grace period in minutes after slot-start | `15` |
-| `VIDEO_TOKEN_PRE_MIN` | Minutes before slot-start to open video token window | `10` |
-| `VIDEO_TOKEN_POST_MIN` | Minutes after slot-end to close video token window | `5` |
-| `RESET_TOKEN_TTL_MIN` | Password-reset token TTL in minutes | `60` |
-| `SESSION_TTL_DAYS` | Session TTL in days (rolling) | `7` |
+| Variable               | Purpose                                              | Default |
+| ---------------------- | ---------------------------------------------------- | ------- |
+| `SLOT_LOCK_TTL_MIN`    | Slot-lock TTL in minutes                             | `10`    |
+| `SLOT_GRANULARITY_MIN` | Slot granularity in minutes                          | `30`    |
+| `NO_SHOW_GRACE_MIN`    | No-show grace period in minutes after slot-start     | `15`    |
+| `VIDEO_TOKEN_PRE_MIN`  | Minutes before slot-start to open video token window | `10`    |
+| `VIDEO_TOKEN_POST_MIN` | Minutes after slot-end to close video token window   | `5`     |
+| `RESET_TOKEN_TTL_MIN`  | Password-reset token TTL in minutes                  | `60`    |
+| `SESSION_TTL_DAYS`     | Session TTL in days (rolling)                        | `7`     |
 
 ### Rate Limits / Lockout (§3.6)
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `LOGIN_MAX_ATTEMPTS` | Failed login attempts before account lockout | `5` |
-| `LOGIN_LOCKOUT_MIN` | Lockout duration in minutes (rolling) | `15` |
-| `SIGNUP_MAX_PER_IP_HOUR` | Max sign-up attempts per IP per hour | `5` |
-| `FORGOT_MAX_PER_ACCOUNT_HOUR` | Max forgot-password requests per account per hour | `5` |
-| `PAYMENT_INTENT_MAX_PER_PATIENT_HOUR` | Max payment-intent requests per patient per hour | `10` |
+| Variable                              | Purpose                                           | Default |
+| ------------------------------------- | ------------------------------------------------- | ------- |
+| `LOGIN_MAX_ATTEMPTS`                  | Failed login attempts before account lockout      | `5`     |
+| `LOGIN_LOCKOUT_MIN`                   | Lockout duration in minutes (rolling)             | `15`    |
+| `SIGNUP_MAX_PER_IP_HOUR`              | Max sign-up attempts per IP per hour              | `5`     |
+| `FORGOT_MAX_PER_ACCOUNT_HOUR`         | Max forgot-password requests per account per hour | `5`     |
+| `PAYMENT_INTENT_MAX_PER_PATIENT_HOUR` | Max payment-intent requests per patient per hour  | `10`    |
 
 ### Refund Retry (#10)
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `REFUND_MAX_ATTEMPTS` | Maximum refund retry attempts | `5` |
-| `REFUND_BACKOFF_BASE_SEC` | Exponential backoff base in seconds | `30` |
+| Variable                  | Purpose                             | Default |
+| ------------------------- | ----------------------------------- | ------- |
+| `REFUND_MAX_ATTEMPTS`     | Maximum refund retry attempts       | `5`     |
+| `REFUND_BACKOFF_BASE_SEC` | Exponential backoff base in seconds | `30`    |
 
 ---
 
 ## Revision Footer
 
-| Date | Change | Why |
-|---|---|---|
+| Date       | Change           | Why                                                  |
+| ---------- | ---------------- | ---------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of CONFIG.md + .env.example |
