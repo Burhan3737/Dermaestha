@@ -4,8 +4,8 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.0                                |
-| Last updated     | 2026-06-01                         |
+| Version          | 1.1                                |
+| Last updated     | 2026-06-03                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
 
@@ -17,7 +17,7 @@
 2. [PayFast (payment) payload shapes](#2-payfast-payment-payload-shapes)
 3. [Daily.co (video) payload shapes](#3-dailyco-video-payload-shapes)
 4. [Resend (email) shapes](#4-resend-email-shapes)
-5. [Email merge-variable catalog (6 triggers)](#5-email-merge-variable-catalog-6-triggers)
+5. [Email merge-variable catalog (7 triggers)](#5-email-merge-variable-catalog-7-triggers)
 6. [Analytics event catalog](#6-analytics-event-catalog)
 7. [Error envelope](#7-error-envelope)
 8. [Revision footer](#revision-footer)
@@ -170,7 +170,7 @@ The worker maps join/leave to no-show resolution (doctor vs patient absent at sl
 
 ---
 
-## 5. Email merge-variable catalog (6 triggers)
+## 5. Email merge-variable catalog (7 triggers)
 
 Retry/backoff lives in the notification worker (`CONFIG.md §3`); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final copy is M4.
 
@@ -182,6 +182,9 @@ Retry/backoff lives in the notification worker (`CONFIG.md §3`); no PDF attachm
 | `prescription_ready`   | `→prescription_issued`                    | `patientName, doctorName, prescriptionUrl`                   |
 | `refund_confirmation`  | refund `settled`                          | `patientName, amount, refundRef, appointmentRef`             |
 | `cancellation_apology` | `doctor_cancelled` / `doctor_no_show`     | `patientName, doctorName, slotStartLocal, refundAmount`      |
+| `password_reset`       | patient forgot-password request (F01.03)  | `resetUrl, expiresInMinutes`                                |
+
+**Auth transactional email (F01.03):** `password_reset` is the one auth-flow template — dispatched directly by the auth service (not the notification worker's six appointment-cadence triggers). The send is best-effort and must never block or alter the enumeration-safe forgot-password response; on provider failure the link is logged in non-production and a warning is recorded.
 
 **Reminder invalidation (§3.4):** the worker re-checks appointment state immediately before dispatch and **suppresses** any reminder for an appointment no longer `confirmed`/`in_progress`.
 
@@ -220,3 +223,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | Date       | Change           | Why                                         |
 | ---------- | ---------------- | ------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of INTEGRATIONS.md |
+| 2026-06-03 | Added `password_reset` email template (§5) | Slice A: F01.03 reset email was missing from the catalog |

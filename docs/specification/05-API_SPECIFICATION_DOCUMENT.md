@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.0                           |
-| Last updated     | 2026-06-01                    |
+| Version          | 1.1                           |
+| Last updated     | 2026-06-03                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -35,7 +35,7 @@ This document is a faithful re-presentation of `docs/engineering/API.md`. It des
 
 **Session established at login:** `POST /api/auth/login` accepts `{ email, password, role }`, validates credentials, and — on success — sets the session cookie. The response includes `{ id, role, fullName, mustChangePassword }`.
 
-**`mustChangePassword` gate:** When a doctor account is created by an admin (or has its password manually reset via `POST /api/doctors/:id/reset-password`), the flag `mustChangePassword` is set to `true`. The middleware blocks all non-auth routes for that session until `POST /api/auth/change-password` is called, which clears the flag (DA3).
+**`mustChangePassword` gate:** When a doctor account is created by an admin (or has its password manually reset via `POST /api/doctors/:id/reset-password`), the flag `mustChangePassword` is set to `true`. The middleware blocks all non-auth routes for that session until `POST /api/auth/change-password` is called, which clears the flag (DA3). Blocked requests return `403 MUST_CHANGE_PASSWORD`.
 
 **Role-based access control (DA6):** Every authenticated route is guarded by the single `requireRole(...)` middleware. Roles are enforced server-side only — never re-checked in handler bodies, never only on the client. Valid roles are `patient`, `doctor`, `admin`, and `system` (worker/webhook, no session). The `GET /api/auth/me` bootstrap endpoint exposes the caller's role to the SPA for client-side UI guards (convenience only; it is not a security boundary).
 
@@ -82,7 +82,7 @@ Validation is Zod-first (`shared/schemas`), then the controller calls a service;
 | `204`  | OK, no body (logout)                                         | —                                                                     |
 | `400`  | Malformed / Zod validation fail                              | `VALIDATION_FAILED`                                                   |
 | `401`  | Not authenticated                                            | `UNAUTHENTICATED`                                                     |
-| `403`  | Authenticated but wrong role / not owner (DA6)               | `FORBIDDEN`                                                           |
+| `403`  | Wrong role / not owner (DA6); or session must change password (DA3) | `FORBIDDEN`, `MUST_CHANGE_PASSWORD`                                                           |
 | `404`  | Not found _or_ not visible to caller (avoid existence leaks) | `NOT_FOUND`                                                           |
 | `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `LOCK_EXPIRED`, `IMMUTABLE_FIELD`, `ALREADY_PRESCRIBED` |
 | `422`  | Well-formed but semantically rejected                        | `BOOKING_TOO_SOON`, `REFUND_INELIGIBLE`                               |
@@ -313,3 +313,4 @@ The **only** module that performs transitions is `appointmentState.service`. It 
 | Date       | Change           | Why                                |
 | ---------- | ---------------- | ---------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of API.md |
+| 2026-06-03 | Added `MUST_CHANGE_PASSWORD` (§1, §3.2 status map) | Slice A DA3 gate response code |

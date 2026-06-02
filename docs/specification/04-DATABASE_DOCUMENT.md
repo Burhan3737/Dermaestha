@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.0                                                           |
-| Last updated     | 2026-06-01                                                    |
+| Version          | 1.1                                                           |
+| Last updated     | 2026-06-03                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
 
@@ -114,6 +114,10 @@ model User {
   tosAcceptedAt      DateTime? @map("tos_accepted_at") @db.Timestamptz(6)
   /// Forced first-login change gate for doctors (DA3/DA5).
   mustChangePassword Boolean   @default(false) @map("must_change_password")
+  /// Password-reset (F01.03): SHA-256 hash of the single-use token (raw token only in the email link).
+  resetTokenHash      String?   @map("reset_token_hash")
+  /// Reset-token expiry (now + RESET_TOKEN_TTL_MIN); cleared with the hash on use/expiry.
+  resetTokenExpiresAt DateTime? @map("reset_token_expires_at") @db.Timestamptz(6)
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -557,7 +561,7 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 
 | Feature                                              | Primary tables                                     | Notes                                                                                                                                           |
 | ---------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| F01 — Patient authentication & account               | `users`, `session`                                 | Sign-up/login/reset; `tos_accepted_at` consent; `must_change_password`; sessions stored in `session`                                            |
+| F01 — Patient authentication & account               | `users`, `session`                                 | Sign-up/login/reset; `tos_accepted_at` consent; `must_change_password`; reset via `reset_token_hash` + `reset_token_expires_at`; sessions stored in `session`                                            |
 | F02 — Doctor discovery (listing & profile)           | `doctors`, `users`, `availability_blocks`          | `is_active` + `status = active` gate the public listing; blocks feed the next-available slot                                                    |
 | F03 — Slot booking & slot-lock                       | `appointments`, `availability_blocks`              | Slots generated at read time; `slot_locked` + `lock_expires_at`; partial unique index prevents double-lock                                      |
 | F04 — Payment                                        | `payments`, `appointments`                         | Atomic confirm; `intent_key` unique (#7); `fee_at_booking` snapshot (#6); `gateway_fee`, `provider_ref`                                         |
@@ -585,3 +589,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | Date       | Change           | Why                                                                       |
 | ---------- | ---------------- | ------------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of `prisma/schema.prisma` + `ARCHITECTURE.md §5` |
+| 2026-06-03 | Added `reset_token_hash` + `reset_token_expires_at` to `users` (§2b, §6 F01) | Slice A password-reset storage (F01.03); schema change per change-impact matrix |
