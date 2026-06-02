@@ -21,6 +21,7 @@ Slice A delivered auth + the client foundation. Slice B adds the read-side disco
 | `docs/superpowers/specs/2026-06-03-slice-b-discovery-availability-design.md` | Created | Slice B design (brainstorming output). |
 | `agentChangeLogs/2026-06-03-0407-slice-b-discovery-availability.md` | Created | This changelog. |
 | `agentChangeLogs/index.md` | Modified | Added Slice B index line. |
+| `docs/superpowers/plans/2026-06-03-slice-b-discovery-availability.md` | Created | Slice B implementation plan (writing-plans output). |
 
 ## Dependencies / config / schema
 Planned (pending): add `date-fns-tz` (server) for Asia/Karachi→UTC slot math (ADR-21). No schema change (Doctor/AvailabilityBlock models already exist). Seed gains demo doctors (data, not schema).
