@@ -1,3 +1,15 @@
-import App from './App.jsx';
-/** Route table. Feature plans add patient/doctor/admin views + RoleRoute guards. */
-export const routes = [{ path: '/', element: <App /> }];
+// @ts-check
+import { SignUp } from './views/SignUp.jsx';
+import { Login } from './views/Login.jsx';
+import { ForgotPassword } from './views/ForgotPassword.jsx';
+import { ResetPassword } from './views/ResetPassword.jsx';
+import { ChangePassword } from './views/ChangePassword.jsx';
+
+/** Public + Slice-A auth routes. Later slices add patient/doctor/admin views + RoleRoute guards. */
+export const routes = [
+  { path: '/signup', element: <SignUp /> },
+  { path: '/login', element: <Login /> },
+  { path: '/forgot-password', element: <ForgotPassword /> },
+  { path: '/reset-password', element: <ResetPassword /> },
+  { path: '/doctor/change-password', element: <ChangePassword /> },
+];
