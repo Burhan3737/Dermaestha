@@ -33,7 +33,9 @@ describe('discovery + availability integration', () => {
 
   it('GET /api/doctors/:id/slots returns generated slots for a date', async () => {
     // Pick a near-future Monday (seed blocks are Mon/Wed/Fri).
-    const res = await request(app).get(`/api/doctors/${doctorId}/slots`).query({ date: nextMonday() });
+    const res = await request(app)
+      .get(`/api/doctors/${doctorId}/slots`)
+      .query({ date: nextMonday() });
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.data)).toBe(true);
     if (res.body.data.length) {
@@ -47,11 +49,15 @@ describe('discovery + availability integration', () => {
     expect(res.status).toBe(401);
   });
 
-  afterAll(async () => { await prisma.$disconnect(); });
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
 });
 
 function nextMonday() {
   const d = new Date();
-  do { d.setUTCDate(d.getUTCDate() + 1); } while (d.getUTCDay() !== 1);
+  do {
+    d.setUTCDate(d.getUTCDate() + 1);
+  } while (d.getUTCDay() !== 1);
   return d.toISOString().slice(0, 10);
 }

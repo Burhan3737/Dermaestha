@@ -16,7 +16,9 @@ export function SidebarLayout({ links = DOCTOR_LINKS, children }) {
           <span className="brand__word">Dermestha</span>
         </div>
         {links.map((l) => (
-          <NavLink key={l.to} to={l.to} end={l.end} className="sidebar__link">{l.label}</NavLink>
+          <NavLink key={l.to} to={l.to} end={l.end} className="sidebar__link">
+            {l.label}
+          </NavLink>
         ))}
       </nav>
       <div className="content">{children}</div>

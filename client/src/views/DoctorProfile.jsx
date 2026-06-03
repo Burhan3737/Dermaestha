@@ -8,7 +8,12 @@ import { SlotButton } from '../components/SlotButton.jsx';
 import { formatPkr } from '../lib/format.js';
 
 function todayKarachiYMD() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
 export function DoctorProfile() {
@@ -17,9 +22,17 @@ export function DoctorProfile() {
   const [date] = useState(todayKarachiYMD());
 
   const doctor = useQuery({ queryKey: ['doctor', id], queryFn: () => api.get(`/doctors/${id}`) });
-  const slots = useQuery({ queryKey: ['slots', id, date], queryFn: () => api.get(`/doctors/${id}/slots?date=${date}`) });
+  const slots = useQuery({
+    queryKey: ['slots', id, date],
+    queryFn: () => api.get(`/doctors/${id}/slots?date=${date}`),
+  });
 
-  if (doctor.isError) return <PatientLayout><p className="error-text">Doctor not found.</p></PatientLayout>;
+  if (doctor.isError)
+    return (
+      <PatientLayout>
+        <p className="error-text">Doctor not found.</p>
+      </PatientLayout>
+    );
 
   return (
     <PatientLayout>
@@ -34,11 +47,18 @@ export function DoctorProfile() {
       <section className="section-card">
         <h2>Available today</h2>
         {slots.isPending && <p className="help">Loading slots…</p>}
-        {slots.data && slots.data.data.length === 0 && <p className="help">No slots available today.</p>}
+        {slots.data && slots.data.data.length === 0 && (
+          <p className="help">No slots available today.</p>
+        )}
         {slots.data && slots.data.data.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2)' }}>
             {slots.data.data.map((s) => (
-              <SlotButton key={s.slotStart} slot={s} selected={false} onSelect={() => navigate(`/book/${id}?slot=${encodeURIComponent(s.slotStart)}`)} />
+              <SlotButton
+                key={s.slotStart}
+                slot={s}
+                selected={false}
+                onSelect={() => navigate(`/book/${id}?slot=${encodeURIComponent(s.slotStart)}`)}
+              />
             ))}
           </div>
         )}

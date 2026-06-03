@@ -26,7 +26,7 @@ export function createApp() {
   app.use(sessionMiddleware);
 
   // API routes first.
-  app.use('/api', mustChangePasswordGate);   // DA3 gate, after session, before feature routers
+  app.use('/api', mustChangePasswordGate); // DA3 gate, after session, before feature routers
   app.use('/api/auth', authRouter);
   app.use('/api/doctors', doctorsRouter);
   app.use('/api/availability', availabilityRouter);

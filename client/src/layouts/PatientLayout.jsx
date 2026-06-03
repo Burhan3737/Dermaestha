@@ -14,16 +14,30 @@ export function PatientLayout({ children }) {
           </Link>
           <nav className="topnav__links">
             <NavLink to="/">Browse</NavLink>
-            {session ? <NavLink to="/appointments">Appointments</NavLink> : <Link to="/login" className="btn btn--secondary btn--sm">Log in</Link>}
+            {session ? (
+              <NavLink to="/appointments">Appointments</NavLink>
+            ) : (
+              <Link to="/login" className="btn btn--secondary btn--sm">
+                Log in
+              </Link>
+            )}
           </nav>
         </div>
       </header>
-      <main className="container" style={{ padding: 'var(--sp-6) var(--sp-4) 80px' }}>{children}</main>
+      <main className="container" style={{ padding: 'var(--sp-6) var(--sp-4) 80px' }}>
+        {children}
+      </main>
       {session && (
         <nav className="tabbar only-mobile">
-          <NavLink to="/" className="tabbar__item">Browse</NavLink>
-          <NavLink to="/appointments" className="tabbar__item">Appointments</NavLink>
-          <NavLink to="/profile" className="tabbar__item">Profile</NavLink>
+          <NavLink to="/" className="tabbar__item">
+            Browse
+          </NavLink>
+          <NavLink to="/appointments" className="tabbar__item">
+            Appointments
+          </NavLink>
+          <NavLink to="/profile" className="tabbar__item">
+            Profile
+          </NavLink>
         </nav>
       )}
     </>

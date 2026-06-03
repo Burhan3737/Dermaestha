@@ -34,7 +34,11 @@ function cellsToBlocks(cells) {
       // Hour 23 is never user-toggleable (the grid renders 08:00–22:00), so `on`
       // is always false at h=23 — that naturally flushes a run ending at 23:00.
       if (!on && runStart !== null) {
-        blocks.push({ weekday: d, startTime: `${String(runStart).padStart(2, '0')}:00`, endTime: `${String(h).padStart(2, '0')}:00` });
+        blocks.push({
+          weekday: d,
+          startTime: `${String(runStart).padStart(2, '0')}:00`,
+          endTime: `${String(h).padStart(2, '0')}:00`,
+        });
         runStart = null;
       }
     }
@@ -52,29 +56,46 @@ export function AvailabilityGrid() {
     enabled: Boolean(session?.doctorId),
   });
 
-  useEffect(() => { if (data?.blocks) setCells(blocksToCells(data.blocks)); }, [data]);
+  useEffect(() => {
+    if (data?.blocks) setCells(blocksToCells(data.blocks));
+  }, [data]);
 
   const save = useMutation({
     mutationFn: () => api.put('/availability', { blocks: cellsToBlocks(cells) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['availability'] }),
   });
 
-  const toggle = (d, h) => setCells((prev) => {
-    const next = new Set(prev);
-    const k = key(d, h);
-    if (next.has(k)) next.delete(k); else next.add(k);
-    return next;
-  });
+  const toggle = (d, h) =>
+    setCells((prev) => {
+      const next = new Set(prev);
+      const k = key(d, h);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
 
   return (
     <SidebarLayout>
       <h1>Weekly availability</h1>
       {isPending && <p className="help">Loading…</p>}
-      {save.isError && <Alert variant="danger">{save.error?.code === 'BLOCK_HAS_BOOKINGS' ? 'Cancel the affected bookings before changing these hours.' : 'Could not save availability.'}</Alert>}
+      {save.isError && (
+        <Alert variant="danger">
+          {save.error?.code === 'BLOCK_HAS_BOOKINGS'
+            ? 'Cancel the affected bookings before changing these hours.'
+            : 'Could not save availability.'}
+        </Alert>
+      )}
       {save.isSuccess && <Alert variant="success">Availability saved.</Alert>}
       <div style={{ overflowX: 'auto', margin: 'var(--sp-4) 0' }}>
         <table className="table">
-          <thead><tr><th>Hour</th>{DAYS.map((d) => <th key={d}>{d}</th>)}</tr></thead>
+          <thead>
+            <tr>
+              <th>Hour</th>
+              {DAYS.map((d) => (
+                <th key={d}>{d}</th>
+              ))}
+            </tr>
+          </thead>
           <tbody>
             {HOURS.map((h) => (
               <tr key={h}>
@@ -95,7 +116,9 @@ export function AvailabilityGrid() {
           </tbody>
         </table>
       </div>
-      <Button onClick={() => save.mutate()} isLoading={save.isPending}>Save availability</Button>
+      <Button onClick={() => save.mutate()} isLoading={save.isPending}>
+        Save availability
+      </Button>
     </SidebarLayout>
   );
 }

@@ -6,19 +6,25 @@ import { AppError } from '../http/AppError.js';
 export async function list(req, res, next) {
   try {
     res.json(await doctorService.listActiveDoctors(req.body /* parsed query, see route */));
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export async function getOne(req, res, next) {
   try {
     res.json(await doctorService.getPublicDoctor(req.params.id));
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export async function slots(req, res, next) {
   try {
     res.json({ data: await availabilityService.generateSlots(req.params.id, req.query.date) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export async function getAvailability(req, res, next) {
@@ -28,11 +34,17 @@ export async function getAvailability(req, res, next) {
       if (!own || own.id !== req.params.id) throw new AppError('NOT_FOUND', 'Not found.', 404);
     }
     res.json({ blocks: await availabilityService.getWeeklyBlocks(req.params.id) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 }
 
 export async function replaceAvailability(req, res, next) {
   try {
-    res.json({ blocks: await availabilityService.replaceWeeklyBlocks(req.session.userId, req.body.blocks) });
-  } catch (e) { next(e); }
+    res.json({
+      blocks: await availabilityService.replaceWeeklyBlocks(req.session.userId, req.body.blocks),
+    });
+  } catch (e) {
+    next(e);
+  }
 }

@@ -11,7 +11,11 @@ vi.mock('../lib/session.jsx', () => ({ useSession: () => ({ session: null }) }))
 function setup() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={qc}><MemoryRouter><DoctorListing /></MemoryRouter></QueryClientProvider>,
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <DoctorListing />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -19,10 +23,27 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('P-02 Doctor listing', () => {
   it('renders a card per active doctor', async () => {
-    api.get.mockResolvedValue({ data: [
-      { id: 'd1', fullName: 'Dr A', specialization: 'Acne', fee: 250000, photoUrl: null, nextAvailableSlot: null },
-      { id: 'd2', fullName: 'Dr B', specialization: 'Eczema', fee: 300000, photoUrl: null, nextAvailableSlot: null },
-    ], page: { number: 1, size: 20, total: 2 } });
+    api.get.mockResolvedValue({
+      data: [
+        {
+          id: 'd1',
+          fullName: 'Dr A',
+          specialization: 'Acne',
+          fee: 250000,
+          photoUrl: null,
+          nextAvailableSlot: null,
+        },
+        {
+          id: 'd2',
+          fullName: 'Dr B',
+          specialization: 'Eczema',
+          fee: 300000,
+          photoUrl: null,
+          nextAvailableSlot: null,
+        },
+      ],
+      page: { number: 1, size: 20, total: 2 },
+    });
     setup();
     await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
     expect(screen.getByText('Dr B')).toBeTruthy();

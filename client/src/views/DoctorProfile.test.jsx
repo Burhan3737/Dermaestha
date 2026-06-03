@@ -13,7 +13,9 @@ function setup() {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={['/doctors/d1']}>
-        <Routes><Route path="/doctors/:id" element={<DoctorProfile />} /></Routes>
+        <Routes>
+          <Route path="/doctors/:id" element={<DoctorProfile />} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -24,8 +26,18 @@ beforeEach(() => vi.clearAllMocks());
 describe('P-03 Doctor profile', () => {
   it('renders the profile and available slots', async () => {
     api.get.mockImplementation((path) => {
-      if (path === '/doctors/d1') return Promise.resolve({ id: 'd1', fullName: 'Dr A', specialization: 'Acne', fee: 250000, bio: 'Bio', photoUrl: null });
-      return Promise.resolve({ data: [{ slotStart: '2026-06-15T13:00:00.000Z', slotEnd: '2026-06-15T13:30:00.000Z' }] });
+      if (path === '/doctors/d1')
+        return Promise.resolve({
+          id: 'd1',
+          fullName: 'Dr A',
+          specialization: 'Acne',
+          fee: 250000,
+          bio: 'Bio',
+          photoUrl: null,
+        });
+      return Promise.resolve({
+        data: [{ slotStart: '2026-06-15T13:00:00.000Z', slotEnd: '2026-06-15T13:30:00.000Z' }],
+      });
     });
     setup();
     await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());

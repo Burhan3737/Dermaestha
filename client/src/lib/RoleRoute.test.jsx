@@ -4,7 +4,11 @@ import { MemoryRouter } from 'react-router-dom';
 import { RoleRoute } from './RoleRoute.jsx';
 
 const renderGuard = (props) =>
-  render(<MemoryRouter><RoleRoute {...props}>OK</RoleRoute></MemoryRouter>);
+  render(
+    <MemoryRouter>
+      <RoleRoute {...props}>OK</RoleRoute>
+    </MemoryRouter>,
+  );
 
 describe('RoleRoute', () => {
   it('renders children when role matches', () => {

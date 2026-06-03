@@ -12,15 +12,13 @@ describe('auth integration', () => {
 
   it('signup issues an HttpOnly, SameSite=Lax session cookie and returns the safe shape', async () => {
     const email = uniq();
-    const res = await request(app)
-      .post('/api/auth/signup')
-      .send({
-        fullName: 'Test P',
-        email,
-        phone: '03001234567',
-        password: 'password1',
-        tosAccepted: true,
-      });
+    const res = await request(app).post('/api/auth/signup').send({
+      fullName: 'Test P',
+      email,
+      phone: '03001234567',
+      password: 'password1',
+      tosAccepted: true,
+    });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
       role: 'patient',
@@ -36,15 +34,13 @@ describe('auth integration', () => {
   it('signup → /me round-trips the session', async () => {
     const email = uniq();
     const agent = request.agent(app);
-    await agent
-      .post('/api/auth/signup')
-      .send({
-        fullName: 'Me',
-        email,
-        phone: '03001234567',
-        password: 'password1',
-        tosAccepted: true,
-      });
+    await agent.post('/api/auth/signup').send({
+      fullName: 'Me',
+      email,
+      phone: '03001234567',
+      password: 'password1',
+      tosAccepted: true,
+    });
     const me = await agent.get('/api/auth/me');
     expect(me.status).toBe(200);
     expect(me.body.email === undefined).toBe(true); // safe shape — no email leaked
@@ -54,15 +50,13 @@ describe('auth integration', () => {
 
   it('login with wrong password returns the generic 401', async () => {
     const email = uniq();
-    await request(app)
-      .post('/api/auth/signup')
-      .send({
-        fullName: 'L',
-        email,
-        phone: '03001234567',
-        password: 'password1',
-        tosAccepted: true,
-      });
+    await request(app).post('/api/auth/signup').send({
+      fullName: 'L',
+      email,
+      phone: '03001234567',
+      password: 'password1',
+      tosAccepted: true,
+    });
     const res = await request(app).post('/api/auth/login').send({ email, password: 'WRONG' });
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('UNAUTHENTICATED');
@@ -71,15 +65,13 @@ describe('auth integration', () => {
 
   it('forgot → reset round-trip works and the token is single-use', async () => {
     const email = uniq();
-    await request(app)
-      .post('/api/auth/signup')
-      .send({
-        fullName: 'R',
-        email,
-        phone: '03001234567',
-        password: 'password1',
-        tosAccepted: true,
-      });
+    await request(app).post('/api/auth/signup').send({
+      fullName: 'R',
+      email,
+      phone: '03001234567',
+      password: 'password1',
+      tosAccepted: true,
+    });
     // Drive the service directly to obtain the raw token (it is never returned over HTTP).
     const { rawToken } = await auth.requestPasswordReset(email);
     const first = await request(app)

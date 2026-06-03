@@ -26,7 +26,10 @@ function blocksCoverSlot(blocks, slotStartUtc, dateYMD) {
   const weekday = karachiWeekday(dateYMD);
   const startMin = toMinutes(formatInTimeZone(slotStartUtc, KARACHI, 'HH:mm'));
   const endMin = startMin + SLOT_GRANULARITY_MIN;
-  return blocks.some((b) => b.weekday === weekday && startMin >= toMinutes(b.startTime) && endMin <= toMinutes(b.endTime));
+  return blocks.some(
+    (b) =>
+      b.weekday === weekday && startMin >= toMinutes(b.startTime) && endMin <= toMinutes(b.endTime),
+  );
 }
 
 export async function generateSlots(doctorId, dateYMD, settings) {
@@ -53,7 +56,11 @@ export async function generateSlots(doctorId, dateYMD, settings) {
   if (future.length === 0) return [];
 
   const active = await prisma.appointment.findMany({
-    where: { doctorId, state: { in: ACTIVE_APPOINTMENT_STATES }, slotStart: { in: future.map((s) => s.slotStart) } },
+    where: {
+      doctorId,
+      state: { in: ACTIVE_APPOINTMENT_STATES },
+      slotStart: { in: future.map((s) => s.slotStart) },
+    },
     select: { slotStart: true },
   });
   const taken = new Set(active.map((a) => a.slotStart.getTime()));
@@ -80,7 +87,11 @@ export async function replaceWeeklyBlocks(userId, blocks) {
   if (!doctor) throw new AppError('NOT_FOUND', 'Doctor profile not found.', 404);
 
   const futureActive = await prisma.appointment.findMany({
-    where: { doctorId: doctor.id, state: { in: ACTIVE_APPOINTMENT_STATES }, slotStart: { gt: new Date() } },
+    where: {
+      doctorId: doctor.id,
+      state: { in: ACTIVE_APPOINTMENT_STATES },
+      slotStart: { gt: new Date() },
+    },
     select: { id: true, slotStart: true },
   });
   const orphans = futureActive.filter((a) => {
@@ -88,14 +99,21 @@ export async function replaceWeeklyBlocks(userId, blocks) {
     return !blocksCoverSlot(blocks, a.slotStart, dateYMD);
   });
   if (orphans.length > 0) {
-    throw new AppError('BLOCK_HAS_BOOKINGS', 'Cancel the affected bookings before changing this availability.', 409, {
-      appointmentIds: orphans.map((o) => o.id),
-    });
+    throw new AppError(
+      'BLOCK_HAS_BOOKINGS',
+      'Cancel the affected bookings before changing this availability.',
+      409,
+      {
+        appointmentIds: orphans.map((o) => o.id),
+      },
+    );
   }
 
   await prisma.$transaction([
     prisma.availabilityBlock.deleteMany({ where: { doctorId: doctor.id } }),
-    prisma.availabilityBlock.createMany({ data: blocks.map((b) => ({ doctorId: doctor.id, ...b })) }),
+    prisma.availabilityBlock.createMany({
+      data: blocks.map((b) => ({ doctorId: doctor.id, ...b })),
+    }),
   ]);
   return getWeeklyBlocks(doctor.id);
 }

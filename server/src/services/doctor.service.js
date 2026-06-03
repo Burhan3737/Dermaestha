@@ -13,7 +13,13 @@ export async function listActiveDoctors({ page, pageSize }) {
       skip,
       take: pageSize,
       orderBy: { createdAt: 'asc' },
-      select: { id: true, specialization: true, fee: true, photoUrl: true, user: { select: { fullName: true } } },
+      select: {
+        id: true,
+        specialization: true,
+        fee: true,
+        photoUrl: true,
+        user: { select: { fullName: true } },
+      },
     }),
     prisma.doctor.count({ where: ACTIVE_WHERE }),
   ]);
@@ -33,10 +39,24 @@ export async function listActiveDoctors({ page, pageSize }) {
 export async function getPublicDoctor(id) {
   const d = await prisma.doctor.findFirst({
     where: { id, ...ACTIVE_WHERE },
-    select: { id: true, specialization: true, fee: true, bio: true, photoUrl: true, user: { select: { fullName: true } } },
+    select: {
+      id: true,
+      specialization: true,
+      fee: true,
+      bio: true,
+      photoUrl: true,
+      user: { select: { fullName: true } },
+    },
   });
   if (!d) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
-  return { id: d.id, fullName: d.user.fullName, specialization: d.specialization, fee: d.fee, bio: d.bio, photoUrl: d.photoUrl };
+  return {
+    id: d.id,
+    fullName: d.user.fullName,
+    specialization: d.specialization,
+    fee: d.fee,
+    bio: d.bio,
+    photoUrl: d.photoUrl,
+  };
 }
 
 /** Used by the availability route to enforce doctor-owns-:id. Returns the Doctor or null. */

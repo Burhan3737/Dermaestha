@@ -5,7 +5,12 @@ const PKR = new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 });
 export const formatPkr = (paisa) => `Rs ${PKR.format(Math.round((paisa ?? 0) / 100))}`;
 
 const KHI = new Intl.DateTimeFormat('en-PK', {
-  timeZone: 'Asia/Karachi', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
+  timeZone: 'Asia/Karachi',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  hour: 'numeric',
+  minute: '2-digit',
 });
 
 /** UTC ISO → human string rendered in Asia/Karachi. */

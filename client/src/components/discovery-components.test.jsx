@@ -7,7 +7,16 @@ describe('DoctorCard', () => {
   it('renders name, specialization, formatted fee, and next-slot', () => {
     render(
       <MemoryRouter>
-        <DoctorCard doctor={{ id: 'd1', fullName: 'Dr A', specialization: 'Acne', fee: 250000, photoUrl: null, nextAvailableSlot: '2026-06-15T13:00:00.000Z' }} />
+        <DoctorCard
+          doctor={{
+            id: 'd1',
+            fullName: 'Dr A',
+            specialization: 'Acne',
+            fee: 250000,
+            photoUrl: null,
+            nextAvailableSlot: '2026-06-15T13:00:00.000Z',
+          }}
+        />
       </MemoryRouter>,
     );
     expect(screen.getByText('Dr A')).toBeTruthy();
@@ -17,7 +26,16 @@ describe('DoctorCard', () => {
   it('shows a no-availability hint when nextAvailableSlot is null', () => {
     render(
       <MemoryRouter>
-        <DoctorCard doctor={{ id: 'd1', fullName: 'Dr A', specialization: 'Acne', fee: 250000, photoUrl: null, nextAvailableSlot: null }} />
+        <DoctorCard
+          doctor={{
+            id: 'd1',
+            fullName: 'Dr A',
+            specialization: 'Acne',
+            fee: 250000,
+            photoUrl: null,
+            nextAvailableSlot: null,
+          }}
+        />
       </MemoryRouter>,
     );
     expect(screen.getByText(/no slots/i)).toBeTruthy();

@@ -5,7 +5,9 @@ function ctx(session) {
   let nextErr;
   const req = { session };
   const res = {};
-  const next = (e) => { nextErr = e; };
+  const next = (e) => {
+    nextErr = e;
+  };
   return { req, res, next, getErr: () => nextErr };
 }
 
