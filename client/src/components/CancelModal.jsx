@@ -11,7 +11,7 @@ export function CancelModal({ quote, lateNoRefund = false, onConfirm, onClose })
             <p>Paid: {formatPkr(quote.amountPaid)}</p>
             <p>Gateway fee: −{formatPkr(quote.gatewayFee)}</p>
             <p>
-              <strong>Refund: {formatPkr(quote.refund)}</strong>
+              <strong>Refund: <span>{formatPkr(quote.refund)}</span></strong>
             </p>
             <p className="help">Refund excludes the payment-gateway fee charged at booking.</p>
           </>

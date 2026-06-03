@@ -1,0 +1,56 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Upcoming } from './Upcoming.jsx';
+import { api } from '../lib/apiClient.js';
+
+vi.mock('../lib/apiClient.js', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('../lib/session.jsx', () => ({ useSession: () => ({ session: { role: 'patient' } }) }));
+
+function setup() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <Upcoming />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+beforeEach(() => vi.clearAllMocks());
+
+describe('P-08 Upcoming', () => {
+  it('renders the empty state when there are no appointments', async () => {
+    api.get.mockResolvedValue({ data: [] });
+    setup();
+    await waitFor(() => expect(screen.getByText(/no upcoming appointments/i)).toBeTruthy());
+  });
+
+  it('lists a confirmed appointment with a Cancel control', async () => {
+    api.get.mockImplementation((path) => {
+      if (path === '/appointments')
+        return Promise.resolve({ data: [{ id: 'a1', slotStart: '2099-01-04T13:00:00.000Z', slotEnd: '2099-01-04T13:30:00.000Z', state: 'confirmed', feeAtBooking: 250000, forSelf: true, subjectName: null, doctorName: 'Dr A', specialization: 'Acne', doctorPhotoUrl: null }] });
+      return Promise.resolve({ id: 'a1', state: 'confirmed', refundQuote: { amountPaid: 250000, gatewayFee: 6000, refund: 244000 } });
+    });
+    setup();
+    await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeTruthy();
+  });
+
+  it('opens the cancel modal and posts the cancel on confirm', async () => {
+    api.get.mockImplementation((path) => {
+      if (path === '/appointments')
+        return Promise.resolve({ data: [{ id: 'a1', slotStart: '2099-01-04T13:00:00.000Z', slotEnd: '2099-01-04T13:30:00.000Z', state: 'confirmed', feeAtBooking: 250000, forSelf: true, subjectName: null, doctorName: 'Dr A', specialization: 'Acne', doctorPhotoUrl: null }] });
+      return Promise.resolve({ id: 'a1', state: 'confirmed', refundQuote: { amountPaid: 250000, gatewayFee: 6000, refund: 244000 } });
+    });
+    api.post.mockResolvedValue({ state: 'cancelled_refunded' });
+    setup();
+    await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => expect(screen.getByText('Rs 2,440')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /cancel & refund/i }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/appointments/a1/cancel', {}));
+  });
+});
