@@ -4,7 +4,18 @@ import { AppError } from './AppError.js';
 import { errorHandler } from './errorHandler.js';
 
 function mockRes() {
-  return { statusCode: 0, body: null, status(c){ this.statusCode = c; return this; }, json(b){ this.body = b; return this; } };
+  return {
+    statusCode: 0,
+    body: null,
+    status(c) {
+      this.statusCode = c;
+      return this;
+    },
+    json(b) {
+      this.body = b;
+      return this;
+    },
+  };
 }
 
 describe('errorHandler', () => {
@@ -12,7 +23,9 @@ describe('errorHandler', () => {
     const res = mockRes();
     errorHandler(new AppError('SLOT_TAKEN', 'Slot just taken.', 409), {}, res, () => {});
     expect(res.statusCode).toBe(409);
-    expect(res.body).toEqual({ error: { code: 'SLOT_TAKEN', message: 'Slot just taken.', details: undefined } });
+    expect(res.body).toEqual({
+      error: { code: 'SLOT_TAKEN', message: 'Slot just taken.', details: undefined },
+    });
   });
   it('maps a ZodError to 400 VALIDATION_FAILED with field details', () => {
     const res = mockRes();

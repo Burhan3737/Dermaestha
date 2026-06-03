@@ -18,9 +18,9 @@ export const sessionMiddleware = session({
   saveUninitialized: false,
   rolling: true,
   cookie: {
-    httpOnly: true,                                  // §3.6
-    secure: env.NODE_ENV === 'production',           // Secure in prod; off for http://localhost dev
-    sameSite: 'lax',                                 // §3.6
+    httpOnly: true, // §3.6
+    secure: env.NODE_ENV === 'production', // Secure in prod; off for http://localhost dev
+    sameSite: 'lax', // §3.6
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 * 1000,
   },
 });

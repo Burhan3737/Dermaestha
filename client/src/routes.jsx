@@ -4,12 +4,14 @@ import { Login } from './views/Login.jsx';
 import { ForgotPassword } from './views/ForgotPassword.jsx';
 import { ResetPassword } from './views/ResetPassword.jsx';
 import { ChangePassword } from './views/ChangePassword.jsx';
+import { DoctorProfile } from './views/DoctorProfile.jsx';
 
-/** Public + Slice-A auth routes. Later slices add patient/doctor/admin views + RoleRoute guards. */
+/** Public + Slice-A auth routes. Slice-B adds discovery routes. */
 export const routes = [
   { path: '/signup', element: <SignUp /> },
   { path: '/login', element: <Login /> },
   { path: '/forgot-password', element: <ForgotPassword /> },
   { path: '/reset-password', element: <ResetPassword /> },
   { path: '/doctor/change-password', element: <ChangePassword /> },
+  { path: '/doctors/:id', element: <DoctorProfile /> },
 ];

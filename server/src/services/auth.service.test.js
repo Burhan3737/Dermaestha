@@ -52,9 +52,16 @@ describe('auth.service', () => {
       fullName: 'Dr',
       mustChangePassword: true,
       passwordHash: 'hash:pw',
+      doctor: { id: 'doc1' },
     });
     const out = await auth.login({ email: 'd@b.com', password: 'pw' });
-    expect(out).toEqual({ id: 'u1', role: 'doctor', fullName: 'Dr', mustChangePassword: true });
+    expect(out).toEqual({
+      id: 'u1',
+      role: 'doctor',
+      fullName: 'Dr',
+      mustChangePassword: true,
+      doctorId: 'doc1',
+    });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'login', actorType: 'doctor', actorId: 'u1' }),
     );

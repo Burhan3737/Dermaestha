@@ -27,5 +27,7 @@ describe('app integration', () => {
     }
   });
 
-  afterAll(async () => { await prisma.$disconnect(); });
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
 });

@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { parseEnv } from './env.js';
 
 const base = {
-  NODE_ENV: 'test', PORT: '3000', APP_BASE_URL: 'http://localhost:3000',
-  DATABASE_URL: 'postgresql://u:p@localhost:5432/d', SESSION_SECRET: 'x'.repeat(16),
+  NODE_ENV: 'test',
+  PORT: '3000',
+  APP_BASE_URL: 'http://localhost:3000',
+  DATABASE_URL: 'postgresql://u:p@localhost:5432/d',
+  SESSION_SECRET: 'x'.repeat(16),
 };
 
 describe('parseEnv', () => {

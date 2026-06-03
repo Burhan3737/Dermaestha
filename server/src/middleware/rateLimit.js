@@ -8,7 +8,14 @@ import { AppError } from '../http/AppError.js';
  *           keyGenerator?: (req: any) => string, skipSuccessfulRequests?: boolean,
  *           onBlocked?: (req: any) => void }} opts
  */
-export function makeRateLimiter({ windowMs, max, code = 'RATE_LIMITED', keyGenerator, skipSuccessfulRequests, onBlocked }) {
+export function makeRateLimiter({
+  windowMs,
+  max,
+  code = 'RATE_LIMITED',
+  keyGenerator,
+  skipSuccessfulRequests,
+  onBlocked,
+}) {
   return rateLimit({
     windowMs,
     max,

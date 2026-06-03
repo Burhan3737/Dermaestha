@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.1                                                                                                |
+| Version          | 1.2                                                                                                |
 | Last updated     | 2026-06-03                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -34,6 +34,7 @@
 19. [ADR-18 — Vite 5 (esbuild) pinned over Vite 8 (rolldown)](#adr-18--vite-5-esbuild-pinned-over-vite-8-rolldown)
 20. [ADR-19 — Documentation suite: sole source of truth / faithful re-presentation only](#adr-19--documentation-suite-sole-source-of-truth--faithful-re-presentation-only)
 21. [ADR-20 — Frontend state: React Context (session) + TanStack Query (server cache)](#adr-20--frontend-state-react-context-session--tanstack-query-server-cache)
+22. [ADR-21 — Asia/Karachi ↔ UTC via date-fns-tz](#adr-21--asiakarachi--utc-via-date-fns-tz)
 
 ---
 
@@ -295,9 +296,22 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-21 — Asia/Karachi ↔ UTC via date-fns-tz
+
+**Date:** 2026-06-03
+
+**Context:** Doctor availability is authored as `Asia/Karachi` wall-times ("HH:mm" + weekday) but stored and served as UTC instants (doc 04/15). Generating 30-minute slots for a calendar date requires converting a local wall-time to the correct UTC instant, and the availability guard must map a UTC `slotStart` back to a Karachi weekday/time. A hand-rolled fixed +05:00 offset works today (Pakistan observes no DST) but is brittle and easy to get subtly wrong. (docs/superpowers/specs/2026-06-03-slice-b-discovery-availability-design.md)
+
+**Decision:** Use `date-fns-tz` **server-side** for the conversions (`fromZonedTime`) and zone-aware formatting (`formatInTimeZone`) in slot generation and the block guard, isolated in `server/src/lib/tz.js`. The **client** renders UTC → Karachi with the **native `Intl.DateTimeFormat({ timeZone: 'Asia/Karachi' })`** — no client-side TZ dependency.
+
+**Consequences:** Correct, DST-proof conversions behind one small helper; the client bundle gains no dependency. One server dependency is added (`date-fns-tz`) — a deliberate exception to the lean-scaffold principle (ADR-16), justified by correctness on the load-bearing slot path. If the platform ever serves regions beyond Pakistan, the same helper handles their zones.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
 | ---------- | ---------------- | ------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Extracted from ARCHITECTURE.md decisions + changelogs + specs |
 | 2026-06-03 | Added ADR-20 (frontend state: Context + TanStack Query) | Slice A frontend-state decision; new client dependency `@tanstack/react-query` |
+| 2026-06-03 | Added ADR-21 (Asia/Karachi ↔ UTC via date-fns-tz) | Slice B slot-generation timezone decision; new server dependency `date-fns-tz` |

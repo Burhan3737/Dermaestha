@@ -8,17 +8,32 @@ describe('no-double-booking partial index (PRD #1)', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { role: 'doctor', email: `idx-${Date.now()}@t.test`, passwordHash: 'x', fullName: 'Dr Idx' },
+      data: {
+        role: 'doctor',
+        email: `idx-${Date.now()}@t.test`,
+        passwordHash: 'x',
+        fullName: 'Dr Idx',
+      },
     });
     const doc = await prisma.doctor.create({
-      data: { userId: user.id, pmcNumber: `PMC-${Date.now()}`, specialization: 'Derm', fee: 100000 },
+      data: {
+        userId: user.id,
+        pmcNumber: `PMC-${Date.now()}`,
+        specialization: 'Derm',
+        fee: 100000,
+      },
     });
     doctorId = doc.id;
   });
 
   it('rejects a second active-state appointment on the same (doctor, slot)', async () => {
     const patient = await prisma.user.create({
-      data: { role: 'patient', email: `p-${Date.now()}@t.test`, passwordHash: 'x', fullName: 'Pat' },
+      data: {
+        role: 'patient',
+        email: `p-${Date.now()}@t.test`,
+        passwordHash: 'x',
+        fullName: 'Pat',
+      },
     });
     await prisma.appointment.create({
       data: { doctorId, patientUserId: patient.id, slotStart, slotEnd, state: 'confirmed' },
@@ -30,5 +45,7 @@ describe('no-double-booking partial index (PRD #1)', () => {
     ).rejects.toMatchObject({ code: 'P2002' });
   });
 
-  afterAll(async () => { await prisma.$disconnect(); });
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
 });
