@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.1                                                                                                     |
+| Version          | 1.2                                                                                                     |
 | Last updated     | 2026-06-03                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
@@ -78,6 +78,7 @@ Scoping rules by role (PRD §3.6):
 
 - **12-factor secrets:** all secrets and integration credentials (`DATABASE_URL`, `SESSION_SECRET`, `PAYFAST_*`, `DAILY_API_KEY`, `RESEND_API_KEY`, error-tracking DSN) are environment variables, not committed to code (ARCH §14.5; `.env.example` is the documented contract).
 - **PayFast sandbox/live mode:** the payment adapter toggles between sandbox and live mode via an env var, preventing accidental live-mode charges in non-production environments (ARCH §12).
+- **Dev provider switches must stay at production-safe defaults:** `PAYMENT_PROVIDER` and `EMAIL_PROVIDER` default to the non-simulating `stub` adapters; the dev mock payment gateway (`mock`) and its `/dev/checkout` routes activate only on explicit opt-in and **must never be set in production** (ADR-22; doc 10 deploy checklist). The mock-IPN HMAC uses `PAYFAST_PASSPHRASE` (or a dev-only fallback constant when unset) — this signing secret is for the dev simulator only; production uses the real PayFast passphrase for genuine IPN verification (doc 15).
 - **Error-tracking DSN:** the DSN for the error-tracking tool is an env secret; unhandled exceptions are surfaced to the admin alert feed (A3) via the integration rather than leaked in error responses (PRD §3.6 A3; ARCH §14.5).
 - **Single-instance worker assumption:** in-process `node-cron` workers and the memory-backed `express-rate-limit` store assume a single running instance. If the app ever scales horizontally, workers must be gated behind a Postgres advisory lock or moved to scheduled tasks, and the rate-limit store must move to a shared backend. This is a documented known limitation (CONFIG §3), not a silent assumption.
 
@@ -267,3 +268,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | ---------- | ---------------- | ----------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD §3.6 + ARCH §7/§11 + CONFIG §2/§5 |
 | 2026-06-03 | Noted reset token hashed + single-use on `users` (A07) | Slice A reset-token storage decision |
+| 2026-06-04 | Noted dev provider switches must stay at safe defaults in prod; mock-IPN passphrase is dev-only | Slice C dev payment simulation (ADR-22) |

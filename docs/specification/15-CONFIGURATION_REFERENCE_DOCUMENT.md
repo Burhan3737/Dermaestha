@@ -3,8 +3,8 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.0                                          |
-| Last updated     | 2026-06-01                                   |
+| Version          | 1.1                                          |
+| Last updated     | 2026-06-04                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
 
@@ -191,8 +191,17 @@ Source: `.env.example`. Copy to `.env` for local dev; set real values in Railway
 | ---------------------- | ----------------------------------- | ----------------------- |
 | `PAYFAST_MERCHANT_ID`  | PayFast merchant ID                 | _(set per environment)_ |
 | `PAYFAST_MERCHANT_KEY` | PayFast merchant key                | _(set per environment)_ |
-| `PAYFAST_PASSPHRASE`   | Used for IPN signature verification | _(set per environment)_ |
+| `PAYFAST_PASSPHRASE`   | IPN signature secret. In production verifies real PayFast IPNs; in dev (`PAYMENT_PROVIDER=mock`) it also keys the mock gateway's HMAC-signed IPN (ADR-22). Falls back to a dev-only constant if unset. | _(set per environment)_ |
 | `PAYFAST_MODE`         | Gateway mode                        | `sandbox` \| `live`     |
+
+### Provider Selection (dev vs production)
+
+Adapter selection switches (ADR-10/ADR-22). **Both default to the production-safe value**: the real-but-not-yet-wired throwing stubs. The dev simulators are opt-in only; production must leave these at their defaults so the dev mock gateway and the `/dev/*` checkout routes are never mounted (see doc 08 secret-handling and doc 10 deploy note).
+
+| Variable           | Purpose                                                                                          | Example / Default          |
+| ------------------ | ------------------------------------------------------------------------------------------------ | -------------------------- |
+| `PAYMENT_PROVIDER` | Selects the `PaymentProvider`: `stub` (prod, throws until the real adapter is wired) or `mock` (dev simulated gateway, mounts `/dev/checkout`) | `stub` (prod) \| `mock` (dev) |
+| `EMAIL_PROVIDER`   | Selects the `EmailProvider`: `stub` (throws) or `console` (dev logging adapter)                  | `stub` (prod) \| `console` (dev) |
 
 ### Daily.co (Video Adapter)
 
@@ -252,3 +261,4 @@ These mirror `docs/engineering/CONFIG.md`; runtime A6 `settings` table entries o
 | Date       | Change           | Why                                                  |
 | ---------- | ---------------- | ---------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of CONFIG.md + .env.example |
+| 2026-06-04 | Added `PAYMENT_PROVIDER` + `EMAIL_PROVIDER` provider-selection switches; noted `PAYFAST_PASSPHRASE` dual use as the dev mock-IPN signing key | Slice C dev payment/email simulation (ADR-22) |

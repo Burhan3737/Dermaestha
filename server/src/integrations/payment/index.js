@@ -1,5 +1,7 @@
 // @ts-check
 import { payfastStub } from './payfast.stub.js';
+import { payfastMock } from './payfast.mock.js';
+import { env } from '../../config/env.js';
 
 /**
  * @typedef {Object} PaymentProvider
@@ -10,4 +12,4 @@ import { payfastStub } from './payfast.stub.js';
  */
 
 /** Selected provider. Swap to the concrete PayFast adapter in M2 via a config switch. */
-export const paymentProvider = payfastStub;
+export const paymentProvider = env.PAYMENT_PROVIDER === 'mock' ? payfastMock : payfastStub;

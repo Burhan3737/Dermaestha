@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.2                           |
+| Version          | 1.3                           |
 | Last updated     | 2026-06-03                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
@@ -84,8 +84,8 @@ Validation is Zod-first (`shared/schemas`), then the controller calls a service;
 | `401`  | Not authenticated                                            | `UNAUTHENTICATED`                                                     |
 | `403`  | Wrong role / not owner (DA6); or session must change password (DA3) | `FORBIDDEN`, `MUST_CHANGE_PASSWORD`                                                           |
 | `404`  | Not found _or_ not visible to caller (avoid existence leaks) | `NOT_FOUND`                                                           |
-| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `LOCK_EXPIRED`, `IMMUTABLE_FIELD`, `ALREADY_PRESCRIBED`, `BLOCK_HAS_BOOKINGS` |
-| `422`  | Well-formed but semantically rejected                        | `BOOKING_TOO_SOON`, `REFUND_INELIGIBLE`                               |
+| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `LOCK_EXPIRED`, `IMMUTABLE_FIELD`, `ALREADY_PRESCRIBED`, `BLOCK_HAS_BOOKINGS`, `ACTIVE_LOCK_EXISTS`, `OVERLAP`, `INVALID_TRANSITION` |
+| `422`  | Well-formed but semantically rejected                        | `BOOKING_TOO_SOON`, `REFUND_INELIGIBLE`, `SLOT_NOT_BOOKABLE`          |
 | `429`  | Rate-limited / locked out                                    | `RATE_LIMITED`, `ACCOUNT_LOCKED`                                      |
 | `500`  | Unexpected; logged to error tracking                         | `INTERNAL`                                                            |
 
@@ -179,6 +179,8 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | `POST /api/webhooks/resend`  | system | Bounce/complaint signal                           | flags email failures to A3                                                                                               |
 
 > Refunds have **no patient/doctor route** — they are a side-effect of cancel/no-show transitions, orchestrated by `refund.service` with the per-appointment idempotency key (#10), retried with backoff, admin-alerted on exhaustion. No in-app manual retry (admin acts in the gateway dashboard if needed).
+
+> **Dev-only, non-canonical:** when `PAYMENT_PROVIDER=mock`, the app mounts `GET /dev/checkout` + `POST /dev/payment/complete` to simulate PayFast's hosted page by emitting a real signed IPN to `/api/webhooks/payfast` (ADR-22, doc 14 §2). These `/dev/*` routes are not part of the canonical API surface and are never mounted in production.
 
 ---
 
@@ -315,3 +317,4 @@ The **only** module that performs transitions is `appointmentState.service`. It 
 | 2026-06-01 | Initial creation | Faithful re-presentation of API.md |
 | 2026-06-03 | Added `MUST_CHANGE_PASSWORD` (§1, §3.2 status map) | Slice A DA3 gate response code |
 | 2026-06-03 | Added `BLOCK_HAS_BOOKINGS` to §3.2 `409` examples | Slice B availability block-lock guard (F09/edge #14) |
+| 2026-06-04 | Added `409` codes `ACTIVE_LOCK_EXISTS`/`OVERLAP`/`INVALID_TRANSITION` + `422` `SLOT_NOT_BOOKABLE`; noted dev-only `/dev/*` checkout routes | Slice C booking/payment (F03/F04) |

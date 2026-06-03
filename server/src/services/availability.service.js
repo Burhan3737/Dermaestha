@@ -60,6 +60,8 @@ export async function generateSlots(doctorId, dateYMD, settings) {
       doctorId,
       state: { in: ACTIVE_APPOINTMENT_STATES },
       slotStart: { in: future.map((s) => s.slotStart) },
+      // Lazy expiry: an expired slot_locked no longer occupies the slot (Slice C, ADR-23).
+      NOT: { state: 'slot_locked', lockExpiresAt: { lt: new Date() } },
     },
     select: { slotStart: true },
   });

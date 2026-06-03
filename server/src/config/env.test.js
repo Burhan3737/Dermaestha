@@ -22,4 +22,16 @@ describe('parseEnv', () => {
   it('rejects a too-short SESSION_SECRET', () => {
     expect(() => parseEnv({ ...base, SESSION_SECRET: 'short' })).toThrow(/SESSION_SECRET/);
   });
+  it('defaults PAYMENT_PROVIDER and EMAIL_PROVIDER to stub and accepts overrides', () => {
+    const base = {
+      APP_BASE_URL: 'http://localhost:3000',
+      DATABASE_URL: 'postgresql://u:p@localhost:5432/d',
+      SESSION_SECRET: 'x'.repeat(16),
+    };
+    expect(parseEnv(base).PAYMENT_PROVIDER).toBe('stub');
+    expect(parseEnv(base).EMAIL_PROVIDER).toBe('stub');
+    const dev = parseEnv({ ...base, PAYMENT_PROVIDER: 'mock', EMAIL_PROVIDER: 'console' });
+    expect(dev.PAYMENT_PROVIDER).toBe('mock');
+    expect(dev.EMAIL_PROVIDER).toBe('console');
+  });
 });
