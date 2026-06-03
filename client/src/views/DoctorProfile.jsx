@@ -47,6 +47,9 @@ export function DoctorProfile() {
       <section className="section-card">
         <h2>Available today</h2>
         {slots.isPending && <p className="help">Loading slots…</p>}
+        {slots.isError && (
+          <p className="error-text">Could not load slots. Please try again.</p>
+        )}
         {slots.data && slots.data.data.length === 0 && (
           <p className="help">No slots available today.</p>
         )}
