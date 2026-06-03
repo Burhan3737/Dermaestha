@@ -11,7 +11,10 @@ import * as availability from './availability.service.js';
 import { lockSlot } from './booking.service.js';
 
 const slotStart = '2099-01-04T13:00:00.000Z';
-const bookable = () => availability.generateSlots.mockResolvedValue([{ slotStart, slotEnd: '2099-01-04T13:30:00.000Z' }]);
+const bookable = () =>
+  availability.generateSlots.mockResolvedValue([
+    { slotStart, slotEnd: '2099-01-04T13:30:00.000Z' },
+  ]);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -21,15 +24,17 @@ beforeEach(() => {
 describe('booking.lockSlot', () => {
   it('rejects a slot that is not bookable', async () => {
     availability.generateSlots.mockResolvedValue([]);
-    await expect(lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }))
-      .rejects.toMatchObject({ code: 'SLOT_NOT_BOOKABLE', status: 422 });
+    await expect(
+      lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }),
+    ).rejects.toMatchObject({ code: 'SLOT_NOT_BOOKABLE', status: 422 });
   });
 
   it('rejects when the patient already holds a live lock (single-lock)', async () => {
     bookable();
     prisma.appointment.findFirst.mockResolvedValueOnce({ id: 'lock1' }); // existing live lock
-    await expect(lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }))
-      .rejects.toMatchObject({ code: 'ACTIVE_LOCK_EXISTS', status: 409 });
+    await expect(
+      lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }),
+    ).rejects.toMatchObject({ code: 'ACTIVE_LOCK_EXISTS', status: 409 });
   });
 
   it('inserts a slot_locked row on the happy path', async () => {
@@ -62,7 +67,8 @@ describe('booking.lockSlot', () => {
       .mockResolvedValueOnce(null) // live lock
       .mockResolvedValueOnce(null) // overlap
       .mockResolvedValueOnce(null); // no expired blocker
-    await expect(lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }))
-      .rejects.toMatchObject({ code: 'SLOT_TAKEN', status: 409 });
+    await expect(
+      lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }),
+    ).rejects.toMatchObject({ code: 'SLOT_TAKEN', status: 409 });
   });
 });

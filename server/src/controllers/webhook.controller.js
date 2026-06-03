@@ -11,8 +11,16 @@ export async function payfast(req, res, next) {
     result = paymentProvider.verifyWebhook(req); // throws AppError(INVALID_SIGNATURE, 401) on bad sig
   } catch (e) {
     logger.warn('payfast webhook signature rejected');
-    await audit.record({ eventType: 'payment.webhook_rejected', actorType: 'system', reason: 'bad signature' }).catch(() => {});
-    return next(e instanceof AppError ? e : new AppError('INVALID_SIGNATURE', 'Webhook rejected.', 401));
+    await audit
+      .record({
+        eventType: 'payment.webhook_rejected',
+        actorType: 'system',
+        reason: 'bad signature',
+      })
+      .catch(() => {});
+    return next(
+      e instanceof AppError ? e : new AppError('INVALID_SIGNATURE', 'Webhook rejected.', 401),
+    );
   }
   try {
     await paymentService.processWebhook(result);

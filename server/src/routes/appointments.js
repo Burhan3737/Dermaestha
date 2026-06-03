@@ -19,4 +19,9 @@ appointmentsRouter.post('/lock', requireRole('patient'), validate(lockSchema), c
 appointmentsRouter.post('/:id/pay', requireRole('patient'), payLimiter, c.pay);
 appointmentsRouter.get('/', requireRole('patient', 'doctor'), c.list);
 appointmentsRouter.get('/:id', requireRole('patient', 'doctor', 'admin'), c.detail);
-appointmentsRouter.post('/:id/cancel', requireRole('patient', 'doctor'), validate(cancelSchema), c.cancel);
+appointmentsRouter.post(
+  '/:id/cancel',
+  requireRole('patient', 'doctor'),
+  validate(cancelSchema),
+  c.cancel,
+);

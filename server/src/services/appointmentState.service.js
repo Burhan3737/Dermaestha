@@ -16,14 +16,28 @@ const LEGAL = {
  *   actorType: 'patient'|'doctor'|'system', actorId?: string|null, reason?: string|null,
  *   data?: object, client?: any }} args
  */
-export async function transition({ appointmentId, to, actorType, actorId = null, reason = null, data = {}, client = prisma }) {
+export async function transition({
+  appointmentId,
+  to,
+  actorType,
+  actorId = null,
+  reason = null,
+  data = {},
+  client = prisma,
+}) {
   const appt = await client.appointment.findUnique({ where: { id: appointmentId } });
   if (!appt) throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
   const allowed = LEGAL[appt.state];
   if (!allowed || !allowed.has(to)) {
     throw new AppError('INVALID_TRANSITION', `Cannot move ${appt.state} → ${to}.`, 409);
   }
-  const updated = await client.appointment.update({ where: { id: appointmentId }, data: { state: to, ...data } });
-  await audit.record({ eventType: `appointment.${to}`, actorType, actorId, targetRef: appointmentId, reason }, client);
+  const updated = await client.appointment.update({
+    where: { id: appointmentId },
+    data: { state: to, ...data },
+  });
+  await audit.record(
+    { eventType: `appointment.${to}`, actorType, actorId, targetRef: appointmentId, reason },
+    client,
+  );
   return updated;
 }

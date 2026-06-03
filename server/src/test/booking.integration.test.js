@@ -31,11 +31,21 @@ describe('booking + payment integration', () => {
     slotStart = await pickSlot(doctorId);
     email = uniq();
     agent = request.agent(app);
-    await agent.post('/api/auth/signup').send({ fullName: 'Booker', email, phone: '03001234567', password: 'password1', tosAccepted: true });
+    await agent
+      .post('/api/auth/signup')
+      .send({
+        fullName: 'Booker',
+        email,
+        phone: '03001234567',
+        password: 'password1',
+        tosAccepted: true,
+      });
   });
 
   it('locks a slot', async () => {
-    const res = await agent.post('/api/appointments/lock').send({ doctorId, slotStart, forSelf: true });
+    const res = await agent
+      .post('/api/appointments/lock')
+      .send({ doctorId, slotStart, forSelf: true });
     expect(res.status).toBe(201);
     appointmentId = res.body.id;
   });
@@ -43,8 +53,18 @@ describe('booking + payment integration', () => {
   it('a second lock on the same slot is rejected (slot already occupied)', async () => {
     const email2 = uniq();
     const agent2 = request.agent(app);
-    await agent2.post('/api/auth/signup').send({ fullName: 'B2', email: email2, phone: '03001234567', password: 'password1', tosAccepted: true });
-    const res = await agent2.post('/api/appointments/lock').send({ doctorId, slotStart, forSelf: true });
+    await agent2
+      .post('/api/auth/signup')
+      .send({
+        fullName: 'B2',
+        email: email2,
+        phone: '03001234567',
+        password: 'password1',
+        tosAccepted: true,
+      });
+    const res = await agent2
+      .post('/api/appointments/lock')
+      .send({ doctorId, slotStart, forSelf: true });
     // generateSlots excludes slot_locked rows from ACTIVE_APPOINTMENT_STATES, so the second
     // patient sees the slot as SLOT_NOT_BOOKABLE (422) rather than SLOT_TAKEN (409).
     // SLOT_TAKEN (409) is only reachable via a concurrent DB-level unique-constraint race.
@@ -58,7 +78,13 @@ describe('booking + payment integration', () => {
     expect(pay.status).toBe(200);
     expect(pay.body.redirectUrl).toContain('/dev/checkout?ref=');
     const payment = await prisma.payment.findFirst({ where: { appointmentId } });
-    const ipn = buildSignedIpn({ event: 'payment.success', providerRef: payment.providerRef, intentKey: `x`, amount: payment.amount, gatewayFee: 5000 });
+    const ipn = buildSignedIpn({
+      event: 'payment.success',
+      providerRef: payment.providerRef,
+      intentKey: `x`,
+      amount: payment.amount,
+      gatewayFee: 5000,
+    });
     const wh = await request(app).post('/api/webhooks/payfast').send(ipn);
     expect(wh.status).toBe(200);
     const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
@@ -67,7 +93,9 @@ describe('booking + payment integration', () => {
   });
 
   it('rejects a webhook with a bad signature (401)', async () => {
-    const res = await request(app).post('/api/webhooks/payfast').send({ event: 'payment.success', providerRef: 'x', signature: 'bad' });
+    const res = await request(app)
+      .post('/api/webhooks/payfast')
+      .send({ event: 'payment.success', providerRef: 'x', signature: 'bad' });
     expect(res.status).toBe(401);
   });
 

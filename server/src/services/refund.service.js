@@ -14,7 +14,11 @@ export async function quoteRefund(appointmentId) {
   if (!payment) throw new AppError('NOT_FOUND', 'No payment to refund.', 404);
   const settings = await prisma.settings.findUnique({ where: { id: 1 } });
   const gatewayFee = payment.gatewayFee ?? fallbackFee(payment.amount, settings);
-  return { amountPaid: payment.amount, gatewayFee, refund: Math.max(0, payment.amount - gatewayFee) };
+  return {
+    amountPaid: payment.amount,
+    gatewayFee,
+    refund: Math.max(0, payment.amount - gatewayFee),
+  };
 }
 
 /** Idempotency-keyed refund (#10). Best-effort caller fires the email post-commit. */
@@ -23,7 +27,11 @@ export async function initiateRefund({ appointmentId }) {
   if (!payment) return null;
   const { refund } = await quoteRefund(appointmentId);
   const key = payment.refundIdempotencyKey ?? `rf_${appointmentId}`;
-  const result = await paymentProvider.refund({ providerRef: payment.providerRef, amount: refund, idempotencyKey: key });
+  const result = await paymentProvider.refund({
+    providerRef: payment.providerRef,
+    amount: refund,
+    idempotencyKey: key,
+  });
   await prisma.payment.update({
     where: { id: payment.id },
     data: { refundIdempotencyKey: key, refundRef: result.refundRef, refundStatus: result.status },

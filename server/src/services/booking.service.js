@@ -3,7 +3,11 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../http/AppError.js';
 import { KARACHI } from '../lib/tz.js';
-import { SLOT_GRANULARITY_MIN, SLOT_LOCK_TTL_MIN, ACTIVE_APPOINTMENT_STATES } from '../config/constants.js';
+import {
+  SLOT_GRANULARITY_MIN,
+  SLOT_LOCK_TTL_MIN,
+  ACTIVE_APPOINTMENT_STATES,
+} from '../config/constants.js';
 import { generateSlots } from './availability.service.js';
 import * as audit from './audit.service.js';
 
@@ -59,7 +63,12 @@ export async function lockSlot({ patientUserId, doctorId, slotStart, forSelf, su
   };
 
   const created = await createWithReclaim(data, doctorId, slotStartDate, now);
-  await audit.record({ eventType: 'appointment.slot_locked', actorType: 'patient', actorId: patientUserId, targetRef: created.id });
+  await audit.record({
+    eventType: 'appointment.slot_locked',
+    actorType: 'patient',
+    actorId: patientUserId,
+    targetRef: created.id,
+  });
   return created;
 }
 
@@ -69,7 +78,12 @@ async function createWithReclaim(data, doctorId, slotStartDate, now) {
   } catch (e) {
     if (e?.code !== 'P2002') throw e;
     const blocker = await prisma.appointment.findFirst({
-      where: { doctorId, slotStart: slotStartDate, state: 'slot_locked', lockExpiresAt: { lt: now } },
+      where: {
+        doctorId,
+        slotStart: slotStartDate,
+        state: 'slot_locked',
+        lockExpiresAt: { lt: now },
+      },
       select: { id: true },
     });
     if (!blocker) throw new AppError('SLOT_TAKEN', 'That slot was just taken.', 409);

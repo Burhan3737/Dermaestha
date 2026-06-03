@@ -34,7 +34,9 @@ export function PaymentReturn() {
           </>
         )}
         {!q.data && !q.isError && <p className="help">Confirming your payment…</p>}
-        {q.data && q.data.state !== 'confirmed' && <p className="help">Awaiting payment confirmation…</p>}
+        {q.data && q.data.state !== 'confirmed' && (
+          <p className="help">Awaiting payment confirmation…</p>
+        )}
       </section>
     </PatientLayout>
   );

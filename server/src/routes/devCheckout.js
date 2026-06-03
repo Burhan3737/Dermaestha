@@ -29,25 +29,32 @@ devCheckoutRouter.get('/checkout', (req, res) => {
 </body></html>`);
 });
 
-devCheckoutRouter.post('/payment/complete', express.urlencoded({ extended: false }), async (req, res, next) => {
-  try {
-    const { ref, outcome } = req.body;
-    const payment = await prisma.payment.findFirst({ where: { providerRef: ref } });
-    if (!payment) return res.status(404).send('Unknown payment ref');
-    const slotStartIso = payment.slotStart instanceof Date ? payment.slotStart.toISOString() : new Date(payment.slotStart).toISOString();
-    // Mock gateway reports a 2.5% fee on success.
-    const gatewayFee = outcome === 'success' ? Math.round(payment.amount * 0.025) : null;
-    const ipn = buildSignedIpn({
-      event: outcome === 'success' ? 'payment.success' : 'payment.failed',
-      providerRef: ref,
-      intentKey: `${payment.patientUserId}:${slotStartIso}`,
-      amount: payment.amount,
-      gatewayFee,
-    });
-    const result = paymentProvider.verifyWebhook({ body: ipn }); // real signature verification
-    await paymentService.processWebhook(result);
-    res.redirect(`${env.APP_BASE_URL}/pay/return?appt=${payment.appointmentId}`);
-  } catch (e) {
-    next(e);
-  }
-});
+devCheckoutRouter.post(
+  '/payment/complete',
+  express.urlencoded({ extended: false }),
+  async (req, res, next) => {
+    try {
+      const { ref, outcome } = req.body;
+      const payment = await prisma.payment.findFirst({ where: { providerRef: ref } });
+      if (!payment) return res.status(404).send('Unknown payment ref');
+      const slotStartIso =
+        payment.slotStart instanceof Date
+          ? payment.slotStart.toISOString()
+          : new Date(payment.slotStart).toISOString();
+      // Mock gateway reports a 2.5% fee on success.
+      const gatewayFee = outcome === 'success' ? Math.round(payment.amount * 0.025) : null;
+      const ipn = buildSignedIpn({
+        event: outcome === 'success' ? 'payment.success' : 'payment.failed',
+        providerRef: ref,
+        intentKey: `${payment.patientUserId}:${slotStartIso}`,
+        amount: payment.amount,
+        gatewayFee,
+      });
+      const result = paymentProvider.verifyWebhook({ body: ipn }); // real signature verification
+      await paymentService.processWebhook(result);
+      res.redirect(`${env.APP_BASE_URL}/pay/return?appt=${payment.appointmentId}`);
+    } catch (e) {
+      next(e);
+    }
+  },
+);

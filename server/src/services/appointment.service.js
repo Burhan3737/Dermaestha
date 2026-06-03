@@ -25,7 +25,16 @@ export async function listForRole({ role, userId }) {
     const rows = await prisma.appointment.findMany({
       where: { patientUserId: userId, state: { in: UPCOMING } },
       orderBy: { slotStart: 'asc' },
-      include: { doctor: { select: { id: true, specialization: true, photoUrl: true, user: { select: { fullName: true } } } } },
+      include: {
+        doctor: {
+          select: {
+            id: true,
+            specialization: true,
+            photoUrl: true,
+            user: { select: { fullName: true } },
+          },
+        },
+      },
     });
     return rows.map(toPatientRow);
   }
@@ -48,12 +57,24 @@ export async function listForRole({ role, userId }) {
 export async function getForRole({ id, role, userId }) {
   const a = await prisma.appointment.findUnique({
     where: { id },
-    include: { doctor: { select: { id: true, specialization: true, photoUrl: true, user: { select: { fullName: true } } } } },
+    include: {
+      doctor: {
+        select: {
+          id: true,
+          specialization: true,
+          photoUrl: true,
+          user: { select: { fullName: true } },
+        },
+      },
+    },
   });
   const visible =
     a &&
     ((role === 'patient' && a.patientUserId === userId) ||
-      (role === 'doctor' && a.doctor && (await prisma.doctor.findUnique({ where: { userId }, select: { id: true } }))?.id === a.doctorId) ||
+      (role === 'doctor' &&
+        a.doctor &&
+        (await prisma.doctor.findUnique({ where: { userId }, select: { id: true } }))?.id ===
+          a.doctorId) ||
       role === 'admin');
   if (!visible) throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
 

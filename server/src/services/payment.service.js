@@ -14,9 +14,16 @@ export async function createIntent({ patientUserId, appointmentId }) {
     throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
   }
   if (appt.state !== 'slot_locked' || !appt.lockExpiresAt || appt.lockExpiresAt < new Date()) {
-    throw new AppError('LOCK_EXPIRED', 'Your slot hold has expired. Please pick the slot again.', 409);
+    throw new AppError(
+      'LOCK_EXPIRED',
+      'Your slot hold has expired. Please pick the slot again.',
+      409,
+    );
   }
-  const doctor = await prisma.doctor.findUnique({ where: { id: appt.doctorId }, select: { fee: true } });
+  const doctor = await prisma.doctor.findUnique({
+    where: { id: appt.doctorId },
+    select: { fee: true },
+  });
   const amount = doctor.fee;
 
   const payment = await prisma.payment.upsert({
@@ -34,7 +41,10 @@ export async function createIntent({ patientUserId, appointmentId }) {
     notifyUrl: `${env.APP_BASE_URL}/api/webhooks/payfast`,
   });
   if (checkout.providerRef && checkout.providerRef !== payment.providerRef) {
-    await prisma.payment.update({ where: { id: payment.id }, data: { providerRef: checkout.providerRef } });
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { providerRef: checkout.providerRef },
+    });
   }
   return { redirectUrl: checkout.redirectUrl };
 }
@@ -45,7 +55,9 @@ export async function processWebhook({ event, providerRef, amount, gatewayFee })
   if (!payment) throw new AppError('NOT_FOUND', 'Unknown payment reference.', 404);
 
   if (event === 'payment.failed') {
-    await prisma.appointment.deleteMany({ where: { id: payment.appointmentId, state: 'slot_locked' } });
+    await prisma.appointment.deleteMany({
+      where: { id: payment.appointmentId, state: 'slot_locked' },
+    });
     await prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed' } });
     return { ok: true };
   }
@@ -61,12 +73,18 @@ export async function processWebhook({ event, providerRef, amount, gatewayFee })
       data: { feeAtBooking: amount, lockExpiresAt: null },
       client: tx,
     });
-    await tx.payment.update({ where: { id: payment.id }, data: { status: 'success', gatewayFee: gatewayFee ?? null } });
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: 'success', gatewayFee: gatewayFee ?? null },
+    });
   });
 
   // Post-commit, best-effort confirmation email (never blocks the transition).
   try {
-    const patient = await prisma.user.findUnique({ where: { id: appt.patientUserId }, select: { email: true, fullName: true } });
+    const patient = await prisma.user.findUnique({
+      where: { id: appt.patientUserId },
+      select: { email: true, fullName: true },
+    });
     await emailProvider.send({
       template: 'booking_confirmation',
       to: patient.email,

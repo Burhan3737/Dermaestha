@@ -22,7 +22,8 @@ export function Booking() {
     setBusy(true);
     try {
       const body = { doctorId: id, slotStart, forSelf };
-      if (!forSelf) body.subject = { name: subject.name, age: Number(subject.age), relation: subject.relation };
+      if (!forSelf)
+        body.subject = { name: subject.name, age: Number(subject.age), relation: subject.relation };
       const appt = await api.post('/appointments/lock', body);
       const { redirectUrl } = await api.post(`/appointments/${appt.id}/pay`);
       window.location.href = redirectUrl;
@@ -45,29 +46,46 @@ export function Booking() {
       <section className="section-card">
         <h2>Who is this consultation for?</h2>
         <label>
-          <input type="radio" name="who" checked={forSelf} onChange={() => setForSelf(true)} /> Myself
+          <input type="radio" name="who" checked={forSelf} onChange={() => setForSelf(true)} />{' '}
+          Myself
         </label>
         <label>
-          <input type="radio" name="who" checked={!forSelf} onChange={() => setForSelf(false)} /> Someone else
+          <input type="radio" name="who" checked={!forSelf} onChange={() => setForSelf(false)} />{' '}
+          Someone else
         </label>
         {!forSelf && (
           <div>
             <label>
               Patient name
-              <input value={subject.name} onChange={(e) => setSubject({ ...subject, name: e.target.value })} />
+              <input
+                value={subject.name}
+                onChange={(e) => setSubject({ ...subject, name: e.target.value })}
+              />
             </label>
             <label>
               Age
-              <input type="number" value={subject.age} onChange={(e) => setSubject({ ...subject, age: e.target.value })} />
+              <input
+                type="number"
+                value={subject.age}
+                onChange={(e) => setSubject({ ...subject, age: e.target.value })}
+              />
             </label>
             <label>
               Relation
-              <input value={subject.relation} onChange={(e) => setSubject({ ...subject, relation: e.target.value })} />
+              <input
+                value={subject.relation}
+                onChange={(e) => setSubject({ ...subject, relation: e.target.value })}
+              />
             </label>
           </div>
         )}
         {error && <p className="error-text">{error}</p>}
-        <button type="button" className="btn btn--primary" disabled={busy || !slotStart} onClick={confirmAndPay}>
+        <button
+          type="button"
+          className="btn btn--primary"
+          disabled={busy || !slotStart}
+          onClick={confirmAndPay}
+        >
           Confirm & Pay
         </button>
       </section>
