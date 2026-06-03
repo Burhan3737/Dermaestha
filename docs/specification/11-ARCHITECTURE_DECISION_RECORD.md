@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.2                                                                                                |
-| Last updated     | 2026-06-03                                                                                         |
+| Version          | 1.3                                                                                                |
+| Last updated     | 2026-06-04                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -35,6 +35,8 @@
 20. [ADR-19 — Documentation suite: sole source of truth / faithful re-presentation only](#adr-19--documentation-suite-sole-source-of-truth--faithful-re-presentation-only)
 21. [ADR-20 — Frontend state: React Context (session) + TanStack Query (server cache)](#adr-20--frontend-state-react-context-session--tanstack-query-server-cache)
 22. [ADR-21 — Asia/Karachi ↔ UTC via date-fns-tz](#adr-21--asiakarachi--utc-via-date-fns-tz)
+23. [ADR-22 — Dev payment simulation: mock gateway with a real signed IPN](#adr-22--dev-payment-simulation-mock-gateway-with-a-real-signed-ipn)
+24. [ADR-23 — Lazy slot-lock expiry (no background worker)](#adr-23--lazy-slot-lock-expiry-no-background-worker)
 
 ---
 
@@ -308,6 +310,30 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-22 — Dev payment simulation: mock gateway with a real signed IPN
+
+**Date:** 2026-06-04
+
+**Context:** Slice C builds the booking↔payment interlock (F03/F04), but there is no live PayFast merchant account in the dev/CI environment, and the concrete network adapter is not yet wired (the `payfast.stub` throws `NOT_IMPLEMENTED`). The webhook-as-source-of-truth design (doc 05 §5, F04.02) makes the signed IPN — not the browser redirect — the authoritative confirmation. A simulation that shortcuts the redirect→out-of-band-signed-callback split would test a different architecture than the one shipped. (docs/superpowers/specs/2026-06-03-slice-c-booking-payment-design.md)
+
+**Decision:** Add a dev-only mock `PaymentProvider` (`server/src/integrations/payment/payfast.mock.js`) implementing the same `@typedef` contract (ADR-10). `createCheckout` returns a redirect to an app-served, env-guarded hosted-checkout page (`/dev/checkout`, mounted only when `PAYMENT_PROVIDER=mock`); its "Pay"/"Fail" action builds a **real HMAC-signed IPN** (`signParams`/`buildSignedIpn`, keyed on `PAYFAST_PASSPHRASE`) and runs it through the **same** `verifyWebhook` + atomic-commit path as production. Selection is via the `PAYMENT_PROVIDER` switch (default `stub`); the throwing stub remains the production default until the concrete adapter is wired.
+
+**Consequences:** The production webhook-truth path — signature verification, the single `$transaction` commit (#2), `feeAtBooking` snapshot (#6), and 401-on-bad-signature — is genuinely exercised offline and in CI; only the "bank" is faked. The concrete PayFast network adapter remains a future file-swap behind the typedef, with no business-logic change. The hard safety constraint is that the mock provider and the `/dev/*` routes must never be active in production: the switch defaults to `stub` and the `/dev` mount is guarded by `env.PAYMENT_PROVIDER === 'mock'` (see doc 10/15/08).
+
+---
+
+## ADR-23 — Lazy slot-lock expiry (no background worker)
+
+**Date:** 2026-06-04
+
+**Context:** A `slot_locked` appointment carries a 10-minute `lockExpiresAt`; when it lapses, the slot must become bookable and reappear in the picker. The `uniq_active_slot` partial index (ADR-07) counts `slot_locked` as occupying, and slot generation excludes `slot_locked`, so an expired-but-present lock row would otherwise keep a slot both hidden and unbookable. ADR-08 anticipated in-process `node-cron` workers for time-based jobs, but a periodic sweep polling the DB every minute is standing overhead, and an in-memory per-lock `setTimeout` is not durable across restarts. (docs/superpowers/specs/2026-06-03-slice-c-booking-payment-design.md)
+
+**Decision:** Expiry is **derived from `lockExpiresAt`**, evaluated lazily at the two moments it matters — never by a background worker. (1) **Read:** slot generation's occupancy query adds `NOT: { state: 'slot_locked', lockExpiresAt: { lt: now } }`, so an expired hold no longer occupies the slot and it reappears in the picker instantly. (2) **Write:** a new lock that collides on the partial index (`P2002`) triggers reclaim — if the blocker is an expired `slot_locked`, delete it and retry once; otherwise return `SLOT_TAKEN`. No `setInterval`/`setTimeout`.
+
+**Consequences:** Correct discovery and booking with zero standing background work and durability across restarts (nothing is held in process memory). A dead lock row lingers invisibly in the table until that slot is rebooked — accepted, since it occupies neither the picker nor a booking attempt. This is a deliberate, documented narrowing of ADR-08's worker model for the lock-release case specifically; the reconciliation and notification workers remain future `node-cron` jobs. A consequence surfaced in testing: a *sequential* second lock on a held slot is rejected at the read-validation gate with `SLOT_NOT_BOOKABLE` (422), while `SLOT_TAKEN` (409) is reserved for the true concurrent race caught by the index.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -315,3 +341,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-01 | Initial creation | Extracted from ARCHITECTURE.md decisions + changelogs + specs |
 | 2026-06-03 | Added ADR-20 (frontend state: Context + TanStack Query) | Slice A frontend-state decision; new client dependency `@tanstack/react-query` |
 | 2026-06-03 | Added ADR-21 (Asia/Karachi ↔ UTC via date-fns-tz) | Slice B slot-generation timezone decision; new server dependency `date-fns-tz` |
+| 2026-06-04 | Added ADR-22 (dev mock payment gateway, signed IPN) + ADR-23 (lazy lock-expiry, no worker) | Slice C booking/payment decisions |

@@ -4,7 +4,7 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.1                                |
+| Version          | 1.2                                |
 | Last updated     | 2026-06-03                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
@@ -122,6 +122,10 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
 - On verified `payment.success`: the webhook handler runs the **single `$transaction`** that moves the appointment `slot_locked→confirmed`, snapshots `feeAtBooking` (#6), and writes the `payments` row (#2). `gatewayFee` from the IPN is stored and drives refund math; if absent, the `settings` fallback applies (policy #5).
 - `notifyUrl` = `${APP_BASE_URL}/api/webhooks/payfast`.
 
+### Dev simulation: `payfast.mock` (ADR-22)
+
+The concrete PayFast network adapter is not yet wired; the production default (`PAYMENT_PROVIDER=stub`) throws `NOT_IMPLEMENTED`. For dev/CI, a `payfast.mock` adapter implements the same `PaymentProvider` typedef: `createCheckout` returns a redirect to an app-served, env-guarded hosted-checkout page (`GET /dev/checkout`, mounted only when `PAYMENT_PROVIDER=mock`). Its Pay/Fail action builds a **real HMAC-signed IPN** (over the fields above, keyed on `PAYFAST_PASSPHRASE`) and POSTs it through the **same** `verifyWebhook` + atomic-commit path as production, so signature verification, the `$transaction` commit (#2), `feeAtBooking` snapshot (#6), and 401-on-bad-signature are exercised offline. The mock signs its own deterministic field set rather than PayFast's exact MD5 param order — the real adapter implements that when wired. The mock gateway and `/dev/*` routes must never be active in production (doc 10/15/08).
+
 ---
 
 ## 3. Daily.co (video) payload shapes
@@ -224,3 +228,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | ---------- | ---------------- | ------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of INTEGRATIONS.md |
 | 2026-06-03 | Added `password_reset` email template (§5) | Slice A: F01.03 reset email was missing from the catalog |
+| 2026-06-04 | Documented the dev `payfast.mock` adapter + `/dev/checkout` simulation (§2) | Slice C: offline payment simulation via real signed IPN (ADR-22) |
