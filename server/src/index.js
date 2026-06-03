@@ -10,6 +10,9 @@ import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
 import { doctorsRouter } from './routes/doctors.js';
 import { availabilityRouter } from './routes/availability.js';
+import { appointmentsRouter } from './routes/appointments.js';
+import { webhooksRouter } from './routes/webhooks.js';
+import { devCheckoutRouter } from './routes/devCheckout.js';
 import { mustChangePasswordGate } from './middleware/mustChangePassword.js';
 import { initErrorTracking } from './lib/errorTracking.js';
 import { logger } from './lib/logger.js';
@@ -30,9 +33,14 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/doctors', doctorsRouter);
   app.use('/api/availability', availabilityRouter);
+  app.use('/api/appointments', appointmentsRouter);
+  app.use('/api/webhooks', webhooksRouter);
   app.use('/api', healthRouter);
   // Unknown /api path → JSON 404 envelope (never the SPA HTML).
   app.use('/api', (_req, _res, next) => next(new AppError('NOT_FOUND', 'Not found.', 404)));
+
+  // Dev-only simulated payment gateway. NEVER mounted in production.
+  if (env.PAYMENT_PROVIDER === 'mock') app.use('/dev', devCheckoutRouter);
 
   // Static SPA + catch-all LAST (ARCHITECTURE §14.3).
   app.use(express.static(CLIENT_DIST));
