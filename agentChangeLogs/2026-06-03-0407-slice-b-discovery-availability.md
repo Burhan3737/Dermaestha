@@ -22,6 +22,9 @@ Slice A delivered auth + the client foundation. Slice B adds the read-side disco
 | `agentChangeLogs/2026-06-03-0407-slice-b-discovery-availability.md` | Created | This changelog. |
 | `agentChangeLogs/index.md` | Modified | Added Slice B index line. |
 | `docs/superpowers/plans/2026-06-03-slice-b-discovery-availability.md` | Created | Slice B implementation plan (writing-plans output). |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | Added ADR-21 (date-fns-tz for Karachi↔UTC); v1.2. |
+| `docs/specification/03-ARCHITECTURE_DOCUMENT.md` | Modified | Noted date-fns-tz in stack; v1.2. |
+| `docs/specification/05-API_SPECIFICATION_DOCUMENT.md` | Modified | Added `BLOCK_HAS_BOOKINGS` to §3.2 409 examples; v1.2. |
 
 ## Dependencies / config / schema
 Planned (pending): add `date-fns-tz` (server) for Asia/Karachi→UTC slot math (ADR-21). No schema change (Doctor/AvailabilityBlock models already exist). Seed gains demo doctors (data, not schema).
@@ -44,6 +47,6 @@ Not verified (design stage; no code yet).
 New server dependency (`date-fns-tz`) + ADR-21 doc edit; both reversible. No schema/migration in Slice B.
 
 ## Open items / next session
-- Governance: write ADR-21 (doc 11) + doc-03 note (after spec approval, before code).
-- Run writing-plans → implement Slice B (TDD) → merge like Slice A.
-- doc 13 status sweep on completion.
+- Governance DONE: ADR-21 (doc 11 v1.2), doc-03 note (v1.2), doc-05 `BLOCK_HAS_BOOKINGS` (v1.2).
+- **PAUSED at user request** after governance — awaiting go-ahead to implement Slice B (plan committed `9d425a3`).
+- On resume: implement Slice B (TDD, inline or subagent), then merge + push like Slice A; doc 13 status sweep on completion.
