@@ -7,8 +7,8 @@ import { prisma } from '../lib/prisma.js';
  * @param {{ eventType: string, actorType: 'patient'|'doctor'|'admin'|'system',
  *           actorId?: string|null, targetRef?: string|null, reason?: string|null, meta?: object }} e
  */
-export function record(e) {
-  return prisma.auditLog.create({
+export function record(e, client = prisma) {
+  return client.auditLog.create({
     data: {
       eventType: e.eventType,
       actorType: e.actorType,
