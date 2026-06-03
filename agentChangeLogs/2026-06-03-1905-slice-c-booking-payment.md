@@ -1,12 +1,12 @@
 # 2026-06-03-1905 — slice-c-booking-payment
 
-**Status:** Implementation COMPLETE & verified on `feat/slice-c-booking-payment` (24 plan tasks + review fixes; 109 server + 32 client tests green; build clean). NOT merged. Canon doc updates (Task 4.1) pending user approval; merge decision pending.
+**Status:** COMPLETE & MERGED to `main` (`8159437`, no-ff). 24 plan tasks + review fixes; canon doc updates applied (user-approved full set); 109 server + 32 client tests green pre- and post-merge; build clean. Not pushed (local merge per user choice).
 **Goal:** Brainstorm + spec + plan + build Slice C (Booking + Payment) — the third vertical slice of the M1+M2 patient journey.
 **Skill(s) used:** superpowers:brainstorming (user-invoked); will hand off to superpowers:writing-plans
 **Ticket / issue:** None
 **Branch:** main (code work will move to a feature branch before any commit)
-**Commits / PR:** 24 commits `078e0b0`…`336d0fd` on `feat/slice-c-booking-payment` (+ 2 docs commits `a144ab5`/`c4f7528`); not merged/pushed.
-**Last updated:** 2026-06-04-0030
+**Commits / PR:** `078e0b0`…`924cde4` on `feat/slice-c-booking-payment`; merged to `main` via `8159437` (no-ff). Not pushed.
+**Last updated:** 2026-06-04-0033
 **Tags:** #feature #booking #payment #refund #frontend
 
 ## Summary
@@ -87,7 +87,8 @@ No schema change / no migration planned — `Appointment`, `Payment`, `Settings`
 No schema/migration. Main risk to guard at build time: the dev mock gateway + `/dev/*` checkout routes must be impossible to mount in production (env guard + provider switch defaulting to the throwing stub in prod). Lazy expiry leaves dead lock rows until rebook (accepted, invisible). Revert = delete created docs/files; no DB impact at this stage.
 
 ## Open items / next session
-- **Code COMPLETE on `feat/slice-c-booking-payment`** (24 commits, 109+32 tests green). NOT merged/pushed — awaiting user merge decision (finishing-a-development-branch).
+- **MERGED to `main`** (`8159437`, no-ff; 109+32 tests green post-merge). Not pushed (local-only per user). Next slice branches off this.
+- **Next: Slice D — Video** (consumes confirmed appointments): Daily.co room/token, `video-token` route, `confirmed→in_progress→completed`/no-show transitions (extend `appointmentState.service`), P-11/P-12 + doctor today-view (D-02) + D-06 doctor-cancel UI. Then F07 reminders + reconciliation/evaluation workers; admin module (M4).
 - **Task 4.1 canon doc updates — APPLIED** (user-approved full set; `77ffa7b`): 11 (ADR-22/ADR-23; v1.3), 15 (provider switches; v1.1) + 08 (v1.2)/10 (v1.1) cascade, 14 (mock adapter; v1.2), 05 (error codes + `/dev/*`; v1.3), 13 (status sweep; v1.4). Surgical edits + version bumps + revision footers per doc 00.
 - **Branch disposition — user chose: merge to main locally** (no push).
 - Deferred (later slices): video lifecycle + `video-token` (Slice D), reminder cadence + reconciliation worker (F07/F04.03), doctor appointment-list UI + D-06 modal (Slice D), admin dispute/records (M4).
