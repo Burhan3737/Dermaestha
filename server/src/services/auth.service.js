@@ -11,13 +11,8 @@ import { RESET_TOKEN_TTL_MIN } from '../config/constants.js';
 const DUMMY_HASH =
   '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHRzb21lc2FsdA$3l0u3Hj5oF0r1uV2bQ8m9rXq5n2pYw0kQ1aZ2bC3dE';
 
-/** @param {{id:string,role:string,fullName:string,mustChangePassword:boolean}} u */
-const toSafeUser = (u) => ({
-  id: u.id,
-  role: u.role,
-  fullName: u.fullName,
-  mustChangePassword: u.mustChangePassword,
-});
+/** @param {{id:string,role:string,fullName:string,mustChangePassword:boolean,doctor?:{id:string}|null}} u */
+const toSafeUser = (u) => ({ id: u.id, role: u.role, fullName: u.fullName, mustChangePassword: u.mustChangePassword, ...(u.doctor ? { doctorId: u.doctor.id } : {}) });
 
 export async function signup({ fullName, email, phone, password }) {
   const passwordHash = await hashPassword(password);
@@ -35,7 +30,7 @@ export async function signup({ fullName, email, phone, password }) {
 }
 
 export async function login({ email, password }) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email }, include: { doctor: { select: { id: true } } } });
   if (!user) {
     // Equalize timing vs. a real verify to reduce enumeration; result ignored.
     await verifyPassword(DUMMY_HASH, password).catch(() => {});
@@ -53,7 +48,7 @@ export async function login({ email, password }) {
 }
 
 export async function getById(id) {
-  const user = await prisma.user.findUnique({ where: { id } });
+  const user = await prisma.user.findUnique({ where: { id }, include: { doctor: { select: { id: true } } } });
   return user ? toSafeUser(user) : null;
 }
 
