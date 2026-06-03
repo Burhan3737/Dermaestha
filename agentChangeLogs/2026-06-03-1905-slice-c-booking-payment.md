@@ -46,6 +46,13 @@ Slices A (identity/access) and B (discovery/availability) are merged to `main`. 
 | `client/src/views/Upcoming.jsx` (+ test) | Created/Modified | P-08 upcoming + cancel flow; `<2h` lateNoRefund signal (review). `e824eee`, `336d0fd` |
 | `client/src/routes.jsx`, `client/src/App.jsx` | Modified | `/book/:id` + `/pay/return` patient-gated (review I3); `/appointments` patient RoleRoute. `6847956`, `336d0fd` |
 | ~22 Slice-C files | Modified | Prettier normalization (slice files only). `b70d5b5` |
+| `docs/specification/11-…md` | Modified | ADR-22 (mock gateway signed-IPN) + ADR-23 (lazy lock-expiry); v1.3. `77ffa7b` |
+| `docs/specification/15-…md` | Modified | `PAYMENT_PROVIDER`/`EMAIL_PROVIDER` switches + `PAYFAST_PASSPHRASE` dual-use; v1.1. `77ffa7b` |
+| `docs/specification/14-…md` | Modified | Dev `payfast.mock` + `/dev/checkout` simulation note (§2); v1.2. `77ffa7b` |
+| `docs/specification/05-…md` | Modified | New 409/422 error codes + `/dev/*` dev-only note; v1.3. `77ffa7b` |
+| `docs/specification/08-…md` | Modified | Dev provider switches must stay safe in prod; mock passphrase dev-only; v1.2. `77ffa7b` |
+| `docs/specification/10-…md` | Modified | Pre-deploy check: dev switches OFF in prod; v1.1. `77ffa7b` |
+| `docs/specification/13-…md` | Modified | Status sweep — M1 ~85%/M2 ~40%, modules 5/6/7/8/12 Built, F03/F04/F06 Built; v1.4. `77ffa7b` |
 
 ## Dependencies / config / schema
 No schema change / no migration planned — `Appointment`, `Payment`, `Settings`, and the `uniq_active_slot` partial index already exist. Planned new config/env (pending approval): payment-provider switch (mock vs throwing stub), dev mock signing passphrase, `APP_BASE_URL`, email-provider switch.
@@ -81,6 +88,7 @@ No schema/migration. Main risk to guard at build time: the dev mock gateway + `/
 
 ## Open items / next session
 - **Code COMPLETE on `feat/slice-c-booking-payment`** (24 commits, 109+32 tests green). NOT merged/pushed — awaiting user merge decision (finishing-a-development-branch).
-- **Task 4.1 canon doc updates — GATED on user approval** (then apply per doc 00 protocol): 11 (ADR-22 mock-gateway-signed-IPN, ADR-23 lazy-expiry-no-worker), 15 (`PAYMENT_PROVIDER`/`EMAIL_PROVIDER`/`PAYFAST_PASSPHRASE`) + 08/10 cascade, 14 (`payfast.mock` + dev checkout), 05 (error codes `SLOT_NOT_BOOKABLE`/`ACTIVE_LOCK_EXISTS`/`OVERLAP`/`INVALID_TRANSITION`; `/dev/*` dev-only), 13 (F03/F04/F06 + module status).
+- **Task 4.1 canon doc updates — APPLIED** (user-approved full set; `77ffa7b`): 11 (ADR-22/ADR-23; v1.3), 15 (provider switches; v1.1) + 08 (v1.2)/10 (v1.1) cascade, 14 (mock adapter; v1.2), 05 (error codes + `/dev/*`; v1.3), 13 (status sweep; v1.4). Surgical edits + version bumps + revision footers per doc 00.
+- **Branch disposition — user chose: merge to main locally** (no push).
 - Deferred (later slices): video lifecycle + `video-token` (Slice D), reminder cadence + reconciliation worker (F07/F04.03), doctor appointment-list UI + D-06 modal (Slice D), admin dispute/records (M4).
 - Low-risk follow-ups noted in Findings (I2 failed-path atomicity; M2 test intentKey) — optional.
