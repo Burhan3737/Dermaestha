@@ -67,4 +67,40 @@ describe('replaceWeeklyBlocks', () => {
     expect(prisma.availabilityBlock.deleteMany).toHaveBeenCalledWith({ where: { doctorId: 'doc1' } });
     expect(prisma.availabilityBlock.createMany).toHaveBeenCalled();
   });
+
+  it('rejects with BLOCK_HAS_BOOKINGS when a shortened block no longer fully fits an existing slot', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'doc1' });
+    // Existing appointment at 20:30 Karachi Monday (15:30 UTC) — a full 20:30–21:00 slot.
+    prisma.appointment.findMany.mockResolvedValue([{ id: 'appt1', slotStart: new Date('2026-06-15T15:30:00.000Z') }]);
+    // New block ends 20:45 — the 20:30–21:00 slot no longer fully fits.
+    await expect(avail.replaceWeeklyBlocks('user1', [{ weekday: 1, startTime: '18:00', endTime: '20:45' }]))
+      .rejects.toMatchObject({ code: 'BLOCK_HAS_BOOKINGS', status: 409 });
+    expect(prisma.availabilityBlock.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('getWeeklyBlocks', () => {
+  it('returns blocks ordered by weekday then startTime', async () => {
+    prisma.availabilityBlock.findMany.mockResolvedValue([{ weekday: 1, startTime: '18:00', endTime: '21:00' }]);
+    const result = await avail.getWeeklyBlocks('doc1');
+    expect(prisma.availabilityBlock.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { doctorId: 'doc1' }, orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }] }),
+    );
+    expect(result).toEqual([{ weekday: 1, startTime: '18:00', endTime: '21:00' }]);
+  });
+});
+
+describe('nextAvailableSlot', () => {
+  it('returns null when no slots exist in the lookahead window', async () => {
+    prisma.availabilityBlock.findMany.mockResolvedValue([]); // no blocks any day
+    const result = await avail.nextAvailableSlot('doc1', 14);
+    expect(result).toBeNull();
+  });
+
+  it('returns the first available slot it finds', async () => {
+    // Monday block 18:00–19:00 → first slot 13:00 UTC. Day 0 of the loop is 2026-06-15 (Monday).
+    prisma.availabilityBlock.findMany.mockResolvedValue([{ weekday: 1, startTime: '18:00', endTime: '19:00' }]);
+    const result = await avail.nextAvailableSlot('doc1', 14);
+    expect(result).toBe('2026-06-15T13:00:00.000Z');
+  });
 });

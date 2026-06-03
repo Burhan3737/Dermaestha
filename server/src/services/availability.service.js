@@ -7,6 +7,11 @@ import { SLOT_GRANULARITY_MIN, ACTIVE_APPOINTMENT_STATES } from '../config/const
 
 const SLOT_MS = SLOT_GRANULARITY_MIN * 60 * 1000;
 
+const toMinutes = (hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
+
 export async function getWeeklyBlocks(doctorId) {
   const blocks = await prisma.availabilityBlock.findMany({
     where: { doctorId },
@@ -16,20 +21,21 @@ export async function getWeeklyBlocks(doctorId) {
   return blocks;
 }
 
-/** True if some block on the slot's Karachi weekday contains [time, time+30min). */
+/** True if some block on the slot's Karachi weekday fully contains the 30-min slot [start, start+30min). */
 function blocksCoverSlot(blocks, slotStartUtc, dateYMD) {
   const weekday = karachiWeekday(dateYMD);
-  const hhmm = formatInTimeZone(slotStartUtc, KARACHI, 'HH:mm');
-  return blocks.some((b) => b.weekday === weekday && hhmm >= b.startTime && hhmm < b.endTime);
+  const startMin = toMinutes(formatInTimeZone(slotStartUtc, KARACHI, 'HH:mm'));
+  const endMin = startMin + SLOT_GRANULARITY_MIN;
+  return blocks.some((b) => b.weekday === weekday && startMin >= toMinutes(b.startTime) && endMin <= toMinutes(b.endTime));
 }
 
-export async function generateSlots(doctorId, dateYMD) {
+export async function generateSlots(doctorId, dateYMD, settings) {
   const weekday = karachiWeekday(dateYMD);
   const blocks = await prisma.availabilityBlock.findMany({ where: { doctorId, weekday } });
   if (blocks.length === 0) return [];
 
-  const settings = await prisma.settings.findUnique({ where: { id: 1 } });
-  const leadMin = settings?.minBookingLeadMinutes ?? 60;
+  const s = settings ?? (await prisma.settings.findUnique({ where: { id: 1 } }));
+  const leadMin = s?.minBookingLeadMinutes ?? 60;
   const earliest = Date.now() + leadMin * 60 * 1000;
 
   /** @type {{slotStart: Date, slotEnd: Date}[]} */
@@ -58,11 +64,12 @@ export async function generateSlots(doctorId, dateYMD) {
 }
 
 export async function nextAvailableSlot(doctorId, days = 14) {
+  const settings = await prisma.settings.findUnique({ where: { id: 1 } });
   const today = new Date();
   for (let i = 0; i < days; i += 1) {
     const d = new Date(today.getTime() + i * 24 * 60 * 60 * 1000);
     const dateYMD = formatInTimeZone(d, KARACHI, 'yyyy-MM-dd');
-    const slots = await generateSlots(doctorId, dateYMD); // eslint-disable-line no-await-in-loop
+    const slots = await generateSlots(doctorId, dateYMD, settings); // eslint-disable-line no-await-in-loop
     if (slots.length > 0) return slots[0].slotStart;
   }
   return null;
