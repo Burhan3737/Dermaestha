@@ -1,12 +1,12 @@
 # 2026-06-03-1905 — slice-c-booking-payment
 
-**Status:** Partial (brainstorming + spec + plan complete; implementation pending)
+**Status:** Implementation COMPLETE & verified on `feat/slice-c-booking-payment` (24 plan tasks + review fixes; 109 server + 32 client tests green; build clean). NOT merged. Canon doc updates (Task 4.1) pending user approval; merge decision pending.
 **Goal:** Brainstorm + spec + plan + build Slice C (Booking + Payment) — the third vertical slice of the M1+M2 patient journey.
 **Skill(s) used:** superpowers:brainstorming (user-invoked); will hand off to superpowers:writing-plans
 **Ticket / issue:** None
 **Branch:** main (code work will move to a feature branch before any commit)
-**Commits / PR:** None yet
-**Last updated:** 2026-06-03-1910
+**Commits / PR:** 24 commits `078e0b0`…`336d0fd` on `feat/slice-c-booking-payment` (+ 2 docs commits `a144ab5`/`c4f7528`); not merged/pushed.
+**Last updated:** 2026-06-04-0030
 **Tags:** #feature #booking #payment #refund #frontend
 
 ## Summary
@@ -22,6 +22,30 @@ Slices A (identity/access) and B (discovery/availability) are merged to `main`. 
 | `agentChangeLogs/index.md` | Modified | Added Slice C index line. |
 | `docs/superpowers/specs/2026-06-03-slice-c-booking-payment-design.md` | Created | Slice C design doc (brainstorming output). |
 | `docs/superpowers/plans/2026-06-03-slice-c-booking-payment.md` | Created | Slice C implementation plan (writing-plans output) — 4 phases, ~20 TDD tasks. |
+| `server/src/config/env.js` (+ test) | Modified | `PAYMENT_PROVIDER`/`EMAIL_PROVIDER` switches (default `stub`) + `PAYFAST_PASSPHRASE`. `078e0b0` |
+| `.env.example` | Modified | Documented the two provider switches. `078e0b0` |
+| `server/src/integrations/email/console.dev.js` (+ test), `email/index.js` | Created/Modified | Dev logging email adapter + `EMAIL_PROVIDER` switch (the resend stub throws). `36a7ed6` |
+| `server/src/integrations/payment/payfast.mock.js` (+ test), `payment/index.js` | Created/Modified | Dev mock gateway: HMAC-signed IPN (`signParams`/`buildSignedIpn`), `verifyWebhook`, `refund`; `PAYMENT_PROVIDER` switch. `33a482b`, `336d0fd` (sig clarity) |
+| `shared/schemas/booking.js` (+ test), `schemas/index.js`, `vitest.config.js` | Created/Modified | `lockSchema`+`cancelSchema`; added `shared/**/*.test.js` to vitest include (latent gap). `f3dd38b` |
+| `server/src/services/audit.service.js` (+ test) | Modified | `record(e, client=prisma)` — optional tx client for atomic audit. `b0a6fd5` |
+| `server/src/services/appointmentState.service.js` (+ test) | Created | Single state-transition writer (legal-pair validation + audit). `7922fb2` |
+| `server/src/services/availability.service.js` (+ expiry test) | Modified | Lazy-expiry `NOT` clause excludes expired `slot_locked` from slot-gen (ADR-23). `e1c3824` |
+| `server/src/services/booking.service.js` (+ test) | Created | `lockSlot`: validate + single-lock + no-overlap + reclaim-on-conflict. `5b1692d` |
+| `server/src/services/refund.service.js` (+ test) | Created | `quoteRefund` (net-of-fee, reported-wins/fallback) + idempotent `initiateRefund`. `0abad29` |
+| `server/src/services/payment.service.js` (+ test) | Created/Modified | `createIntent` (idempotent) + `processWebhook` (atomic commit); `payment.failed` status guard (review). `610fbcc`, `336d0fd` |
+| `server/src/services/cancellation.service.js` (+ test) | Created/Modified | Patient ≥2h/<2h + doctor cancel; best-effort `safeRefund` wrapper (review). `cd60cc2`, `336d0fd` |
+| `server/src/services/appointment.service.js` (+ test) | Created | Role-scoped `listForRole` + `getForRole` (404 no-leak, refundQuote on confirmed). `14b38eb` |
+| `server/src/controllers/appointment.controller.js`, `routes/appointments.js` | Created | lock/pay/list/detail/cancel; pay rate-limited. `971e08a` |
+| `server/src/controllers/webhook.controller.js`, `routes/webhooks.js` | Created | `POST /api/webhooks/payfast` — signature-verified, 401+audit on bad sig. `7735252` |
+| `server/src/routes/devCheckout.js` | Created | Dev-only mock hosted page + `/dev/payment/complete` (real signed IPN). `9598c30` |
+| `server/src/index.js` | Modified | Wire appointments+webhooks routers; env-guarded `/dev` mount (mock only). `1c87c6f` |
+| `server/src/test/booking.integration.test.js` | Created | Real-DB lock→pay→confirm→cancel→refund + bad-sig 401 + double-book guard. `61796a7` |
+| `client/src/components/CancelModal.jsx` (+ test) | Created/Modified | P-10 modal (refund breakdown / no-refund warning). `8f3064d`, `e824eee` |
+| `client/src/views/Booking.jsx` (+ test) | Created | P-06 slot + who-for + confirm/pay → redirect. `3a14c6b` |
+| `client/src/views/PaymentReturn.jsx` (+ test) | Created | P-07 polls appointment state → confirmed/failed. `2097f34` |
+| `client/src/views/Upcoming.jsx` (+ test) | Created/Modified | P-08 upcoming + cancel flow; `<2h` lateNoRefund signal (review). `e824eee`, `336d0fd` |
+| `client/src/routes.jsx`, `client/src/App.jsx` | Modified | `/book/:id` + `/pay/return` patient-gated (review I3); `/appointments` patient RoleRoute. `6847956`, `336d0fd` |
+| ~22 Slice-C files | Modified | Prettier normalization (slice files only). `b70d5b5` |
 
 ## Dependencies / config / schema
 No schema change / no migration planned — `Appointment`, `Payment`, `Settings`, and the `uniq_active_slot` partial index already exist. Planned new config/env (pending approval): payment-provider switch (mock vs throwing stub), dev mock signing passphrase, `APP_BASE_URL`, email-provider switch.
@@ -39,14 +63,24 @@ No schema change / no migration planned — `Appointment`, `Payment`, `Settings`
 - `Settings` row IS seeded (id=1; defaults `minBookingLeadMinutes=60`, fallback fees 0) — refund fallback-fee model + lead-time filter have a row to read.
 - The `uniq_active_slot` partial index counts `slot_locked` as occupying AND slot generation excludes `slot_locked`, so an expired-but-present lock row would keep a slot both hidden and unbookable — which is why lazy read-time filtering + reclaim-on-conflict are required for correctness, not polish.
 - `DoctorProfile` already navigates to `/book/:id?slot=…` — the placeholder route Slice C fills.
+- **Integration-test catch (Task 2.5):** a *second* sequential lock on a held slot returns **422 `SLOT_NOT_BOOKABLE`** (validation gate via `generateSlots`, which already excludes the locked slot), not 409 `SLOT_TAKEN`. The 409 path is only reachable under a true concurrent race (covered by the `booking.service` unit test + DB-level `doubleBooking.test.js`). Double-booking is prevented with defense-in-depth; the plan's test expectation was corrected to match reality.
+- **Final-review catches (all traced to plan gaps, not implementer error):** (C1) `cancellation.service` awaited `initiateRefund` with no try/catch → a provider error would 500 a request whose state transition had already committed; fixed with a best-effort `safeRefund` (log + `payment.refund_failed` audit). (C2) the `payment.failed` webhook branch unconditionally set the payment row to `failed`, so a replayed/late failure after a success would corrupt the `success` row and break refund lookup; fixed with a `status !== 'pending'` guard. (I1) `Upcoming.jsx` never passed `lateNoRefund`, so a `<2h` cancel showed a false refund estimate; fixed by computing the window client-side. (I3) `/book/:id` + `/pay/return` were public routes → now patient-gated.
+- Known low-risk items deferred (documented, not fixed): the `payment.failed` two-write path is not wrapped in a `$transaction` (I2); the integration test signs a placeholder `intentKey` (M2) — `processWebhook` looks up by `providerRef`, so harmless.
 
 ## Verification
-Not verified (no code written yet — design/spec stage).
+**Verified.** Built subagent-driven (fresh implementer per task; controller independently inspected every committed diff; dedicated final whole-implementation reviewer subagent → 3 must-fix issues found + fixed → re-verified).
+- **Server suite:** 109/109 green (28 files) — incl. appointmentState (3), booking.service (5), refund.service (4), payment.service (6), cancellation.service (7), appointment.service (3), payfast.mock (5), availability.expiry (1), and the real-DB `booking.integration` (6: lock, double-book guard, pay→signed-webhook→confirmed, bad-sig 401, upcoming list, ≥2h cancel→refund settled).
+- **Client suite:** 32/32 green (15 files) — incl. CancelModal (3), Booking (2), PaymentReturn (2), Upcoming (4: empty, list, cancel-confirm, <2h no-refund).
+- **Build:** `npm --workspace client run build` clean (111 modules).
+- **Prettier:** slice files normalized.
+- **No schema change / no migration.**
+- Root `npm run lint` still PRE-EXISTING broken (ESLint 9 flat-config missing) — not Slice C scope.
 
 ## Risk / rollback
 No schema/migration. Main risk to guard at build time: the dev mock gateway + `/dev/*` checkout routes must be impossible to mount in production (env guard + provider switch defaulting to the throwing stub in prod). Lazy expiry leaves dead lock rows until rebook (accepted, invisible). Revert = delete created docs/files; no DB impact at this stage.
 
 ## Open items / next session
-- Recommended canonical-doc updates (pending user approval, then apply): 11 (ADR-22 mock gateway, ADR-23 lazy-expiry-no-worker), 15 (env vars) + 08/10 cascade, 14 (mock adapter + dev checkout), 05 (any new error codes; `/dev/*` dev-only note), 13 (F03/F04/F06 + module status).
-- After user reviews the written spec → invoke superpowers:writing-plans for the implementation plan.
-- Then build (subagent-driven, per-task TDD + review), branch `feat/slice-c-booking-payment` off `main`.
+- **Code COMPLETE on `feat/slice-c-booking-payment`** (24 commits, 109+32 tests green). NOT merged/pushed — awaiting user merge decision (finishing-a-development-branch).
+- **Task 4.1 canon doc updates — GATED on user approval** (then apply per doc 00 protocol): 11 (ADR-22 mock-gateway-signed-IPN, ADR-23 lazy-expiry-no-worker), 15 (`PAYMENT_PROVIDER`/`EMAIL_PROVIDER`/`PAYFAST_PASSPHRASE`) + 08/10 cascade, 14 (`payfast.mock` + dev checkout), 05 (error codes `SLOT_NOT_BOOKABLE`/`ACTIVE_LOCK_EXISTS`/`OVERLAP`/`INVALID_TRANSITION`; `/dev/*` dev-only), 13 (F03/F04/F06 + module status).
+- Deferred (later slices): video lifecycle + `video-token` (Slice D), reminder cadence + reconciliation worker (F07/F04.03), doctor appointment-list UI + D-06 modal (Slice D), admin dispute/records (M4).
+- Low-risk follow-ups noted in Findings (I2 failed-path atomicity; M2 test intentKey) — optional.
