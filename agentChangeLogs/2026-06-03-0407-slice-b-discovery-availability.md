@@ -1,6 +1,6 @@
 # 2026-06-03-0407 — slice-b-discovery-availability
 
-**Status:** Implementation complete (subagent-driven; all 16 tasks + review fixes; 63 server + 21 client green; final review READY TO MERGE). Pending gated steps: doc-13 sweep + merge/push.
+**Status:** COMPLETE & MERGED. Slice B built subagent-driven (16 tasks + review fixes; 63 server + 21 client green); doc-13 swept (v1.3); merged to `main` (`71cfe74`) + pushed; post-merge suites green.
 **Goal:** Build Slice B (Discovery & Availability) of the M1+M2 journey — public doctor listing/profile, doctor weekly availability + 30-min slot generation, nav layouts, seeded doctors; screens P-02/P-03/D-03.
 **Skill(s) used:** superpowers:brainstorming (user-invoked) → writing-plans → subagent-driven-development (implementer + two-stage review per task) → receiving-code-review
 **Ticket / issue:** None
@@ -71,7 +71,5 @@ Added `date-fns-tz` ^3.2.0 (server) for Asia/Karachi→UTC slot math (ADR-21) �
 New server dependency (`date-fns-tz`) + ADR-21 doc edit; both reversible. No schema/migration in Slice B. Prettier pass reformatted ~13 unrelated Slice-A files (whitespace-only, user-approved as a one-time normalization).
 
 ## Open items / next session
-- **Slice B implementation COMPLETE** — 16 plan tasks + 3 review fixes; all suites green; final review READY TO MERGE.
-- **PENDING (gated):** doc-13 status sweep (governance — needs user approval of specific edits); merge to `main` + push (mirror Slice A).
-- Follow-up (not a blocker): `DoctorProfile` slots-error state was added (`2adb905`) — the only review nit; resolved.
-- Next slices: C (Booking + Payment — consumes these slots/`BLOCK_HAS_BOOKINGS`), D (Video).
+- **Slice B DONE** — merged to `main` (`71cfe74`), pushed (`9440403..71cfe74`); doc-13 sweep (v1.3) approved + committed (`a3bd8dc`); post-merge suites green (63 + 21).
+- Next slices: **C (Booking + Payment)** — consumes these slots + `BLOCK_HAS_BOOKINGS`; then **D (Video)**. Admin doctor-onboarding remains M4 (doctors seeded).
