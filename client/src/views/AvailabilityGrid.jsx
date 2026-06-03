@@ -31,9 +31,10 @@ function cellsToBlocks(cells) {
     for (let h = 8; h <= 23; h += 1) {
       const on = cells.has(key(d, h));
       if (on && runStart === null) runStart = h;
-      if ((!on || h === 23) && runStart !== null) {
-        const endH = on && h === 23 ? 24 : h;
-        blocks.push({ weekday: d, startTime: `${String(runStart).padStart(2, '0')}:00`, endTime: `${String(endH).padStart(2, '0')}:00` });
+      // Hour 23 is never user-toggleable (the grid renders 08:00–22:00), so `on`
+      // is always false at h=23 — that naturally flushes a run ending at 23:00.
+      if (!on && runStart !== null) {
+        blocks.push({ weekday: d, startTime: `${String(runStart).padStart(2, '0')}:00`, endTime: `${String(h).padStart(2, '0')}:00` });
         runStart = null;
       }
     }
