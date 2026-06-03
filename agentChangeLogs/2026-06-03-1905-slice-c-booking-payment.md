@@ -1,12 +1,12 @@
 # 2026-06-03-1905 — slice-c-booking-payment
 
-**Status:** Partial (brainstorming + spec stage; implementation pending)
+**Status:** Partial (brainstorming + spec + plan complete; implementation pending)
 **Goal:** Brainstorm + spec + plan + build Slice C (Booking + Payment) — the third vertical slice of the M1+M2 patient journey.
 **Skill(s) used:** superpowers:brainstorming (user-invoked); will hand off to superpowers:writing-plans
 **Ticket / issue:** None
 **Branch:** main (code work will move to a feature branch before any commit)
 **Commits / PR:** None yet
-**Last updated:** 2026-06-03-1905
+**Last updated:** 2026-06-03-1910
 **Tags:** #feature #booking #payment #refund #frontend
 
 ## Summary
@@ -21,6 +21,7 @@ Slices A (identity/access) and B (discovery/availability) are merged to `main`. 
 | `agentChangeLogs/2026-06-03-1905-slice-c-booking-payment.md` | Created | This session changelog. |
 | `agentChangeLogs/index.md` | Modified | Added Slice C index line. |
 | `docs/superpowers/specs/2026-06-03-slice-c-booking-payment-design.md` | Created | Slice C design doc (brainstorming output). |
+| `docs/superpowers/plans/2026-06-03-slice-c-booking-payment.md` | Created | Slice C implementation plan (writing-plans output) — 4 phases, ~20 TDD tasks. |
 
 ## Dependencies / config / schema
 No schema change / no migration planned — `Appointment`, `Payment`, `Settings`, and the `uniq_active_slot` partial index already exist. Planned new config/env (pending approval): payment-provider switch (mock vs throwing stub), dev mock signing passphrase, `APP_BASE_URL`, email-provider switch.
