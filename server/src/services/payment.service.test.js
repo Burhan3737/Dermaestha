@@ -111,4 +111,21 @@ describe('payment.processWebhook', () => {
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it('ignores a payment.failed for an already-successful payment', async () => {
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'p1',
+      appointmentId: 'a1',
+      providerRef: 'mock_1',
+      status: 'success',
+    });
+    const out = await processWebhook({
+      event: 'payment.failed',
+      providerRef: 'mock_1',
+      amount: 250000,
+      gatewayFee: null,
+    });
+    expect(out).toEqual({ ok: true });
+    expect(prisma.payment.update).not.toHaveBeenCalled();
+  });
 });

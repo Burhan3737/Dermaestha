@@ -55,6 +55,7 @@ export async function processWebhook({ event, providerRef, amount, gatewayFee })
   if (!payment) throw new AppError('NOT_FOUND', 'Unknown payment reference.', 404);
 
   if (event === 'payment.failed') {
+    if (payment.status !== 'pending') return { ok: true }; // ignore late/replayed failure after success
     await prisma.appointment.deleteMany({
       where: { id: payment.appointmentId, state: 'slot_locked' },
     });

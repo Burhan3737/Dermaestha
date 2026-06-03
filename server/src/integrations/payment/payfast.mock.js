@@ -23,7 +23,15 @@ export function buildSignedIpn({ event, providerRef, intentKey, amount, gatewayF
 
 /** @type {import('./index.js').PaymentProvider} */
 export const payfastMock = {
-  async createCheckout({ providerRef } = {}) {
+  async createCheckout({
+    appointmentId,
+    intentKey,
+    amount,
+    returnUrl,
+    cancelUrl,
+    notifyUrl,
+    providerRef,
+  } = {}) {
     const ref = providerRef || `mock_${crypto.randomUUID()}`;
     return {
       redirectUrl: `${env.APP_BASE_URL}/dev/checkout?ref=${encodeURIComponent(ref)}`,

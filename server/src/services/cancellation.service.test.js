@@ -14,6 +14,7 @@ vi.mock('./refund.service.js', () => ({
 vi.mock('../integrations/email/index.js', () => ({
   emailProvider: { send: vi.fn().mockResolvedValue({ providerId: 'x' }) },
 }));
+vi.mock('./audit.service.js', () => ({ record: vi.fn().mockResolvedValue({}) }));
 
 import { prisma } from '../lib/prisma.js';
 import * as state from './appointmentState.service.js';
@@ -111,5 +112,17 @@ describe('cancellation.cancel', () => {
     await expect(
       cancel({ appointmentId: 'a1', actorType: 'patient', actorId: 'u1' }),
     ).rejects.toMatchObject({ code: 'INVALID_TRANSITION', status: 409 });
+  });
+
+  it('patient ≥2h: a refund provider failure does not fail the cancellation', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({
+      id: 'a1',
+      state: 'confirmed',
+      patientUserId: 'u1',
+      slotStart: future(180),
+    });
+    refund.initiateRefund.mockRejectedValueOnce(new Error('provider down'));
+    const out = await cancel({ appointmentId: 'a1', actorType: 'patient', actorId: 'u1' });
+    expect(out.state).toBe('cancelled_refunded');
   });
 });

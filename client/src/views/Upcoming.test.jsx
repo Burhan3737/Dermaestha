@@ -31,19 +31,90 @@ describe('P-08 Upcoming', () => {
   it('lists a confirmed appointment with a Cancel control', async () => {
     api.get.mockImplementation((path) => {
       if (path === '/appointments')
-        return Promise.resolve({ data: [{ id: 'a1', slotStart: '2099-01-04T13:00:00.000Z', slotEnd: '2099-01-04T13:30:00.000Z', state: 'confirmed', feeAtBooking: 250000, forSelf: true, subjectName: null, doctorName: 'Dr A', specialization: 'Acne', doctorPhotoUrl: null }] });
-      return Promise.resolve({ id: 'a1', state: 'confirmed', refundQuote: { amountPaid: 250000, gatewayFee: 6000, refund: 244000 } });
+        return Promise.resolve({
+          data: [
+            {
+              id: 'a1',
+              slotStart: '2099-01-04T13:00:00.000Z',
+              slotEnd: '2099-01-04T13:30:00.000Z',
+              state: 'confirmed',
+              feeAtBooking: 250000,
+              forSelf: true,
+              subjectName: null,
+              doctorName: 'Dr A',
+              specialization: 'Acne',
+              doctorPhotoUrl: null,
+            },
+          ],
+        });
+      return Promise.resolve({
+        id: 'a1',
+        state: 'confirmed',
+        refundQuote: { amountPaid: 250000, gatewayFee: 6000, refund: 244000 },
+      });
     });
     setup();
     await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
     expect(screen.getByRole('button', { name: /cancel/i })).toBeTruthy();
   });
 
+  it('shows the no-refund warning for a <2h cancellation', async () => {
+    const soon = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    api.get.mockImplementation((path) => {
+      if (path === '/appointments')
+        return Promise.resolve({
+          data: [
+            {
+              id: 'a1',
+              slotStart: soon,
+              slotEnd: soon,
+              state: 'confirmed',
+              feeAtBooking: 250000,
+              forSelf: true,
+              subjectName: null,
+              doctorName: 'Dr A',
+              specialization: 'Acne',
+              doctorPhotoUrl: null,
+            },
+          ],
+        });
+      return Promise.resolve({
+        id: 'a1',
+        state: 'confirmed',
+        refundQuote: { amountPaid: 250000, gatewayFee: 6000, refund: 244000 },
+      });
+    });
+    setup();
+    await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => expect(screen.getByText(/no refund/i)).toBeTruthy());
+    expect(screen.queryByText('Rs 2,440')).toBeNull();
+  });
+
   it('opens the cancel modal and posts the cancel on confirm', async () => {
     api.get.mockImplementation((path) => {
       if (path === '/appointments')
-        return Promise.resolve({ data: [{ id: 'a1', slotStart: '2099-01-04T13:00:00.000Z', slotEnd: '2099-01-04T13:30:00.000Z', state: 'confirmed', feeAtBooking: 250000, forSelf: true, subjectName: null, doctorName: 'Dr A', specialization: 'Acne', doctorPhotoUrl: null }] });
-      return Promise.resolve({ id: 'a1', state: 'confirmed', refundQuote: { amountPaid: 250000, gatewayFee: 6000, refund: 244000 } });
+        return Promise.resolve({
+          data: [
+            {
+              id: 'a1',
+              slotStart: '2099-01-04T13:00:00.000Z',
+              slotEnd: '2099-01-04T13:30:00.000Z',
+              state: 'confirmed',
+              feeAtBooking: 250000,
+              forSelf: true,
+              subjectName: null,
+              doctorName: 'Dr A',
+              specialization: 'Acne',
+              doctorPhotoUrl: null,
+            },
+          ],
+        });
+      return Promise.resolve({
+        id: 'a1',
+        state: 'confirmed',
+        refundQuote: { amountPaid: 250000, gatewayFee: 6000, refund: 244000 },
+      });
     });
     api.post.mockResolvedValue({ state: 'cancelled_refunded' });
     setup();

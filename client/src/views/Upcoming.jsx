@@ -58,13 +58,21 @@ export function Upcoming() {
           </div>
         ))}
       </section>
-      {cancelId && detail.data && (
-        <CancelModal
-          quote={detail.data.refundQuote}
-          onClose={() => setCancelId(null)}
-          onConfirm={() => cancelMut.mutate(cancelId)}
-        />
-      )}
+      {cancelId &&
+        detail.data &&
+        (() => {
+          const appt = rows.find((r) => r.id === cancelId);
+          const isLate =
+            appt && new Date(appt.slotStart).getTime() - Date.now() < 2 * 60 * 60 * 1000;
+          return (
+            <CancelModal
+              quote={isLate ? null : detail.data.refundQuote}
+              lateNoRefund={isLate}
+              onClose={() => setCancelId(null)}
+              onConfirm={() => cancelMut.mutate(cancelId)}
+            />
+          );
+        })()}
     </PatientLayout>
   );
 }

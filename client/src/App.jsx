@@ -6,6 +6,8 @@ import { RoleRoute } from './lib/RoleRoute.jsx';
 import { DoctorListing } from './views/DoctorListing.jsx';
 import { AvailabilityGrid } from './views/AvailabilityGrid.jsx';
 import { Upcoming } from './views/Upcoming.jsx';
+import { Booking } from './views/Booking.jsx';
+import { PaymentReturn } from './views/PaymentReturn.jsx';
 
 function Placeholder({ label }) {
   const { logout } = useSession();
@@ -42,6 +44,22 @@ export function AppRoutes() {
         element={
           <RoleRoute session={session} role="patient">
             <Upcoming />
+          </RoleRoute>
+        }
+      />
+      <Route
+        path="/book/:id"
+        element={
+          <RoleRoute session={session} role="patient">
+            <Booking />
+          </RoleRoute>
+        }
+      />
+      <Route
+        path="/pay/return"
+        element={
+          <RoleRoute session={session} role="patient">
+            <PaymentReturn />
           </RoleRoute>
         }
       />
