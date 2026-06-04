@@ -3,6 +3,7 @@ import * as bookingService from '../services/booking.service.js';
 import * as paymentService from '../services/payment.service.js';
 import * as appointmentService from '../services/appointment.service.js';
 import * as cancellationService from '../services/cancellation.service.js';
+import * as videoService from '../services/video.service.js';
 
 export async function lock(req, res, next) {
   try {
@@ -61,6 +62,18 @@ export async function cancel(req, res, next) {
         actorType: req.session.role,
         actorId: req.session.userId,
         reason: req.body.reason,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function videoToken(req, res, next) {
+  try {
+    res.json(
+      await videoService.issueAppointmentToken({
+        id: req.params.id, role: req.session.role, userId: req.session.userId,
       }),
     );
   } catch (e) {
