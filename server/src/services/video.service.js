@@ -63,6 +63,10 @@ export async function recordJoinFromDailyEvent({ type, room, user_name, timestam
   if (!id) return;
   const a = await prisma.appointment.findUnique({ where: { id } });
   if (!a) return;
+  // DEV/MOCK ONLY: role is inferred from the literal user_name ('doctor'/'patient') the dev
+  // simulator sends. The real Daily adapter must NOT rely on this — Daily echoes the participant's
+  // display name (e.g. "Sara Khan"), so the real swap must map role from is_owner / a stable
+  // participant id, not a substring match. (See ADR-24 follow-up.)
   const role = String(user_name).toLowerCase().includes('doctor') ? 'doctor' : 'patient';
   const field = role === 'doctor' ? 'doctorJoinedAt' : 'patientJoinedAt';
   if (a[field]) return; // first-join wins
