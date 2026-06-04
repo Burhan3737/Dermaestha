@@ -33,6 +33,7 @@ export async function list(req, res, next) {
       data: await appointmentService.listForRole({
         role: req.session.role,
         userId: req.session.userId,
+        scope: req.query.scope,
       }),
     });
   } catch (e) {
