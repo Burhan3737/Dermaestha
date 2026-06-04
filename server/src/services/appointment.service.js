@@ -20,7 +20,7 @@ function toPatientRow(a) {
   };
 }
 
-export async function listForRole({ role, userId }) {
+export async function listForRole({ role, userId, scope = 'active' }) {
   if (role === 'patient') {
     const rows = await prisma.appointment.findMany({
       where: { patientUserId: userId, state: { in: UPCOMING } },
@@ -40,9 +40,14 @@ export async function listForRole({ role, userId }) {
   }
   const doctor = await prisma.doctor.findUnique({ where: { userId }, select: { id: true } });
   if (!doctor) return [];
+  const TERMINAL = ['completed', 'prescription_issued', 'patient_no_show', 'doctor_no_show',
+    'cancelled_refunded', 'cancelled_no_refund', 'doctor_cancelled'];
+  const where = scope === 'history'
+    ? { doctorId: doctor.id, state: { in: TERMINAL } }
+    : { doctorId: doctor.id, state: { in: UPCOMING } };
   const rows = await prisma.appointment.findMany({
-    where: { doctorId: doctor.id, state: { in: UPCOMING } },
-    orderBy: { slotStart: 'asc' },
+    where, orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
+    include: { patient: { select: { fullName: true } } },
   });
   return rows.map((a) => ({
     id: a.id,
@@ -51,6 +56,7 @@ export async function listForRole({ role, userId }) {
     state: a.state,
     forSelf: a.forSelf,
     subjectName: a.subjectName,
+    patientName: a.patient?.fullName ?? null,
   }));
 }
 
@@ -90,6 +96,9 @@ export async function getForRole({ id, role, userId }) {
     specialization: a.doctor.specialization,
     doctorPhotoUrl: a.doctor.photoUrl,
   };
+  detail.serverNow = new Date().toISOString();
+  detail.peerJoined =
+    role === 'patient' ? !!a.doctorJoinedAt : role === 'doctor' ? !!a.patientJoinedAt : false;
   if (a.state === 'confirmed') {
     detail.refundQuote = await quoteRefund(id).catch(() => null);
   }

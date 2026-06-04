@@ -80,4 +80,29 @@ describe('appointment.getForRole', () => {
       status: 404,
     });
   });
+
+  it('detail exposes role-aware peerJoined + serverNow for a patient', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({
+      id: 'a1', patientUserId: 'p1', doctorId: 'd1', state: 'in_progress',
+      slotStart: new Date('2026-06-04T10:00:00Z'), slotEnd: new Date('2026-06-04T10:30:00Z'),
+      feeAtBooking: 250000, forSelf: true, subjectName: null,
+      doctorJoinedAt: new Date('2026-06-04T10:01:00Z'), patientJoinedAt: null,
+      doctor: { id: 'd1', specialization: 'Acne', photoUrl: null, user: { fullName: 'Dr A' } },
+    });
+    const out = await getForRole({ id: 'a1', role: 'patient', userId: 'p1' });
+    expect(out.peerJoined).toBe(true); // patient sees the DOCTOR's presence
+    expect(typeof out.serverNow).toBe('string');
+  });
+});
+
+describe('appointment.listForRole (doctor)', () => {
+  it('doctor list rows include patientName', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    prisma.appointment.findMany.mockResolvedValue([
+      { id: 'a1', slotStart: new Date(), slotEnd: new Date(), state: 'confirmed', forSelf: false,
+        subjectName: 'Child', patient: { fullName: 'Parent P' } },
+    ]);
+    const rows = await listForRole({ role: 'doctor', userId: 'docUser' });
+    expect(rows[0].patientName).toBe('Parent P');
+  });
 });
