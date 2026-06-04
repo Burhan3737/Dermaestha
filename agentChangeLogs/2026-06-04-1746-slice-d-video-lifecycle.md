@@ -1,6 +1,6 @@
 # 2026-06-04-1746 — slice-d-video-lifecycle
 
-**Status:** Partial (brainstorming + spec complete; plan + build pending)
+**Status:** Partial (brainstorming + spec + plan complete; build pending)
 **Goal:** Brainstorm + spec + plan + build Slice D (Video & Appointment Lifecycle) — the fourth and final vertical slice of the M1+M2 patient journey.
 **Skill(s) used:** superpowers:brainstorming (user-invoked); will hand off to superpowers:writing-plans
 **Ticket / issue:** None
@@ -21,6 +21,7 @@ Slices A/B/C are merged to `main`. Slice C deferred all video + lifecycle work t
 | `agentChangeLogs/2026-06-04-1746-slice-d-video-lifecycle.md` | Created | This session changelog. |
 | `agentChangeLogs/index.md` | Modified | Added Slice D index line. |
 | `docs/superpowers/specs/2026-06-04-slice-d-video-lifecycle-design.md` | Created | Slice D design doc (brainstorming output). |
+| `docs/superpowers/plans/2026-06-04-slice-d-video-lifecycle.md` | Created | Slice D implementation plan (writing-plans output) — 7 phases, ~17 TDD tasks. |
 
 ## Dependencies / config / schema
 Planned (pending plan/build approval):
