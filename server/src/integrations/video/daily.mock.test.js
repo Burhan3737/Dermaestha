@@ -19,5 +19,8 @@ describe('daily.mock VideoProvider', () => {
     expect(typeof t.token).toBe('string');
     expect(t.token.length).toBeGreaterThan(10);
     expect(t.expiresAt).toBe('2026-06-04T10:35:00.000Z');
+    // The embedded payload must decode intact (guards against payload-construction regressions).
+    const decoded = Buffer.from(t.token, 'base64url').toString('utf8');
+    expect(decoded).toContain('appt_appt123|patient|2026-06-04T10:00:00.000Z');
   });
 });
