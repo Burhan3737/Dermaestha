@@ -16,6 +16,7 @@ import { devCheckoutRouter } from './routes/devCheckout.js';
 import { mustChangePasswordGate } from './middleware/mustChangePassword.js';
 import { initErrorTracking } from './lib/errorTracking.js';
 import { logger } from './lib/logger.js';
+import { startWorkers } from './workers/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(__dirname, '../../client/dist');
@@ -53,5 +54,6 @@ export function createApp() {
 // Start the server only when executed directly (not when imported by tests).
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   initErrorTracking();
+  startWorkers();
   createApp().listen(env.PORT, () => logger.info(`Dermestha listening on :${env.PORT}`));
 }
