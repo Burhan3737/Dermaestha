@@ -34,4 +34,8 @@ describe('parseEnv', () => {
     expect(dev.PAYMENT_PROVIDER).toBe('mock');
     expect(dev.EMAIL_PROVIDER).toBe('console');
   });
+  it('defaults VIDEO_PROVIDER to stub and accepts mock/daily', () => {
+    expect(parseEnv(base).VIDEO_PROVIDER).toBe('stub');
+    expect(parseEnv({ ...base, VIDEO_PROVIDER: 'mock' }).VIDEO_PROVIDER).toBe('mock');
+  });
 });
