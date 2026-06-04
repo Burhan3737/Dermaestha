@@ -4,26 +4,9 @@ import { AppError } from '../http/AppError.js';
 import { logger } from '../lib/logger.js';
 import { emailProvider } from '../integrations/email/index.js';
 import * as appointmentState from './appointmentState.service.js';
-import * as refund from './refund.service.js';
-import * as audit from './audit.service.js';
+import { safeRefund } from './refundSideEffects.js';
 
 const FREE_CANCEL_MS = 2 * 60 * 60 * 1000;
-
-async function safeRefund(appointmentId) {
-  try {
-    await refund.initiateRefund({ appointmentId });
-  } catch (e) {
-    logger.warn('refund initiation failed (will be reconciled)', { appointmentId, err: String(e) });
-    await audit
-      .record({
-        eventType: 'payment.refund_failed',
-        actorType: 'system',
-        targetRef: appointmentId,
-        reason: String(e?.message ?? e),
-      })
-      .catch(() => {});
-  }
-}
 
 /**
  * @param {{ appointmentId: string, actorType: 'patient'|'doctor', actorId: string, reason?: string }} args
