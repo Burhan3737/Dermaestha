@@ -47,9 +47,16 @@ export function Upcoming() {
             <div>{formatKarachi(a.slotStart)}</div>
             {!a.forSelf && <div>for: {a.subjectName}</div>}
             <div>{formatPkr(a.feeAtBooking)}</div>
-            <button type="button" className="btn btn--secondary" disabled>
-              Join Call
-            </button>
+            {(() => {
+              const opensAt = new Date(a.slotStart).getTime() - 10 * 60 * 1000;
+              const closesAt = new Date(a.slotEnd).getTime() + 5 * 60 * 1000;
+              const active = Date.now() >= opensAt && Date.now() <= closesAt;
+              return active ? (
+                <Link className="btn btn--secondary" to={`/video/${a.id}`}>Join Call</Link>
+              ) : (
+                <button type="button" className="btn btn--secondary" disabled>Join Call</button>
+              );
+            })()}
             {a.state === 'confirmed' && (
               <button type="button" className="btn btn--ghost" onClick={() => setCancelId(a.id)}>
                 Cancel

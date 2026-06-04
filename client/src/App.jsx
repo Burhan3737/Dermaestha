@@ -8,6 +8,8 @@ import { AvailabilityGrid } from './views/AvailabilityGrid.jsx';
 import { Upcoming } from './views/Upcoming.jsx';
 import { Booking } from './views/Booking.jsx';
 import { PaymentReturn } from './views/PaymentReturn.jsx';
+import { VideoRoom } from './views/VideoRoom.jsx';
+import { Login } from './views/Login.jsx';
 
 function Placeholder({ label }) {
   const { logout } = useSession();
@@ -63,6 +65,7 @@ export function AppRoutes() {
           </RoleRoute>
         }
       />
+      <Route path="/video/:id" element={session ? <VideoRoom /> : <Login />} />
       <Route path="/doctor" element={<Placeholder label="Doctor — Today" />} />
       <Route path="/admin" element={<Placeholder label="Admin panel" />} />
       <Route path="*" element={<Placeholder label="Dermestha" />} />
