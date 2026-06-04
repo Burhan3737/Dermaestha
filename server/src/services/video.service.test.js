@@ -53,6 +53,16 @@ describe('issueAppointmentToken', () => {
       issueAppointmentToken({ id: 'a1', role: 'patient', userId: 'p1', now: SLOT_START }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
+
+  it('issues a token for the owning doctor (resolved via their Doctor row)', async () => {
+    prisma.appointment.findUnique.mockResolvedValue(baseAppt);
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    const out = await issueAppointmentToken({
+      id: 'a1', role: 'doctor', userId: 'docUser', now: new Date('2026-06-04T09:55:00.000Z'),
+    });
+    expect(out.token).toBe('tok');
+    expect(prisma.doctor.findUnique).toHaveBeenCalledWith({ where: { userId: 'docUser' }, select: { id: true } });
+  });
 });
 
 describe('recordJoinFromDailyEvent', () => {
@@ -60,7 +70,10 @@ describe('recordJoinFromDailyEvent', () => {
     prisma.appointment.findUnique.mockResolvedValue({ ...baseAppt, patientJoinedAt: null });
     await recordJoinFromDailyEvent({ type: 'participant.joined', room: 'appt_a1', user_name: 'patient', timestamp: '2026-06-04T10:01:00.000Z' });
     expect(prisma.appointment.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'a1' }, data: { patientJoinedAt: expect.any(Date) } }),
+      expect.objectContaining({
+        where: { id: 'a1' },
+        data: { patientJoinedAt: new Date('2026-06-04T10:01:00.000Z') },
+      }),
     );
   });
 

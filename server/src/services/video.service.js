@@ -44,7 +44,7 @@ export async function issueAppointmentToken({ id, role, userId, now = new Date()
 }
 
 /** Maps a documented Daily participant.joined event to the join column (first-join wins). */
-export async function recordJoinFromDailyEvent({ type, room, user_name }) {
+export async function recordJoinFromDailyEvent({ type, room, user_name, timestamp }) {
   if (type !== 'participant.joined') return;
   const id = String(room || '').replace(/^appt_/, '');
   if (!id) return;
@@ -53,5 +53,9 @@ export async function recordJoinFromDailyEvent({ type, room, user_name }) {
   const role = String(user_name).toLowerCase().includes('doctor') ? 'doctor' : 'patient';
   const field = role === 'doctor' ? 'doctorJoinedAt' : 'patientJoinedAt';
   if (a[field]) return; // first-join wins
-  await prisma.appointment.update({ where: { id }, data: { [field]: new Date() } });
+  // Prefer the event's own timestamp (a delayed webhook must not record server-receipt time).
+  await prisma.appointment.update({
+    where: { id },
+    data: { [field]: timestamp ? new Date(timestamp) : new Date() },
+  });
 }
