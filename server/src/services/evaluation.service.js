@@ -22,7 +22,10 @@ async function activateDue(now) {
     try {
       await state.transition({ appointmentId: a.id, to: 'in_progress', actorType: 'system' });
     } catch (e) {
-      logger.error('activation failed; will retry next tick', { appointmentId: a.id, err: String(e) });
+      logger.error('activation failed; will retry next tick', {
+        appointmentId: a.id,
+        err: String(e),
+      });
     }
   }
 }
@@ -67,8 +70,10 @@ async function resolveNoShow(a, atCutoff) {
     if (atCutoff && !a.doctorJoinedAt && !a.patientJoinedAt) {
       await audit
         .record({
-          eventType: 'appointment.evaluation_data_gap', actorType: 'system',
-          targetRef: a.id, reason: 'no join data at slot-end+5m; resolved non-penalizing',
+          eventType: 'appointment.evaluation_data_gap',
+          actorType: 'system',
+          targetRef: a.id,
+          reason: 'no join data at slot-end+5m; resolved non-penalizing',
         })
         .catch(() => {});
     }
@@ -77,12 +82,14 @@ async function resolveNoShow(a, atCutoff) {
 
 async function sendApology(patientUserId, appointmentId) {
   const patient = await prisma.user.findUnique({
-    where: { id: patientUserId }, select: { email: true, fullName: true },
+    where: { id: patientUserId },
+    select: { email: true, fullName: true },
   });
   if (!patient) return;
   try {
     await emailProvider.send({
-      template: 'cancellation_apology', to: patient.email,
+      template: 'cancellation_apology',
+      to: patient.email,
       vars: { patientName: patient.fullName, appointmentRef: appointmentId },
     });
   } catch {

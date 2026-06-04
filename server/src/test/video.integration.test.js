@@ -21,7 +21,11 @@ describe('video + lifecycle integration', () => {
     email = uniq();
     agent = request.agent(app);
     await agent.post('/api/auth/signup').send({
-      fullName: 'Vid Patient', email, phone: '03001234567', password: 'password1', tosAccepted: true,
+      fullName: 'Vid Patient',
+      email,
+      phone: '03001234567',
+      password: 'password1',
+      tosAccepted: true,
     });
     const me = await agent.get('/api/auth/me');
     userId = me.body.id;
@@ -29,14 +33,30 @@ describe('video + lifecycle integration', () => {
     // A: live appointment (slot active now) → token-window test.
     const liveStart = new Date(Date.now() - 5 * 60000);
     const live = await prisma.appointment.create({
-      data: { doctorId, patientUserId: userId, slotStart: liveStart, slotEnd: new Date(liveStart.getTime() + 30 * 60000), state: 'confirmed', feeAtBooking: 250000, forSelf: true },
+      data: {
+        doctorId,
+        patientUserId: userId,
+        slotStart: liveStart,
+        slotEnd: new Date(liveStart.getTime() + 30 * 60000),
+        state: 'confirmed',
+        feeAtBooking: 250000,
+        forSelf: true,
+      },
     });
     liveId = live.id;
 
     // B: fully-past appointment (ended >5min ago) → join → worker → completed.
     const pastStart = new Date(Date.now() - 40 * 60000);
     const past = await prisma.appointment.create({
-      data: { doctorId, patientUserId: userId, slotStart: pastStart, slotEnd: new Date(pastStart.getTime() + 30 * 60000), state: 'confirmed', feeAtBooking: 250000, forSelf: true },
+      data: {
+        doctorId,
+        patientUserId: userId,
+        slotStart: pastStart,
+        slotEnd: new Date(pastStart.getTime() + 30 * 60000),
+        state: 'confirmed',
+        feeAtBooking: 250000,
+        forSelf: true,
+      },
     });
     pastId = past.id;
   });
@@ -55,8 +75,12 @@ describe('video + lifecycle integration', () => {
   });
 
   it('records both joins via the daily webhook and completes after cutoff', async () => {
-    await request(app).post('/api/webhooks/daily').send({ type: 'participant.joined', room: `appt_${pastId}`, user_name: 'doctor' });
-    await request(app).post('/api/webhooks/daily').send({ type: 'participant.joined', room: `appt_${pastId}`, user_name: 'patient' });
+    await request(app)
+      .post('/api/webhooks/daily')
+      .send({ type: 'participant.joined', room: `appt_${pastId}`, user_name: 'doctor' });
+    await request(app)
+      .post('/api/webhooks/daily')
+      .send({ type: 'participant.joined', room: `appt_${pastId}`, user_name: 'patient' });
     await evaluateDueAppointments(new Date());
     const appt = await prisma.appointment.findUnique({ where: { id: pastId } });
     expect(appt.state).toBe('completed');

@@ -73,7 +73,9 @@ export async function videoToken(req, res, next) {
   try {
     res.json(
       await videoService.issueAppointmentToken({
-        id: req.params.id, role: req.session.role, userId: req.session.userId,
+        id: req.params.id,
+        role: req.session.role,
+        userId: req.session.userId,
       }),
     );
   } catch (e) {

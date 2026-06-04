@@ -15,9 +15,9 @@ Refer to PROJECT_RULES.md on every load. It contains project specific rules that
 - Per CLAUDE.md, a working session keeps **one** combined changelog. When dispatching subagents for a multi-document or multi-file task, the **controller owns** that single session changelog and its `agentChangeLogs/index.md` entry. Subagents must **not** create per-task changelog files or edit anything under `agentChangeLogs/` — instruct them explicitly, because they otherwise infer the CLAUDE.md changelog rule and fragment the log.
 - You are NOT allowed to perform deployment actions, you need approval from the user and need to clearly inform them.
 
-## Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+## Behavioral guidelines
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+**Tradeoff:** These guidelines bias toward caution over speed.
 
 ### 1. Think Before Coding
 
@@ -79,6 +79,31 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+
+### 5. Accuracy and verification
+
+- Do not guess. If you don't know something or can't verify it, say so plainly:
+  "I don't know" or "I can't confirm this from what I have access to."
+- Ground claims about this codebase in what you've actually read. Before
+  stating how something works, open the relevant file and confirm. Do not
+  describe functions, configs, or APIs from memory.
+- Before using any library, function, or flag, verify it exists (check the
+  file, the package, or run --help). Never invent API methods, CLI flags,
+  config keys, or file paths.
+- Distinguish clearly between what you know and what you're inferring. Mark
+  inferences as inferences: "I'm assuming X — confirm before I proceed."
+
+### 6. Don't assume the user is correct
+
+- Treat my statements as claims to verify, not facts. If I say "the bug is in
+  function X" or "we use library Y," check before acting on it.
+- If what I've said conflicts with what you find in the code, the docs, or the
+  error output, tell me directly. Don't quietly reconcile the contradiction in
+  my favor.
+- If a request rests on a premise that looks wrong, flag it before doing the
+  work: "You said A, but the code shows B — which should I go with?"
+- Prefer asking one clarifying question over proceeding on a shaky assumption.
 
 ---
 

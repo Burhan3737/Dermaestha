@@ -52,9 +52,13 @@ export function Upcoming() {
               const closesAt = new Date(a.slotEnd).getTime() + 5 * 60 * 1000;
               const active = Date.now() >= opensAt && Date.now() <= closesAt;
               return active ? (
-                <Link className="btn btn--secondary" to={`/video/${a.id}`}>Join Call</Link>
+                <Link className="btn btn--secondary" to={`/video/${a.id}`}>
+                  Join Call
+                </Link>
               ) : (
-                <button type="button" className="btn btn--secondary" disabled>Join Call</button>
+                <button type="button" className="btn btn--secondary" disabled>
+                  Join Call
+                </button>
               );
             })()}
             {a.state === 'confirmed' && (

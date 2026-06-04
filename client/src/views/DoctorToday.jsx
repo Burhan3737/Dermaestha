@@ -9,11 +9,17 @@ import { DoctorCancelModal } from '../components/DoctorCancelModal.jsx';
 
 export function DoctorToday() {
   const qc = useQueryClient();
-  const list = useQuery({ queryKey: ['doctor-appointments'], queryFn: () => api.get('/appointments') });
+  const list = useQuery({
+    queryKey: ['doctor-appointments'],
+    queryFn: () => api.get('/appointments'),
+  });
   const [cancelId, setCancelId] = useState(null);
   const cancelMut = useMutation({
     mutationFn: ({ id, reason }) => api.post(`/appointments/${id}/cancel`, { reason }),
-    onSuccess: () => { setCancelId(null); qc.invalidateQueries({ queryKey: ['doctor-appointments'] }); },
+    onSuccess: () => {
+      setCancelId(null);
+      qc.invalidateQueries({ queryKey: ['doctor-appointments'] });
+    },
   });
   const rows = list.data?.data ?? [];
   return (
@@ -32,12 +38,18 @@ export function DoctorToday() {
               <strong>{a.patientName}</strong>
               {!a.forSelf && <div>for: {a.subjectName}</div>}
               {active ? (
-                <Link className="btn btn--secondary" to={`/video/${a.id}`}>Join Call</Link>
+                <Link className="btn btn--secondary" to={`/video/${a.id}`}>
+                  Join Call
+                </Link>
               ) : (
-                <button type="button" className="btn btn--secondary" disabled>Join Call</button>
+                <button type="button" className="btn btn--secondary" disabled>
+                  Join Call
+                </button>
               )}
               {a.state === 'confirmed' && (
-                <button type="button" className="btn btn--ghost" onClick={() => setCancelId(a.id)}>Cancel</button>
+                <button type="button" className="btn btn--ghost" onClick={() => setCancelId(a.id)}>
+                  Cancel
+                </button>
               )}
             </div>
           );

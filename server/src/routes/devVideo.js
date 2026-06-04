@@ -22,26 +22,38 @@ devVideoRouter.get('/video/:id', (req, res) => {
 });
 
 // Documented-payload sink (the dev page + the SPA join-sim both reach recordJoin through here).
-devVideoRouter.post('/video/event', express.urlencoded({ extended: false }), async (req, res, next) => {
-  try {
-    await videoService.recordJoinFromDailyEvent({
-      type: 'participant.joined', room: req.body.room, user_name: req.body.user_name,
-      timestamp: new Date().toISOString(),
-    });
-    res.json({ ok: true });
-  } catch (e) { next(e); }
-});
+devVideoRouter.post(
+  '/video/event',
+  express.urlencoded({ extended: false }),
+  async (req, res, next) => {
+    try {
+      await videoService.recordJoinFromDailyEvent({
+        type: 'participant.joined',
+        room: req.body.room,
+        user_name: req.body.user_name,
+        timestamp: new Date().toISOString(),
+      });
+      res.json({ ok: true });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
 
 // SPA join-sim: role derived from the session, appointmentId from the body.
 devVideoRouter.post('/video/join', express.json(), async (req, res, next) => {
   try {
     const role = req.session?.role === 'doctor' ? 'doctor' : 'patient';
     await videoService.recordJoinFromDailyEvent({
-      type: 'participant.joined', room: `appt_${req.body.appointmentId}`, user_name: role,
+      type: 'participant.joined',
+      room: `appt_${req.body.appointmentId}`,
+      user_name: role,
       timestamp: new Date().toISOString(),
     });
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // On-demand single evaluation pass (demo/testing without waiting for the cron tick).
@@ -49,5 +61,7 @@ devVideoRouter.post('/worker/evaluate', async (_req, res, next) => {
   try {
     await evaluation.evaluateDueAppointments(new Date());
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });

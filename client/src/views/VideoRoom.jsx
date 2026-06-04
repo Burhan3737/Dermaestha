@@ -19,12 +19,24 @@ export function VideoRoom() {
 
   // Mock mode: entering the room records this participant's join (server-provided URL).
   useEffect(() => {
-    if (token.data?.joinSimUrl) api.post(token.data.joinSimUrl, { appointmentId: id }).catch(() => {});
+    if (token.data?.joinSimUrl)
+      api.post(token.data.joinSimUrl, { appointmentId: id }).catch(() => {});
   }, [token.data?.joinSimUrl, id]);
 
   if (token.isError)
-    return <main className="video-page"><p className="help">The video room isn't open yet. Try again closer to your appointment time.</p></main>;
-  if (token.isPending || detail.isPending) return <main className="video-page"><p className="help">Connecting…</p></main>;
+    return (
+      <main className="video-page">
+        <p className="help">
+          The video room isn't open yet. Try again closer to your appointment time.
+        </p>
+      </main>
+    );
+  if (token.isPending || detail.isPending)
+    return (
+      <main className="video-page">
+        <p className="help">Connecting…</p>
+      </main>
+    );
 
   const peerJoined = detail.data?.peerJoined;
   return (
@@ -38,9 +50,19 @@ export function VideoRoom() {
         <div className="video-self" />
       </div>
       <div className="video-controls">
-        <button type="button" className="video-ctrl">Mic</button>
-        <button type="button" className="video-ctrl">Cam</button>
-        <button type="button" className="video-ctrl video-ctrl--leave" onClick={() => window.history.back()}>Leave</button>
+        <button type="button" className="video-ctrl">
+          Mic
+        </button>
+        <button type="button" className="video-ctrl">
+          Cam
+        </button>
+        <button
+          type="button"
+          className="video-ctrl video-ctrl--leave"
+          onClick={() => window.history.back()}
+        >
+          Leave
+        </button>
       </div>
     </main>
   );

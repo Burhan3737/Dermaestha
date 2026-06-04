@@ -40,13 +40,22 @@ export async function listForRole({ role, userId, scope = 'active' }) {
   }
   const doctor = await prisma.doctor.findUnique({ where: { userId }, select: { id: true } });
   if (!doctor) return [];
-  const TERMINAL = ['completed', 'prescription_issued', 'patient_no_show', 'doctor_no_show',
-    'cancelled_refunded', 'cancelled_no_refund', 'doctor_cancelled'];
-  const where = scope === 'history'
-    ? { doctorId: doctor.id, state: { in: TERMINAL } }
-    : { doctorId: doctor.id, state: { in: UPCOMING } };
+  const TERMINAL = [
+    'completed',
+    'prescription_issued',
+    'patient_no_show',
+    'doctor_no_show',
+    'cancelled_refunded',
+    'cancelled_no_refund',
+    'doctor_cancelled',
+  ];
+  const where =
+    scope === 'history'
+      ? { doctorId: doctor.id, state: { in: TERMINAL } }
+      : { doctorId: doctor.id, state: { in: UPCOMING } };
   const rows = await prisma.appointment.findMany({
-    where, orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
+    where,
+    orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
     include: { patient: { select: { fullName: true } } },
   });
   return rows.map((a) => ({

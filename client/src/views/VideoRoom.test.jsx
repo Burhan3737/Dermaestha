@@ -13,7 +13,9 @@ function setup() {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={['/video/a1']}>
-        <Routes><Route path="/video/:id" element={<VideoRoom />} /></Routes>
+        <Routes>
+          <Route path="/video/:id" element={<VideoRoom />} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -24,8 +26,21 @@ describe('VideoRoom', () => {
   it('shows the waiting room until the peer joins', async () => {
     api.get.mockImplementation((path) =>
       path.includes('video-token')
-        ? Promise.resolve({ token: 't', roomName: 'appt_a1', roomUrl: 'u', serverNow: new Date().toISOString(), joinSimUrl: null })
-        : Promise.resolve({ id: 'a1', state: 'in_progress', peerJoined: false, slotStart: new Date().toISOString(), slotEnd: new Date(Date.now()+18e5).toISOString(), serverNow: new Date().toISOString() }),
+        ? Promise.resolve({
+            token: 't',
+            roomName: 'appt_a1',
+            roomUrl: 'u',
+            serverNow: new Date().toISOString(),
+            joinSimUrl: null,
+          })
+        : Promise.resolve({
+            id: 'a1',
+            state: 'in_progress',
+            peerJoined: false,
+            slotStart: new Date().toISOString(),
+            slotEnd: new Date(Date.now() + 18e5).toISOString(),
+            serverNow: new Date().toISOString(),
+          }),
     );
     setup();
     await waitFor(() => expect(screen.getByText(/will be with you shortly/i)).toBeTruthy());
@@ -34,8 +49,21 @@ describe('VideoRoom', () => {
   it('shows the live stage once the peer has joined', async () => {
     api.get.mockImplementation((path) =>
       path.includes('video-token')
-        ? Promise.resolve({ token: 't', roomName: 'appt_a1', roomUrl: 'u', serverNow: new Date().toISOString(), joinSimUrl: null })
-        : Promise.resolve({ id: 'a1', state: 'in_progress', peerJoined: true, slotStart: new Date().toISOString(), slotEnd: new Date(Date.now()+18e5).toISOString(), serverNow: new Date().toISOString() }),
+        ? Promise.resolve({
+            token: 't',
+            roomName: 'appt_a1',
+            roomUrl: 'u',
+            serverNow: new Date().toISOString(),
+            joinSimUrl: null,
+          })
+        : Promise.resolve({
+            id: 'a1',
+            state: 'in_progress',
+            peerJoined: true,
+            slotStart: new Date().toISOString(),
+            slotEnd: new Date(Date.now() + 18e5).toISOString(),
+            serverNow: new Date().toISOString(),
+          }),
     );
     setup();
     await waitFor(() => expect(screen.getByText(/live|in call|connected/i)).toBeTruthy());

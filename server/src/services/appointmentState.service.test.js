@@ -57,10 +57,13 @@ describe('appointmentState.transition', () => {
     expect(out.state).toBe('in_progress');
   });
 
-  it.each(['completed', 'patient_no_show', 'doctor_no_show'])('allows in_progress → %s', async (to) => {
-    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'in_progress' });
-    prisma.appointment.update.mockResolvedValue({ id: 'a1', state: to });
-    const out = await transition({ appointmentId: 'a1', to, actorType: 'system' });
-    expect(out.state).toBe(to);
-  });
+  it.each(['completed', 'patient_no_show', 'doctor_no_show'])(
+    'allows in_progress → %s',
+    async (to) => {
+      prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'in_progress' });
+      prisma.appointment.update.mockResolvedValue({ id: 'a1', state: to });
+      const out = await transition({ appointmentId: 'a1', to, actorType: 'system' });
+      expect(out.state).toBe(to);
+    },
+  );
 });

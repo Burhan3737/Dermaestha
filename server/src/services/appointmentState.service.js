@@ -6,7 +6,12 @@ import * as audit from './audit.service.js';
 /** Legal transitions (doc 05 §5). Slice C: slot_locked/confirmed entries. Slice D: added in_progress. */
 const LEGAL = {
   slot_locked: new Set(['confirmed']),
-  confirmed: new Set(['cancelled_refunded', 'cancelled_no_refund', 'doctor_cancelled', 'in_progress']),
+  confirmed: new Set([
+    'cancelled_refunded',
+    'cancelled_no_refund',
+    'doctor_cancelled',
+    'in_progress',
+  ]),
   in_progress: new Set(['completed', 'patient_no_show', 'doctor_no_show']),
 };
 
