@@ -13,6 +13,7 @@ import { availabilityRouter } from './routes/availability.js';
 import { appointmentsRouter } from './routes/appointments.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { devCheckoutRouter } from './routes/devCheckout.js';
+import { devVideoRouter } from './routes/devVideo.js';
 import { mustChangePasswordGate } from './middleware/mustChangePassword.js';
 import { initErrorTracking } from './lib/errorTracking.js';
 import { logger } from './lib/logger.js';
@@ -42,6 +43,7 @@ export function createApp() {
 
   // Dev-only simulated payment gateway. NEVER mounted in production.
   if (env.PAYMENT_PROVIDER === 'mock') app.use('/dev', devCheckoutRouter);
+  if (env.VIDEO_PROVIDER === 'mock') app.use('/dev', devVideoRouter);
 
   // Static SPA + catch-all LAST (ARCHITECTURE §14.3).
   app.use(express.static(CLIENT_DIST));
