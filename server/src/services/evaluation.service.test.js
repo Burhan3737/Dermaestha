@@ -15,6 +15,7 @@ import { prisma } from '../lib/prisma.js';
 import * as state from './appointmentState.service.js';
 import { safeRefund } from './refundSideEffects.js';
 import * as audit from './audit.service.js';
+import { emailProvider } from '../integrations/email/index.js';
 import { evaluateDueAppointments } from './evaluation.service.js';
 
 const start = new Date('2026-06-04T10:00:00.000Z');
@@ -45,6 +46,8 @@ describe('evaluateDueAppointments', () => {
     await evaluateDueAppointments(new Date('2026-06-04T10:16:00.000Z'));
     expect(state.transition).toHaveBeenCalledWith(expect.objectContaining({ appointmentId: 'a1', to: 'patient_no_show' }));
     expect(safeRefund).not.toHaveBeenCalled();
+    expect(emailProvider.send).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('completes at slot-end+5 when both joined', async () => {
