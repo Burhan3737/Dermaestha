@@ -1,6 +1,6 @@
 # 2026-06-04-1746 — slice-d-video-lifecycle
 
-**Status:** COMPLETE & GREEN on `feat/slice-d-video-lifecycle` (135 server + 41 client tests, build clean); subagent-driven (17 plan tasks + 3 review-fix tasks); final whole-impl review passed; canon docs updated (user-approved, 10 docs, v-bumps). PENDING: merge disposition (user).
+**Status:** COMPLETE & MERGED to `main` locally (no-ff `03c4d73`; not pushed). 135 server + 41 client tests green (re-verified post-resume via a temp 5433 port-remap around a host-Postgres/5432 conflict); subagent-driven (17 plan tasks + 3 review-fix tasks); final whole-impl review passed; canon docs updated (user-approved, 10 docs, v-bumps). Local feature branch deleted; `origin/feat/slice-d-video-lifecycle` remote branch remains.
 **Goal:** Brainstorm + spec + plan + build Slice D (Video & Appointment Lifecycle) — the fourth and final vertical slice of the M1+M2 patient journey.
 **Skill(s) used:** superpowers:brainstorming (user-invoked); will hand off to superpowers:writing-plans
 **Ticket / issue:** None
@@ -81,6 +81,9 @@ Applied during build:
 
 ## Risk / rollback
 Planned schema migration (additive nullable columns) + a new server dependency (`node-cron`) are the only non-trivially-reversible items, both pending approval at build time. Main build-time safety: the `daily.mock` provider + `/dev/video/*` + `/dev/worker/*` routes must be impossible to mount in production (env switch defaults to `stub`; `/dev` mounts env-guarded — mirrors ADR-22). Revert at this stage = delete created docs; no DB impact yet.
+
+## Post-merge environment note
+The dev integration tests connect via `.env` `DATABASE_URL`. A **host-installed PostgreSQL occupies port 5432**, shadowing the Docker `db` container's published port; and the container's bridge IP `172.18.0.2` (the `.env` value) became unreachable from the shell after a Docker Desktop restart. Re-verification used a temporary `docker-compose` remap to `5433:5432` + `.env`→`localhost:5433` (both reverted; tracked tree pristine). **Durable fix for the user:** either stop the host Postgres, or publish the container on a free port (e.g. `5433`) and set `.env` `DATABASE_URL=postgresql://user:pass@localhost:5433/dermestha`.
 
 ## Open items / next session
 - Write the design doc → spec self-review → user review gate → hand off to writing-plans.
