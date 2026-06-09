@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.4                           |
-| Last updated     | 2026-06-05                    |
+| Version          | 1.5                           |
+| Last updated     | 2026-06-09                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -160,7 +160,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                           | Role                 | Purpose                                                     | Notes                                                                  |
 | --------------------------------------- | -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `POST /api/appointments/lock`           | patient              | Create `slot_locked` (10-min hold) + "who-for" (P3/P8)      | the partial unique index makes a 2nd lock fail → 409 `SLOT_TAKEN` (#1) |
+| `POST /api/appointments/lock`           | patient              | Create `slot_locked` (10-min hold) + "who-for" (P3/P8)      | a concurrent 2nd lock fails via the partial unique index → 409 `SLOT_TAKEN` (#1); validation also returns 409 `ACTIVE_LOCK_EXISTS`/`OVERLAP` (single-lock / no-overlap) and 422 `SLOT_NOT_BOOKABLE` (non-bookable or expired-lock collision, ADR-23) |
 | `POST /api/appointments/:id/pay`        | patient              | Create idempotent payment intent → PayFast handoff URL (P3) | idempotent on `(patient, slot)` (#7); 409 `LOCK_EXPIRED` if hold gone  |
 | `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant             |
 | `GET /api/appointments/:id`             | patient/doctor/admin | Detail, ownership-checked                                   | 404 (not 403) when not visible                                         |
@@ -319,3 +319,4 @@ The **only** module that performs transitions is `appointmentState.service`. It 
 | 2026-06-03 | Added `BLOCK_HAS_BOOKINGS` to §3.2 `409` examples | Slice B availability block-lock guard (F09/edge #14) |
 | 2026-06-04 | Added `409` codes `ACTIVE_LOCK_EXISTS`/`OVERLAP`/`INVALID_TRANSITION` + `422` `SLOT_NOT_BOOKABLE`; noted dev-only `/dev/*` checkout routes | Slice C booking/payment (F03/F04) |
 | 2026-06-05 | Added `VIDEO_WINDOW_CLOSED` to §3.2 `422` example codes | Slice D (F05 video & lifecycle) |
+| 2026-06-09 | Completed the `POST /api/appointments/lock` Notes cell to list `ACTIVE_LOCK_EXISTS`/`OVERLAP`/`SLOT_NOT_BOOKABLE` (already in §3.2 status table) | Gap-analysis O2 — endpoint-note completeness |

@@ -27,11 +27,22 @@ export async function initiateRefund({ appointmentId }) {
   if (!payment) return null;
   const { refund } = await quoteRefund(appointmentId);
   const key = payment.refundIdempotencyKey ?? `rf_${appointmentId}`;
-  const result = await paymentProvider.refund({
-    providerRef: payment.providerRef,
-    amount: refund,
-    idempotencyKey: key,
-  });
+  let result;
+  try {
+    result = await paymentProvider.refund({
+      providerRef: payment.providerRef,
+      amount: refund,
+      idempotencyKey: key,
+    });
+  } catch (e) {
+    // Record the failure so the dashboard/refund-status view reflects it and a future
+    // retry is idempotency-keyed; re-throw so the best-effort caller still audits (#10).
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { refundIdempotencyKey: key, refundStatus: 'failed' },
+    });
+    throw e;
+  }
   await prisma.payment.update({
     where: { id: payment.id },
     data: { refundIdempotencyKey: key, refundRef: result.refundRef, refundStatus: result.status },

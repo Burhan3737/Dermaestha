@@ -21,6 +21,9 @@ export async function getOne(req, res, next) {
 
 export async function slots(req, res, next) {
   try {
+    // Active-doctor gate (404-no-leak, parity with the profile endpoint): an inactive or
+    // unknown doctor must not expose bookable slots.
+    await doctorService.getPublicDoctor(req.params.id);
     res.json({ data: await availabilityService.generateSlots(req.params.id, req.query.date) });
   } catch (e) {
     next(e);

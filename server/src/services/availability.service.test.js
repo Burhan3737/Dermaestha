@@ -85,6 +85,19 @@ describe('replaceWeeklyBlocks', () => {
     expect(prisma.availabilityBlock.createMany).toHaveBeenCalled();
   });
 
+  it('excludes expired slot_locked holds from the orphan check (lazy expiry, ADR-23)', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'doc1' });
+    prisma.appointment.findMany.mockResolvedValue([]);
+    await avail.replaceWeeklyBlocks('user1', [{ weekday: 1, startTime: '18:00', endTime: '21:00' }]);
+    expect(prisma.appointment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          NOT: { state: 'slot_locked', lockExpiresAt: { lt: expect.any(Date) } },
+        }),
+      }),
+    );
+  });
+
   it('rejects with BLOCK_HAS_BOOKINGS when a shortened block no longer fully fits an existing slot', async () => {
     prisma.doctor.findUnique.mockResolvedValue({ id: 'doc1' });
     // Existing appointment at 20:30 Karachi Monday (15:30 UTC) — a full 20:30–21:00 slot.

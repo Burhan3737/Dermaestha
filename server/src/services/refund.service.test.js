@@ -67,4 +67,22 @@ describe('refund.initiateRefund', () => {
     expect(await initiateRefund({ appointmentId: 'a1' })).toBeNull();
     expect(paymentProvider.refund).not.toHaveBeenCalled();
   });
+
+  it('marks refundStatus=failed (idempotency-keyed) and re-throws when the provider fails', async () => {
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'p1',
+      appointmentId: 'a1',
+      amount: 250000,
+      gatewayFee: 6000,
+      providerRef: 'mock_1',
+      refundIdempotencyKey: null,
+    });
+    prisma.settings.findUnique.mockResolvedValue({ fallbackFeePctBps: 0, fallbackFeeFixed: 0 });
+    paymentProvider.refund.mockRejectedValue(new Error('provider down'));
+    await expect(initiateRefund({ appointmentId: 'a1' })).rejects.toThrow('provider down');
+    expect(prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { refundIdempotencyKey: 'rf_a1', refundStatus: 'failed' },
+    });
+  });
 });

@@ -80,19 +80,20 @@ export async function processWebhook({ event, providerRef, amount, gatewayFee })
     });
   });
 
-  // Post-commit, best-effort confirmation email (never blocks the transition).
-  try {
-    const patient = await prisma.user.findUnique({
+  // Post-commit, best-effort confirmation email — fire-and-forget so a slow/hung provider
+  // cannot delay acknowledging the IPN (the transition is already committed).
+  prisma.user
+    .findUnique({
       where: { id: appt.patientUserId },
       select: { email: true, fullName: true },
-    });
-    await emailProvider.send({
-      template: 'booking_confirmation',
-      to: patient.email,
-      vars: { patientName: patient.fullName, appointmentRef: appt.id },
-    });
-  } catch {
-    logger.warn('confirmation email not sent', { appointmentId: appt.id });
-  }
+    })
+    .then((patient) =>
+      emailProvider.send({
+        template: 'booking_confirmation',
+        to: patient.email,
+        vars: { patientName: patient.fullName, appointmentRef: appt.id },
+      }),
+    )
+    .catch(() => logger.warn('confirmation email not sent', { appointmentId: appt.id }));
   return { ok: true };
 }
