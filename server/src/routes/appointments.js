@@ -25,3 +25,4 @@ appointmentsRouter.post(
   validate(cancelSchema),
   c.cancel,
 );
+appointmentsRouter.get('/:id/video-token', requireRole('patient', 'doctor'), c.videoToken);

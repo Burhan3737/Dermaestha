@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.0                                    |
-| Last updated     | 2026-06-01                             |
+| Version          | 1.1                                    |
+| Last updated     | 2026-06-05                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -130,6 +130,12 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F05-007 | §3 mid-call drop does not finalise (Edge #22)        | `CA` in `in_progress`; both joined once | 1. A party drops mid-call. 2. The same party rejoins before slot-end + 5 min.                  | A transient disconnect does not finalise completion; either party may rejoin the same room until slot-end + 5 min; completion finalises at the cutoff.                                            | High     |
 | TC-F05-008 | §3 no-show evaluation (Edge #25a — neither joins)    | `CA`; neither party joins by slot+15    | 1. Let the grace window (slot+15) elapse with no joins.                                        | The appointment resolves to `doctor_no_show` (doctor-absence precedence); refund initiated net of gateway fee + apology email; the appointment never remains `in_progress` past slot-end + 5 min. | Critical |
 | TC-F05-009 | §3 no-show evaluation (patient absent, Edge #20)     | `CA`; only `D` joined by slot+15        | 1. Doctor joins; patient never joins by slot+15.                                               | Marked `patient_no_show`; no refund.                                                                                                                                                              | High     |
+| TC-F05-010 | F05.03 Video-token window (happy path + closed window) | `CA` confirmed; current time known | 1. Request `GET /api/appointments/:id/video-token` within slot-start−10m … slot-end+5m. 2. Request again after slot-end+5m. | First request returns a valid time-bound token. Second request is rejected `422 VIDEO_WINDOW_CLOSED`. | Critical |
+| TC-F05-011 | §5 Evaluation worker: `confirmed→in_progress` activation | `CA` confirmed; slot start time reached | 1. Let the evaluation worker tick at or after slot-start. | The appointment transitions to `in_progress`; no manual trigger required; the worker drives the transition via `appointmentState.service`. | Critical |
+| TC-F05-012 | §3 No-show resolution — doctor-absence precedence | `CA` in `in_progress`; doctor never joined by slot+15m | 1. Doctor never joins. 2. Let the no-show grace window (slot+15m) elapse. | Appointment → `doctor_no_show`; refund initiated net of gateway fee; apology email sent; doctor absence takes precedence regardless of patient join status (ADR-12). | Critical |
+| TC-F05-013 | §3 No-show resolution — patient absent (doctor joined) | `CA` in `in_progress`; doctor joined, patient absent at slot+15m | 1. Doctor joins; patient never joins. 2. Let the no-show grace window elapse. | Appointment → `patient_no_show`; no refund; the doctor-joined record ensures doctor-absence precedence does not fire (ADR-12). | High     |
+| TC-F05-014 | §5 Evaluation worker: `in_progress→completed` at slot-end+5m | `CA` in `in_progress`; both parties have joined | 1. Let slot-end+5m arrive. 2. The evaluation worker ticks. | Appointment transitions to `completed`; no appointment remains in `in_progress` past slot-end+5m (hard guarantee per ADR-25). | Critical |
+| TC-F05-015 | §3 Zero-join-data at cutoff → non-penalizing terminal + admin alert | `CA` in `in_progress`; no join-event data recorded when slot-end+5m arrives | 1. Let slot-end+5m arrive with `doctorJoinedAt` and `patientJoinedAt` both null. | Appointment resolves to `doctor_no_show` (non-penalizing, doctor-absence-precedence for missing data per ADR-12); an `evaluation_data_gap` admin alert is raised; the appointment does NOT remain in `in_progress`. | Critical |
 
 ### F06 — Cancellation & refund
 
@@ -275,3 +281,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | Date       | Change           | Why                                          |
 | ---------- | ---------------- | -------------------------------------------- |
 | 2026-06-01 | Initial creation | Derived from docs 02 (scope) + 08 (security) |
+| 2026-06-05 | Added TC-F05-010 through TC-F05-015 (video-token window, evaluation worker activation, no-show resolution branches, completion cutoff, zero-join-data alert) | Slice D (F05 video & lifecycle) |

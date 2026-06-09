@@ -91,6 +91,30 @@ describe('P-08 Upcoming', () => {
     expect(screen.queryByText('Rs 2,440')).toBeNull();
   });
 
+  it('enables Join Call within 10 min of slot start linking to the video room', async () => {
+    const soon = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    api.get.mockResolvedValue({
+      data: [
+        {
+          id: 'a1',
+          slotStart: soon,
+          slotEnd: soon,
+          state: 'confirmed',
+          feeAtBooking: 250000,
+          forSelf: true,
+          subjectName: null,
+          doctorName: 'Dr A',
+          specialization: 'Acne',
+          doctorPhotoUrl: null,
+        },
+      ],
+    });
+    setup();
+    await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
+    const join = screen.getByRole('link', { name: /join call/i });
+    expect(join.getAttribute('href')).toContain('/video/a1');
+  });
+
   it('opens the cancel modal and posts the cancel on confirm', async () => {
     api.get.mockImplementation((path) => {
       if (path === '/appointments')

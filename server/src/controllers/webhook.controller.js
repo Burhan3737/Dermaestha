@@ -4,6 +4,7 @@ import * as paymentService from '../services/payment.service.js';
 import * as audit from '../services/audit.service.js';
 import { AppError } from '../http/AppError.js';
 import { logger } from '../lib/logger.js';
+import * as videoService from '../services/video.service.js';
 
 export async function payfast(req, res, next) {
   let result;
@@ -24,6 +25,16 @@ export async function payfast(req, res, next) {
   }
   try {
     await paymentService.processWebhook(result);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+}
+
+// Daily participant events (doc 14 §3). Signature verification deferred to the real adapter.
+export async function daily(req, res, next) {
+  try {
+    await videoService.recordJoinFromDailyEvent(req.body ?? {});
     res.json({ ok: true });
   } catch (e) {
     next(e);

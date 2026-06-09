@@ -13,9 +13,11 @@ import { availabilityRouter } from './routes/availability.js';
 import { appointmentsRouter } from './routes/appointments.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { devCheckoutRouter } from './routes/devCheckout.js';
+import { devVideoRouter } from './routes/devVideo.js';
 import { mustChangePasswordGate } from './middleware/mustChangePassword.js';
 import { initErrorTracking } from './lib/errorTracking.js';
 import { logger } from './lib/logger.js';
+import { startWorkers } from './workers/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(__dirname, '../../client/dist');
@@ -41,6 +43,7 @@ export function createApp() {
 
   // Dev-only simulated payment gateway. NEVER mounted in production.
   if (env.PAYMENT_PROVIDER === 'mock') app.use('/dev', devCheckoutRouter);
+  if (env.VIDEO_PROVIDER === 'mock') app.use('/dev', devVideoRouter);
 
   // Static SPA + catch-all LAST (ARCHITECTURE §14.3).
   app.use(express.static(CLIENT_DIST));
@@ -53,5 +56,6 @@ export function createApp() {
 // Start the server only when executed directly (not when imported by tests).
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   initErrorTracking();
+  startWorkers();
   createApp().listen(env.PORT, () => logger.info(`Dermestha listening on :${env.PORT}`));
 }

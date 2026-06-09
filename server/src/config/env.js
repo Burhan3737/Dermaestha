@@ -12,6 +12,9 @@ const schema = z.object({
   PAYMENT_PROVIDER: z.enum(['stub', 'mock']).default('stub'),
   EMAIL_PROVIDER: z.enum(['stub', 'console']).default('stub'),
   DAILY_API_KEY: z.string().optional(),
+  DAILY_DOMAIN: z.string().optional(),
+  VIDEO_PROVIDER: z.enum(['stub', 'mock', 'daily']).default('stub'),
+  VIDEO_MOCK_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   ERROR_TRACKING_DSN: z.string().optional(),
 });

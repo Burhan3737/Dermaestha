@@ -1,11 +1,11 @@
 node_modules/
 client/dist/
+docs/client/
 .env
 coverage/
 *.log
 
+
 # local agent state
 .claude/
 .superpowers/
-
-docs\product\meeting-notes

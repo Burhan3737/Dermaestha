@@ -8,6 +8,9 @@ import { AvailabilityGrid } from './views/AvailabilityGrid.jsx';
 import { Upcoming } from './views/Upcoming.jsx';
 import { Booking } from './views/Booking.jsx';
 import { PaymentReturn } from './views/PaymentReturn.jsx';
+import { VideoRoom } from './views/VideoRoom.jsx';
+import { Login } from './views/Login.jsx';
+import { DoctorToday } from './views/DoctorToday.jsx';
 
 function Placeholder({ label }) {
   const { logout } = useSession();
@@ -63,7 +66,8 @@ export function AppRoutes() {
           </RoleRoute>
         }
       />
-      <Route path="/doctor" element={<Placeholder label="Doctor — Today" />} />
+      <Route path="/video/:id" element={session ? <VideoRoom /> : <Login />} />
+      <Route path="/doctor" element={<RoleRoute session={session} role="doctor"><DoctorToday /></RoleRoute>} />
       <Route path="/admin" element={<Placeholder label="Admin panel" />} />
       <Route path="*" element={<Placeholder label="Dermestha" />} />
     </Routes>

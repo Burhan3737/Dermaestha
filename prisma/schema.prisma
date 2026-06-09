@@ -166,9 +166,12 @@ model Appointment {
   /// Support-workflow marker, orthogonal to the state machine (§3.6). Admin-set via A5.
   disputed      Boolean          @default(false)
   /// now()+10min while slot_locked; the lock-release worker reads this.
-  lockExpiresAt DateTime?        @map("lock_expires_at") @db.Timestamptz(6)
-  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lockExpiresAt   DateTime?        @map("lock_expires_at")   @db.Timestamptz(6)
+  /// Set on FIRST participant join (idempotent). Drives no-show resolution (ADR-12).
+  doctorJoinedAt  DateTime?        @map("doctor_joined_at")  @db.Timestamptz(6)
+  patientJoinedAt DateTime?        @map("patient_joined_at") @db.Timestamptz(6)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   payments      Payment[]
   prescriptions Prescription[]
