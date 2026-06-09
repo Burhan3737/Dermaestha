@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.3                                                                                                |
-| Last updated     | 2026-06-04                                                                                         |
+| Version          | 1.4                                                                                                |
+| Last updated     | 2026-06-05                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -37,6 +37,8 @@
 22. [ADR-21 — Asia/Karachi ↔ UTC via date-fns-tz](#adr-21--asiakarachi--utc-via-date-fns-tz)
 23. [ADR-22 — Dev payment simulation: mock gateway with a real signed IPN](#adr-22--dev-payment-simulation-mock-gateway-with-a-real-signed-ipn)
 24. [ADR-23 — Lazy slot-lock expiry (no background worker)](#adr-23--lazy-slot-lock-expiry-no-background-worker)
+25. [ADR-24 — Dev video simulation: mock provider + real webhook + dev simulator](#adr-24--dev-video-simulation-mock-provider--real-webhook--dev-simulator)
+26. [ADR-25 — Appointment-evaluation worker: in-process node-cron (realizing ADR-08)](#adr-25--appointment-evaluation-worker-in-process-node-cron-realizing-adr-08)
 
 ---
 
@@ -334,6 +336,30 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-24 — Dev video simulation: mock provider + real webhook + dev simulator
+
+**Date:** 2026-06-05
+
+**Context:** Slice D builds F05 video, but there is no live Daily.co account in dev/CI and the concrete network adapter is unwired (`daily.stub` throws `NOT_IMPLEMENTED`). No-show resolution depends on participant-join data Daily would post to `POST /api/webhooks/daily`. A simulation that bypassed the webhook→worker path would test a different architecture than the one shipped (same rationale as ADR-22 for payments).
+
+**Decision:** Add a dev-only mock `VideoProvider` (`server/src/integrations/video/daily.mock.js`) implementing the same `@typedef` (ADR-10): `createRoom` returns a deterministic `appt_<id>` room; `issueToken` returns an HMAC-signed (keyed on `VIDEO_MOCK_SECRET`) opaque dev token bounded by the slot window. The real `POST /api/webhooks/daily` handler records first-join timestamps via `recordJoinFromDailyEvent`; a dev-only, env-guarded simulator (`/dev/video/*`, mounted only when `VIDEO_PROVIDER=mock`) emits the documented Daily participant payload through that same handler, and the SPA records its join via a server-provided `joinSimUrl`. Selection is via the `VIDEO_PROVIDER` switch (default `stub`); `stub` and `daily` resolve to the throwing stub until the concrete `daily.js` adapter is wired.
+
+**Consequences:** The production webhook→worker no-show path (join recording, the §4.3 transitions, refund/email side-effects) is genuinely exercised offline and in CI; only the vendor REST call and the browser media SDK are faked. The real-Daily swap reduces to a concrete `daily.js` adapter + the client Daily SDK on P-12 + webhook signature verification — business logic untouched. Hard safety constraint: the mock provider and `/dev/*` routes must never be active in production (switch defaults to `stub`; `/dev` mounts env-guarded). Mock role-inference from `user_name` is dev-only; the real adapter must map role from `is_owner`/a stable participant id.
+
+---
+
+## ADR-25 — Appointment-evaluation worker: in-process node-cron (realizing ADR-08)
+
+**Date:** 2026-06-05
+
+**Context:** The non-payment lifecycle transitions (`confirmed→in_progress` at slot start, `in_progress→completed` at slot-end+5m, no-show resolution at slot+15m) fire as push side-effects (refund + apology email) even when no one reads the appointment — so the lazy approach used for lock-expiry (ADR-23) is insufficient here. ADR-08 anticipated in-process `node-cron` workers; Slice D builds the first one.
+
+**Decision:** A pure, clock-injected `evaluateDueAppointments(now)` (`server/src/services/evaluation.service.js`) performs activation, ADR-12 no-show resolution, and completion — transitioning ONLY via `appointmentState.service` and reusing the shared best-effort `safeRefund` (`refundSideEffects.js`). It is driven by an in-process `node-cron` job (`* * * * *`) in a new `server/src/workers/` seam, started ONLY in the server run guard (never under tests). A dev-only `/dev/worker/evaluate` triggers one pass on demand. Each appointment is wrapped in its own try/catch so one failing row cannot poison the batch (retried next tick). Hard guarantee: no appointment remains `in_progress` past slot-end+5m. The `evaluation_data_gap` admin alert is scoped to the zero-join-data ("resolved blind") case — a deliberate v1 narrowing of ADR-12's "missing/ambiguous".
+
+**Consequences:** Establishes the worker seam the deferred notification (F07) and reconciliation (F04.03) workers will reuse. Single-instance assumption per doc 15 §3 (no leader election); horizontal scaling would need a distributed lock or worker extraction. `node-cron` is added as the first worker dependency. Clock injection keeps every transition branch unit-testable without timers.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -342,3 +368,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-03 | Added ADR-20 (frontend state: Context + TanStack Query) | Slice A frontend-state decision; new client dependency `@tanstack/react-query` |
 | 2026-06-03 | Added ADR-21 (Asia/Karachi ↔ UTC via date-fns-tz) | Slice B slot-generation timezone decision; new server dependency `date-fns-tz` |
 | 2026-06-04 | Added ADR-22 (dev mock payment gateway, signed IPN) + ADR-23 (lazy lock-expiry, no worker) | Slice C booking/payment decisions |
+| 2026-06-05 | Added ADR-24 (dev video simulation: mock provider + real webhook) + ADR-25 (appointment-evaluation worker, node-cron) | Slice D (F05 video & lifecycle) |

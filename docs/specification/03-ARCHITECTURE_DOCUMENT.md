@@ -4,8 +4,8 @@
 | -------------------- | ---------------------------------- |
 | **Document ID**      | 03-ARCHITECTURE_DOCUMENT           |
 | **Status**           | Canonical                          |
-| **Version**          | 1.2                                |
-| **Last updated**     | 2026-06-03                         |
+| **Version**          | 1.3                                |
+| **Last updated**     | 2026-06-05                         |
 | **Sources absorbed** | `docs/engineering/ARCHITECTURE.md` |
 | **Related docs**     | 02, 04, 05, 10, 14, 15             |
 
@@ -39,7 +39,7 @@ Dermestha v1 is a **single-deployable, same-origin monolith**: one JavaScript Ex
 - **Database** — Durable store for all domain data and server sessions. PostgreSQL (managed).
 - **Reconciliation worker** — Hourly query of PayFast for unconfirmed payments; reconcile missed webhooks. `node-cron` (in-process).
 - **Notification worker** — Schedule and dispatch the 6 email triggers; retry/backoff; reminder invalidation. `node-cron` (in-process).
-- **Appointment-evaluation worker** — Advance `confirmed→in_progress`, resolve `completed`/no-show within the grace window. `node-cron` (in-process).
+- **Appointment-evaluation worker** — Advance `confirmed→in_progress`, resolve `completed`/no-show within the grace window. `node-cron` (in-process). **Now implemented** (`server/src/workers/`; `evaluation.service.js`; ADR-25): owns all non-payment §4.3 transitions (`confirmed→in_progress` at slot-start; `in_progress→completed` at slot-end+5m; no-show resolution at slot+15m with doctor-absence precedence per ADR-12).
 - **Payment adapter** — Hosted checkout, signed webhook verify, refund API, reconciliation query. PayFast.
 - **Video adapter** — Per-appointment rooms, time-bound participant tokens. Daily.co.
 - **Email adapter** — Transactional sends + bounce/failure signal. Resend.
@@ -181,3 +181,4 @@ There are no message queues or other third-party infrastructure services. The th
 | 2026-06-01 | Initial creation | Faithful re-presentation of `docs/engineering/ARCHITECTURE.md` |
 | 2026-06-03 | Noted frontend state stack (Context + TanStack Query) in §2 | Reflects ADR-20 (Slice A) |
 | 2026-06-03 | Noted `date-fns-tz` in the frontend/stack row | Reflects ADR-21 (Slice B) |
+| 2026-06-05 | Noted appointment-evaluation worker as implemented (§1 components) | Slice D (F05 video & lifecycle; ADR-25) |

@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.1                                                           |
-| Last updated     | 2026-06-03                                                    |
+| Version          | 1.2                                                           |
+| Last updated     | 2026-06-05                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
 
@@ -218,6 +218,10 @@ model Appointment {
   disputed      Boolean          @default(false)
   /// now()+10min while slot_locked; the lock-release worker reads this.
   lockExpiresAt DateTime?        @map("lock_expires_at") @db.Timestamptz(6)
+  /// Set on FIRST participant join; drives no-show resolution (ADR-12). Nullable.
+  doctorJoinedAt  DateTime?      @map("doctor_joined_at") @db.Timestamptz(6)
+  /// Set on FIRST participant join; drives no-show resolution (ADR-12). Nullable.
+  patientJoinedAt DateTime?      @map("patient_joined_at") @db.Timestamptz(6)
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -234,6 +238,8 @@ model Appointment {
 ```
 
 `feeAtBooking` is `null` while the appointment is `slot_locked` and is populated (snapshot from `Doctor.fee`) on transition to `confirmed` (invariant #6). The `forSelf / subjectName / subjectAge / subjectRelation` fields implement the "booking for a third party" feature (PRD P8). `disputed` is an orthogonal support flag, admin-set; it does not participate in the state machine.
+
+`doctorJoinedAt` and `patientJoinedAt` are both nullable `timestamptz`; they are set once (on first join) by the `POST /api/webhooks/daily` handler via `recordJoinFromDailyEvent` and drive the no-show resolution logic (ADR-12). Migration `20260604141222_add_video_join_columns` adds them as additive nullable columns; the `uniq_active_slot` partial index is untouched.
 
 ---
 
@@ -590,3 +596,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | ---------- | ---------------- | ------------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of `prisma/schema.prisma` + `ARCHITECTURE.md §5` |
 | 2026-06-03 | Added `reset_token_hash` + `reset_token_expires_at` to `users` (§2b, §6 F01) | Slice A password-reset storage (F01.03); schema change per change-impact matrix |
+| 2026-06-05 | Added `doctor_joined_at` + `patient_joined_at` nullable TIMESTAMPTZ columns to `appointments` (§2e); migration `20260604141222_add_video_join_columns` | Slice D (F05 video & lifecycle) |

@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
 | Status           | Canonical                                                                                               |
-| Version          | 1.1                                                                                                     |
-| Last updated     | 2026-06-01                                                                                              |
+| Version          | 1.2                                                                                                     |
+| Last updated     | 2026-06-05                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
 | Related docs     | 03, 08, 15                                                                                              |
 
@@ -103,6 +103,7 @@ Complete every item before triggering a production deploy.
 - [ ] **Secrets rotated per environment** — `SESSION_SECRET`, `PAYFAST_*`, `DAILY_API_KEY`, `RESEND_API_KEY`, `ERROR_TRACKING_DSN`.
 - [ ] **PayFast KYC complete** — merchant account must be fully verified before `PAYFAST_MODE=live` can process payments (ARCHITECTURE.md §12).
 - [ ] **Dev provider switches OFF** — `PAYMENT_PROVIDER` and `EMAIL_PROVIDER` are unset or `stub` (NOT `mock`/`console`) so the dev mock payment gateway and the `/dev/checkout` routes are never mounted in production (ADR-22; doc 08; doc 15).
+- [ ] **Dev video switch OFF** — `VIDEO_PROVIDER` is unset or `stub` (NOT `mock`) so the dev mock video provider, the `/dev/video/*` join-simulator routes, and the `/dev/worker/*` evaluation trigger are never mounted in production (ADR-24; doc 08; doc 15).
 - [ ] **First deploy only: admin bootstrap** — run `npm run bootstrap:admin` after the initial deploy (see §9 and §4 step 8).
 
 ---
@@ -319,3 +320,4 @@ A formal version scheme and Git tagging convention have not been established. At
 | ---------- | ---------------- | ------------------------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of ARCH §13/§14 + Dockerfile + docker-compose + package.json |
 | 2026-06-04 | Added pre-deploy check: dev provider switches OFF in prod (no mock gateway / `/dev` routes) | Slice C dev payment simulation (ADR-22) |
+| 2026-06-05 | Added pre-deploy check: `VIDEO_PROVIDER` must not be `mock` in production (§3) | Slice D (F05 video & lifecycle) |

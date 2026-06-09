@@ -3,8 +3,8 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.1                                          |
-| Last updated     | 2026-06-04                                   |
+| Version          | 1.2                                          |
+| Last updated     | 2026-06-05                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
 
@@ -95,7 +95,7 @@ Workers use `node-cron`, running in-process. **Single-instance assumption (v1):*
 | ---------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Reconciliation         | **hourly** (`0 * * * *`)       | PayFast unconfirmed-payments query, last 24 h (edge #6/#6a)                                                                            |
 | Notification           | **every minute** (`* * * * *`) | Dispatch due emails; **re-check appointment state immediately before send**; suppress reminders if no longer `confirmed`/`in_progress` |
-| Appointment-evaluation | **every minute** (`* * * * *`) | `confirmed→in_progress` at slot-start; resolve `completed`/no-show in grace window; never strand `in_progress` past slot-end+5 min     |
+| Appointment-evaluation | **every minute** (`* * * * *`) | `confirmed→in_progress` at slot-start; resolve `completed`/no-show in grace window; never strand `in_progress` past slot-end+5 min. **Implemented** (`server/src/workers/`; `evaluation.service.js`; ADR-25). |
 
 ---
 
@@ -202,6 +202,8 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 | ------------------ | ------------------------------------------------------------------------------------------------ | -------------------------- |
 | `PAYMENT_PROVIDER` | Selects the `PaymentProvider`: `stub` (prod, throws until the real adapter is wired) or `mock` (dev simulated gateway, mounts `/dev/checkout`) | `stub` (prod) \| `mock` (dev) |
 | `EMAIL_PROVIDER`   | Selects the `EmailProvider`: `stub` (throws) or `console` (dev logging adapter)                  | `stub` (prod) \| `console` (dev) |
+| `VIDEO_PROVIDER`   | Selects the `VideoProvider`: `stub` (prod, throws until concrete adapter wired), `mock` (dev — real webhook path + `/dev/video/*` + `/dev/worker/*` simulator), or `daily` (resolves to stub until the concrete `daily.js` adapter is wired). Mock and `/dev/*` routes **must never be active in production** (ADR-24; doc 08; doc 10). | `stub` |
+| `VIDEO_MOCK_SECRET` | Dev-only mock meeting-token signing key (HMAC). Optional; for use only when `VIDEO_PROVIDER=mock`. Never set in production. | _(optional, dev-only)_ |
 
 ### Daily.co (Video Adapter)
 
@@ -262,3 +264,4 @@ These mirror `docs/engineering/CONFIG.md`; runtime A6 `settings` table entries o
 | ---------- | ---------------- | ---------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of CONFIG.md + .env.example |
 | 2026-06-04 | Added `PAYMENT_PROVIDER` + `EMAIL_PROVIDER` provider-selection switches; noted `PAYFAST_PASSPHRASE` dual use as the dev mock-IPN signing key | Slice C dev payment/email simulation (ADR-22) |
+| 2026-06-05 | Added `VIDEO_PROVIDER` + `VIDEO_MOCK_SECRET` provider-selection switches (§8); noted appointment-evaluation worker as Implemented (§3) | Slice D (F05 video & lifecycle) |
