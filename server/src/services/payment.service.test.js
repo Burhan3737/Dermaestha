@@ -19,6 +19,7 @@ vi.mock('./appointmentState.service.js', () => ({ transition: vi.fn().mockResolv
 
 import { prisma } from '../lib/prisma.js';
 import { paymentProvider } from '../integrations/payment/index.js';
+import { emailProvider } from '../integrations/email/index.js';
 import * as state from './appointmentState.service.js';
 import { createIntent, processWebhook } from './payment.service.js';
 
@@ -128,4 +129,27 @@ describe('payment.processWebhook', () => {
     expect(out).toEqual({ ok: true });
     expect(prisma.payment.update).not.toHaveBeenCalled();
   });
+
+  it('does not block the webhook ack on a hung confirmation email (fire-and-forget)', async () => {
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'p1',
+      appointmentId: 'a1',
+      providerRef: 'mock_1',
+    });
+    prisma.appointment.findUnique.mockResolvedValue({
+      id: 'a1',
+      state: 'slot_locked',
+      patientUserId: 'u1',
+    });
+    prisma.$transaction.mockImplementation(async (fn) => fn({ payment: { update: vi.fn() } }));
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
+    emailProvider.send.mockReturnValue(new Promise(() => {})); // never resolves — a hung provider
+    const out = await processWebhook({
+      event: 'payment.success',
+      providerRef: 'mock_1',
+      amount: 250000,
+      gatewayFee: 6000,
+    });
+    expect(out).toEqual({ ok: true });
+  }, 2000);
 });

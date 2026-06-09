@@ -44,6 +44,39 @@ describe('discovery + availability integration', () => {
     }
   });
 
+  it('GET /api/doctors/:id/slots returns 404 for an inactive doctor (parity with profile, no leak)', async () => {
+    const suffix = Date.now();
+    const user = await prisma.user.create({
+      data: {
+        role: 'doctor',
+        email: `inactive_${suffix}@test.local`,
+        phone: `0300${String(suffix).slice(-7)}`,
+        fullName: 'Dr. Inactive',
+        passwordHash: 'x',
+        mustChangePassword: false,
+      },
+    });
+    const doc = await prisma.doctor.create({
+      data: {
+        userId: user.id,
+        pmcNumber: `PMC-INACT-${suffix}`,
+        specialization: 'Test',
+        fee: 250000,
+        isActive: false,
+        status: 'active',
+      },
+    });
+    try {
+      const res = await request(app)
+        .get(`/api/doctors/${doc.id}/slots`)
+        .query({ date: nextMonday() });
+      expect(res.status).toBe(404);
+    } finally {
+      await prisma.doctor.delete({ where: { id: doc.id } });
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+  });
+
   it('availability requires auth (no session → 401)', async () => {
     const res = await request(app).put('/api/availability').send({ blocks: [] });
     expect(res.status).toBe(401);
