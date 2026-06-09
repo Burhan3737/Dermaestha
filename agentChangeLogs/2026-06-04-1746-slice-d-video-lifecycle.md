@@ -1,6 +1,6 @@
 # 2026-06-04-1746 — slice-d-video-lifecycle
 
-**Status:** Build COMPLETE & GREEN on `feat/slice-d-video-lifecycle` (135 server + 41 client tests, build clean); subagent-driven (17 plan tasks + 3 review-fix tasks); final whole-impl review passed. PENDING: canon doc updates (user approval) + merge.
+**Status:** COMPLETE & GREEN on `feat/slice-d-video-lifecycle` (135 server + 41 client tests, build clean); subagent-driven (17 plan tasks + 3 review-fix tasks); final whole-impl review passed; canon docs updated (user-approved, 10 docs, v-bumps). PENDING: merge disposition (user).
 **Goal:** Brainstorm + spec + plan + build Slice D (Video & Appointment Lifecycle) — the fourth and final vertical slice of the M1+M2 patient journey.
 **Skill(s) used:** superpowers:brainstorming (user-invoked); will hand off to superpowers:writing-plans
 **Ticket / issue:** None
@@ -39,6 +39,7 @@ Slices A/B/C are merged to `main`. Slice C deferred all video + lifecycle work t
 | `client/src/views/Upcoming.jsx` (+ test), `App.jsx` | Modified | Activate patient Join Call → `/video/:id` route. `2b8a2b3` |
 | `client/src/views/DoctorToday.jsx` (+ test), `components/DoctorCancelModal.jsx`, `App.jsx` | Created/Modified | D-02 today/History tabs + Join Call; D-06 reason-required cancel modal; `/doctor` route. `a2b77e0`/`564d994` |
 | ~30 slice files | Modified | Prettier normalization (slice files only). `1548a68` |
+| `docs/specification/` 03,04,05,08,10,11,12,13,14,15 | Modified | Canon updates (user-approved): ADR-24 (video sim) + ADR-25 (evaluation worker) in 11; join columns in 04; `VIDEO_WINDOW_CLOSED` in 05; `VIDEO_PROVIDER`/`VIDEO_MOCK_SECRET` in 15; TC-F05-010..015 in 12; status sweep (M2 ~75%, F05/module-9/worker Built) in 13; cascades 03/08/10/14. v-bumps + footers. `dc5562a` |
 
 ## Dependencies / config / schema
 Applied during build:
@@ -67,6 +68,7 @@ Applied during build:
 - **(Task 5.1 plan bug)** the plan's integration test back-dated the slot only 1 min then asserted `completed` — unreachable (completion needs now ≥ slotEnd+5m), and one appointment can't be both in-window and past-cutoff; corrected to two appointments (live + fully-past).
 - **(Final whole-impl review)** 3 design-fidelity gaps (no bugs): dead `listForRole` history branch + missing D-02 History tab/today-filter, and missing VideoRoom slot timer/cutoff — all 3 built per user decision (`564d994`, `e98b84b`).
 - **(Task 0.1 spec)** duplicate `DAILY_DOMAIN` + a non-blank mock secret in `.env.example` — fixed (`345d8a0`).
+- **(Canon step)** 6 canon docs (04/05/08/10/11/15) had pre-existing **uncommitted** Slice D edits in the working tree at session start (from prior work on this branch); verified faithful + complete, filled the 4 gaps (03/12/13/14), and caught/fixed a blank-line table split in doc 12's new TC-F05 rows before committing (`dc5562a`).
 
 ## Verification
 **Verified.** Built subagent-driven (fresh implementer per task; controller did per-task spec + code-quality review, full two-stage review on the critical worker/service tasks; final whole-implementation reviewer subagent → backend correct/no critical issues → 3 design-fidelity gaps surfaced + all 3 built per user decision).
