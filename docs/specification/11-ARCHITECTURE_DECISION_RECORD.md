@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.5                                                                                                |
+| Version          | 1.6                                                                                                |
 | Last updated     | 2026-06-05                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -183,7 +183,7 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Context:** PRD policy #5 defines that patient refunds are calculated net of the gateway fee, not at the full payment amount. The gateway fee is reported by PayFast on the payment record; when not reported, a fallback fee model (percentage + fixed, configurable via Settings A6) is used. This is a business unit-economics decision recorded in the PRD. (ARCHITECTURE.md §8, §12)
 
-**Decision:** `refund.service` computes the refund amount as `payment.amount − gateway_fee`. When `gateway_fee` is not reported by PayFast, the Settings `fallback_fee_pct` + `fallback_fee_fixed` (admin-configurable, A6) apply. The gateway-reported fee is captured on the `payments` record at booking time and drives the refund amount, the cancellation-modal estimate, and the dashboard breakdown identically.
+**Decision:** The refund logic (in `modules/appointment/service.js` since the ADR-26 restructure) computes the refund amount as `payment.amount − gateway_fee`. When `gateway_fee` is not reported by PayFast, the Settings `fallback_fee_pct` + `fallback_fee_fixed` (admin-configurable, A6) apply. The gateway-reported fee is captured on the `payments` record at booking time and drives the refund amount, the cancellation-modal estimate, and the dashboard breakdown identically.
 
 **Consequences:** The platform absorbs the gateway cost on cancellations rather than passing it to the patient as a surprise deduction beyond what was shown at booking. The fallback fee model is admin-configurable at runtime (no redeploy required). The `refund_idempotency_key` UNIQUE constraint on `payments` (invariant #10) ensures no duplicate refunds are issued regardless of retry behaviour.
 
@@ -391,3 +391,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-04 | Added ADR-22 (dev mock payment gateway, signed IPN) + ADR-23 (lazy lock-expiry, no worker) | Slice C booking/payment decisions |
 | 2026-06-05 | Added ADR-24 (dev video simulation: mock provider + real webhook) + ADR-25 (appointment-evaluation worker, node-cron) | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Added ADR-26 (feature-first client + domain server modules); re-pointed ADR-21 (`lib/tz/tz.js`) + ADR-25 (merged `modules/appointment/service.js`) path refs | Folder-structure restructure for maintainability; behavior unchanged |
+| 2026-06-11 | Normalized ADR-19's `refund.service` decision ref to the merged `modules/appointment/service.js` (cross-ref ADR-26) | Docs↔code alignment follow-up |

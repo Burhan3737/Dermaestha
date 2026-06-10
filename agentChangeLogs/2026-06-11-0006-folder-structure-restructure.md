@@ -77,7 +77,7 @@ Two dev notes flagged inconsistent client/server folder layouts. The approved de
 A read-only review agent audited all 16 canon docs against the restructure; the scope expanded from an initial 2-doc path estimate to **9 docs** (03, 05, 08, 09, 10, 11, 12, 13, 15). Applied (each + version bump + revision-footer row): ADR-26 (doc 11) + doc 03 §3a.1 "Code organization & folder conventions"; repointed all stale file-path refs + the merged-service conceptual names; updated doc 09's Vitest glob (`+ server/src/**/test.js` + `shared/**`); fixed doc 13 prose (AppProviders, `buildRoutes`, session state/action split). Pure relocation → no DB (04), API-endpoint (05 surface), or config-key changes.
 
 ## Open items / next session
-- **Deliberately left (mentioned):** (1) ADR-19 (doc 11 §ADR-19) still names `refund.service` in its *historical* decision text — left as a point-in-time record, superseded by ADR-26's cross-ref. (2) Doc 09's "no `.test.jsx` files exist yet in the client source tree" clause is **pre-existing** drift (client tests existed since Slice A), unrelated to this restructure — not touched per the surgical-edit rule.
+- **Normalized on request (follow-up commit):** (1) ADR-19 (doc 11) `refund.service` ref → merged `modules/appointment/service.js` (cross-ref ADR-26); (2) doc 09's stale "no `.test.jsx` files exist yet" clause → corrected to the co-located client suite. Docs now have **zero** stale code references.
 - **Out of scope (design §8.1):** `prisma/schema.prisma` headers cite deprecated `docs/engineering/*`; a later hygiene pass could repoint to docs 04/15.
 - Push remains GATED (CLAUDE.md) — not pushed.
 - `.gitignore` + `CLAUDE.md` had pre-existing (non-mine) working-tree edits; left uncommitted.
