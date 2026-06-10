@@ -20,16 +20,18 @@ vi.mock('../../lib/prisma/prisma.js', () => ({
 // Cross-module collaborators stay real module-mocks (these seams remain cross-module after the merge).
 vi.mock('../doctor/service.js', () => ({ generateSlots: vi.fn() }));
 vi.mock('../../services/audit/audit.service.js', () => ({ record: vi.fn().mockResolvedValue({}) }));
-vi.mock('../../integrations/email/index.js', () => ({
-  emailProvider: { send: vi.fn().mockResolvedValue({ providerId: 'x' }) },
-}));
 vi.mock('../../integrations/payment/index.js', () => ({ paymentProvider: { refund: vi.fn() } }));
+vi.mock('../notification/service.js', () => ({
+  enqueue: vi.fn().mockResolvedValue({}),
+  enqueueBookingEmails: vi.fn().mockResolvedValue(undefined),
+  slotStartLocal: vi.fn().mockReturnValue('Mon, 06 Jan 2099 09:00'),
+}));
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as availability from '../doctor/service.js';
 import * as audit from '../../services/audit/audit.service.js';
-import { emailProvider } from '../../integrations/email/index.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
+import * as notification from '../notification/service.js';
 import * as svc from './service.js';
 
 // Direct (real) handles for functions tested head-on; intra-cluster seams are spied per-suite on `svc`.
@@ -358,12 +360,16 @@ describe('cancellation.cancel', () => {
       patientUserId: 'u1',
       slotStart: future(180),
     });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
     const out = await cancel({ appointmentId: 'a1', actorType: 'patient', actorId: 'u1' });
     expect(state.transition).toHaveBeenCalledWith(
       expect.objectContaining({ to: 'cancelled_refunded' }),
     );
     expect(refund.initiateRefund).toHaveBeenCalledWith({ appointmentId: 'a1' });
     expect(out.state).toBe('cancelled_refunded');
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'refund_confirmation', appointmentId: 'a1' }),
+    );
   });
 
   it('patient <2h before → cancelled_no_refund, no refund', async () => {
@@ -390,6 +396,7 @@ describe('cancellation.cancel', () => {
       slotStart: future(30),
     });
     prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
     const out = await cancel({
       appointmentId: 'a1',
       actorType: 'doctor',
@@ -401,6 +408,9 @@ describe('cancellation.cancel', () => {
     );
     expect(refund.initiateRefund).toHaveBeenCalled();
     expect(out.state).toBe('doctor_cancelled');
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'cancellation_apology', appointmentId: 'a1' }),
+    );
   });
 
   it('doctor cancel without a reason → 400', async () => {
@@ -515,7 +525,7 @@ describe('evaluateDueAppointments', () => {
       expect.objectContaining({ appointmentId: 'a1', to: 'patient_no_show' }),
     );
     expect(safeRefund).not.toHaveBeenCalled();
-    expect(emailProvider.send).not.toHaveBeenCalled();
+    expect(notification.enqueue).not.toHaveBeenCalled();
     expect(audit.record).not.toHaveBeenCalled();
   });
 
@@ -551,12 +561,16 @@ describe('evaluateDueAppointments', () => {
         },
       ],
     });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
     await evaluateDueAppointments(new Date('2026-06-04T10:36:00.000Z'));
     expect(state.transition).toHaveBeenCalledWith(
       expect.objectContaining({ appointmentId: 'a1', to: 'doctor_no_show' }),
     );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'appointment.evaluation_data_gap' }),
+    );
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'cancellation_apology' }),
     );
   });
 

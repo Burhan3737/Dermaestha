@@ -12,8 +12,8 @@ import {
   VIDEO_TOKEN_POST_MIN,
 } from '../../config/constants.js';
 import { generateSlots } from '../doctor/service.js';
-import { emailProvider } from '../../integrations/email/index.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
+import * as notification from '../notification/service.js';
 import * as audit from '../../services/audit/audit.service.js';
 // Self-import: intra-module calls that tests stub (quoteRefund/transition/initiateRefund/safeRefund)
 // route through the namespace so vi.spyOn can intercept them under ESM (a bare local call cannot be spied).
@@ -359,7 +359,7 @@ export async function cancel({ appointmentId, actorType, actorId, reason }) {
       reason,
     });
     await safeRefund(appointmentId);
-    await sendApology(appt, 'cancellation_apology');
+    await enqueueCancellationEmail(appt, 'cancellation_apology');
     return { state: 'doctor_cancelled' };
   }
 
@@ -372,7 +372,7 @@ export async function cancel({ appointmentId, actorType, actorId, reason }) {
       actorId,
     });
     await safeRefund(appointmentId);
-    await sendApology(appt, 'refund_confirmation');
+    await enqueueCancellationEmail(appt, 'refund_confirmation');
     return { state: 'cancelled_refunded' };
   }
   await self.transition({
@@ -384,19 +384,41 @@ export async function cancel({ appointmentId, actorType, actorId, reason }) {
   return { state: 'cancelled_no_refund' };
 }
 
-async function sendApology(appt, template) {
+/** Enqueue a cancellation-flow email (outbox). Vars are snapshotted now (doc 14 §5). */
+async function enqueueCancellationEmail(appt, type) {
   try {
-    const patient = await prisma.user.findUnique({
-      where: { id: appt.patientUserId },
-      select: { email: true, fullName: true },
+    const [patient, doctor, payment] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: appt.patientUserId },
+        select: { email: true, fullName: true },
+      }),
+      prisma.doctor.findUnique({
+        where: { id: appt.doctorId },
+        select: { user: { select: { fullName: true } } },
+      }),
+      prisma.payment.findFirst({ where: { appointmentId: appt.id, status: 'success' } }),
+    ]);
+    if (!patient) return;
+    const refundAmount = payment
+      ? Math.max(0, payment.amount - (payment.gatewayFee ?? 0))
+      : null;
+    await notification.enqueue({
+      type,
+      appointmentId: appt.id,
+      recipientEmail: patient.email,
+      scheduledFor: new Date(),
+      vars: {
+        patientName: patient.fullName,
+        doctorName: doctor?.user?.fullName ?? null,
+        slotStartLocal: notification.slotStartLocal(appt.slotStart),
+        appointmentRef: appt.id,
+        amount: refundAmount,
+        refundAmount,
+        refundRef: payment?.refundRef ?? null,
+      },
     });
-    await emailProvider.send({
-      template,
-      to: patient.email,
-      vars: { patientName: patient.fullName, appointmentRef: appt.id },
-    });
-  } catch {
-    logger.warn('cancellation email not sent', { appointmentId: appt.id, template });
+  } catch (e) {
+    logger.warn('cancellation email not enqueued', { appointmentId: appt.id, type, err: String(e) });
   }
 }
 
@@ -456,7 +478,7 @@ async function resolveNoShow(a, atCutoff) {
   await self.transition({ appointmentId: a.id, to, actorType: 'system' });
   if (to === 'doctor_no_show') {
     await self.safeRefund(a.id);
-    await sendNoShowApology(a.patientUserId, a.id).catch(() => {});
+    await enqueueCancellationEmail(a, 'cancellation_apology');
     // Scoped to the zero-join-data case (neither party recorded a join at the hard cutoff) —
     // the strict "resolved blind" subset of ADR-12's "missing/ambiguous". Spec-owner to confirm
     // at the canon-docs step whether the alert should widen to late doctor-absent resolutions too.
@@ -473,19 +495,3 @@ async function resolveNoShow(a, atCutoff) {
   }
 }
 
-async function sendNoShowApology(patientUserId, appointmentId) {
-  const patient = await prisma.user.findUnique({
-    where: { id: patientUserId },
-    select: { email: true, fullName: true },
-  });
-  if (!patient) return;
-  try {
-    await emailProvider.send({
-      template: 'cancellation_apology',
-      to: patient.email,
-      vars: { patientName: patient.fullName, appointmentRef: appointmentId },
-    });
-  } catch {
-    logger.warn('no-show apology email not sent', { appointmentId });
-  }
-}
