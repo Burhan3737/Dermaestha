@@ -3,6 +3,10 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { prisma } from '../../lib/prisma/prisma.js';
 import { KARACHI } from '../../lib/tz/tz.js';
 import { env } from '../../config/env/env.js';
+import { logger } from '../../lib/logger/logger.js';
+import { EMAIL_MAX_ATTEMPTS, EMAIL_BACKOFF_BASE_SEC } from '../../config/constants.js';
+import { emailProvider } from '../../integrations/email/index.js';
+import * as audit from '../../services/audit/audit.service.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -80,4 +84,93 @@ export async function enqueueBookingEmails({
       vars: { ...common, joinUrl: dashboardUrl },
     });
   }
+}
+
+const REMINDER_TYPES = new Set(['reminder_24h', 'reminder_1h']);
+const SENDABLE_STATES = new Set(['confirmed', 'in_progress']);
+const LEASE_MS = 60_000;
+
+/** Minute-cron worker body: deliver due outbox rows. Pure w.r.t. the injected clock. */
+export async function dispatchDueNotifications(now = new Date()) {
+  const due = await prisma.notificationJob.findMany({
+    where: {
+      status: 'pending',
+      scheduledFor: { lte: now },
+      OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+    },
+    orderBy: { scheduledFor: 'asc' },
+  });
+  for (const job of due) {
+    // One poisoned row must not starve the batch — it is retried next tick.
+    try {
+      await dispatchOne(job, now);
+    } catch (e) {
+      logger.error('notification dispatch failed; will retry next tick', {
+        jobId: job.id,
+        err: String(e),
+      });
+    }
+  }
+}
+
+async function dispatchOne(job, now) {
+  // Lease claim (defense-in-depth over the ADR-08 single-instance assumption): pushing
+  // nextAttemptAt forward atomically prevents a concurrent pass double-sending this row.
+  const claimed = await prisma.notificationJob.updateMany({
+    where: { id: job.id, status: 'pending' },
+    data: { nextAttemptAt: new Date(now.getTime() + LEASE_MS) },
+  });
+  if (claimed.count === 0) return;
+
+  // Reminder-Invalidation Rule (F07.03): re-check state immediately before dispatch.
+  if (REMINDER_TYPES.has(job.type)) {
+    const appt = await prisma.appointment.findUnique({
+      where: { id: job.appointmentId },
+      select: { state: true },
+    });
+    if (!appt || !SENDABLE_STATES.has(appt.state)) {
+      await prisma.notificationJob.update({
+        where: { id: job.id },
+        data: { status: 'suppressed' },
+      });
+      return;
+    }
+  }
+
+  try {
+    await emailProvider.send({ template: job.type, to: job.recipientEmail, vars: job.vars ?? {} });
+  } catch (e) {
+    const attempts = job.attempts + 1;
+    const lastError = String(e?.message ?? e);
+    if (attempts >= EMAIL_MAX_ATTEMPTS) {
+      await prisma.notificationJob.update({
+        where: { id: job.id },
+        data: { status: 'failed', attempts, lastError },
+      });
+      // Alert source for the Slice G admin feed (F12.01 "email failures after retry exhaustion").
+      await audit
+        .record({
+          eventType: 'email.send_failed_final',
+          actorType: 'system',
+          targetRef: job.appointmentId,
+          reason: `${job.type}: ${lastError}`,
+        })
+        .catch(() => {});
+      return;
+    }
+    await prisma.notificationJob.update({
+      where: { id: job.id },
+      data: {
+        attempts,
+        lastError,
+        nextAttemptAt: new Date(now.getTime() + EMAIL_BACKOFF_BASE_SEC * 1000 * 2 ** attempts),
+      },
+    });
+    return;
+  }
+
+  await prisma.notificationJob.update({
+    where: { id: job.id },
+    data: { status: 'sent', sentAt: new Date(), lastError: null },
+  });
 }

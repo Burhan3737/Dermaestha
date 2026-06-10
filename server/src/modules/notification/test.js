@@ -108,3 +108,96 @@ describe('notification.enqueueBookingEmails (F07.02 cadence + short-lead skip)',
     expect(types).toEqual(['booking_confirmation']);
   });
 });
+
+import { emailProvider } from '../../integrations/email/index.js';
+import * as audit from '../../services/audit/audit.service.js';
+import { dispatchDueNotifications } from './service.js';
+
+const baseJob = {
+  id: 'n1',
+  type: 'booking_confirmation',
+  appointmentId: 'a1',
+  recipientEmail: 'p@t.test',
+  vars: { patientName: 'P' },
+  status: 'pending',
+  attempts: 0,
+};
+
+describe('notification.dispatchDueNotifications', () => {
+  beforeEach(() => {
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
+    prisma.notificationJob.update.mockResolvedValue({});
+  });
+
+  it('sends a due job and marks it sent', async () => {
+    prisma.notificationJob.findMany.mockResolvedValue([baseJob]);
+    await dispatchDueNotifications(NOW);
+    expect(emailProvider.send).toHaveBeenCalledWith({
+      template: 'booking_confirmation',
+      to: 'p@t.test',
+      vars: { patientName: 'P' },
+    });
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'sent' }) }),
+    );
+  });
+
+  it('suppresses a reminder whose appointment left confirmed/in_progress (F07.03 invalidation)', async () => {
+    prisma.notificationJob.findMany.mockResolvedValue([{ ...baseJob, type: 'reminder_24h' }]);
+    prisma.appointment.findUnique.mockResolvedValue({ state: 'cancelled_refunded' });
+    await dispatchDueNotifications(NOW);
+    expect(emailProvider.send).not.toHaveBeenCalled();
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'suppressed' } }),
+    );
+  });
+
+  it('still sends a reminder while the appointment is confirmed', async () => {
+    prisma.notificationJob.findMany.mockResolvedValue([{ ...baseJob, type: 'reminder_1h' }]);
+    prisma.appointment.findUnique.mockResolvedValue({ state: 'confirmed' });
+    await dispatchDueNotifications(NOW);
+    expect(emailProvider.send).toHaveBeenCalled();
+  });
+
+  it('on failure schedules an exponential-backoff retry', async () => {
+    prisma.notificationJob.findMany.mockResolvedValue([baseJob]);
+    emailProvider.send.mockRejectedValueOnce(new Error('smtp down'));
+    await dispatchDueNotifications(NOW);
+    const update = prisma.notificationJob.update.mock.calls[0][0];
+    expect(update.data.attempts).toBe(1);
+    // EMAIL_BACKOFF_BASE_SEC=60 default: 60s * 2^1 = 120s after NOW
+    expect(update.data.nextAttemptAt).toEqual(new Date(NOW.getTime() + 120_000));
+    expect(update.data.status).toBeUndefined();
+  });
+
+  it('at EMAIL_MAX_ATTEMPTS marks failed and writes the email.send_failed_final audit alert', async () => {
+    prisma.notificationJob.findMany.mockResolvedValue([{ ...baseJob, attempts: 2 }]); // 3rd try
+    emailProvider.send.mockRejectedValueOnce(new Error('smtp down'));
+    await dispatchDueNotifications(NOW);
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'failed', attempts: 3 }) }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'email.send_failed_final', targetRef: 'a1' }),
+    );
+  });
+
+  it('skips a job another pass already claimed (lease flip returned count 0)', async () => {
+    prisma.notificationJob.findMany.mockResolvedValue([baseJob]);
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 0 });
+    await dispatchDueNotifications(NOW);
+    expect(emailProvider.send).not.toHaveBeenCalled();
+  });
+
+  it('one poisoned job does not starve the batch', async () => {
+    prisma.notificationJob.findMany.mockResolvedValue([
+      { ...baseJob, id: 'n1' },
+      { ...baseJob, id: 'n2' },
+    ]);
+    prisma.notificationJob.updateMany
+      .mockRejectedValueOnce(new Error('db hiccup'))
+      .mockResolvedValue({ count: 1 });
+    await dispatchDueNotifications(NOW);
+    expect(emailProvider.send).toHaveBeenCalledTimes(1);
+  });
+});
