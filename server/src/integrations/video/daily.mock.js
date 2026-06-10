@@ -1,6 +1,6 @@
 // @ts-check
 import crypto from 'node:crypto';
-import { env } from '../../config/env.js';
+import { env } from '../../config/env/env.js';
 
 const SECRET = env.VIDEO_MOCK_SECRET || 'dev-mock-video-secret';
 

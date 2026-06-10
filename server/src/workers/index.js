@@ -1,7 +1,7 @@
 // @ts-check
 import cron from 'node-cron';
-import { evaluateDueAppointments } from '../services/evaluation.service.js';
-import { logger } from '../lib/logger.js';
+import { evaluateDueAppointments } from '../modules/appointment/service.js';
+import { logger } from '../lib/logger/logger.js';
 
 /**
  * Start in-process workers (ADR-08). Single-instance; no leader election (doc 15 §3).

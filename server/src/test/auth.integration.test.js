@@ -1,8 +1,8 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../index.js';
-import { prisma } from '../lib/prisma.js';
-import * as auth from '../services/auth.service.js';
+import { prisma } from '../lib/prisma/prisma.js';
+import * as auth from '../modules/auth/service.js';
 
 const app = createApp();
 const uniq = () => `slicea_${Date.now()}_${Math.floor(Math.random() * 1e6)}@test.local`;

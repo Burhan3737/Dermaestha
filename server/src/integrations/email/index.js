@@ -1,7 +1,7 @@
 // @ts-check
 import { resendStub } from './resend.stub.js';
 import { consoleEmail } from './console.dev.js';
-import { env } from '../../config/env.js';
+import { env } from '../../config/env/env.js';
 
 /**
  * @typedef {Object} EmailProvider

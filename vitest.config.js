@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   return {
     test: {
       environment: 'node',
-      include: ['server/src/**/*.test.js', 'shared/**/*.test.js'],
+      include: ['server/src/**/*.test.js', 'server/src/**/test.js', 'shared/**/*.test.js'],
       hookTimeout: 30000,
     },
   };

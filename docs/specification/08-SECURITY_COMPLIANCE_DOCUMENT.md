@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.3                                                                                                     |
+| Version          | 1.4                                                                                                     |
 | Last updated     | 2026-06-05                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
@@ -67,7 +67,7 @@ Scoping rules by role (PRD §3.6):
 
 ### A04 — Insecure design
 
-- **Appointment state machine as single authority:** all appointment transitions are defined in one module (`appointmentState.service.js`). No route or worker transitions state outside this module; the allowed-transition table is the definitive authority (PRD §4.3; ARCH §8).
+- **Appointment state machine as single authority:** all appointment transitions go through one writer (the `transition()` function in `server/src/modules/appointment/service.js`). No route or worker transitions state outside this module; the allowed-transition table is the definitive authority (PRD §4.3; ARCH §8).
 - **Data integrity invariants:** ten non-negotiable invariants (#1–#10) are enforced at the storage and service layers (PRD §3.3): slot double-booking impossible via partial unique index; atomic booking+payment commit; doctor-identity durability across renames; prescription immutability; price/fee/medicine snapshots at write time; idempotent payment intents and refunds; deactivation that preserves existing appointments.
 - **Append-only audit log:** `audit.service.record()` is the single writer; no update or delete path exists for audit entries anywhere in the application (PRD §3.6; ARCH §8).
 - **Idempotency keys:** `payments.intent_key` UNIQUE `(patient_user_id, slot_start)` prevents double-payment-intents; `refund_idempotency_key` UNIQUE per appointment prevents double-refund settlements (PRD §3.3 #7/#10; ARCH §5).
@@ -271,3 +271,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | 2026-06-03 | Noted reset token hashed + single-use on `users` (A07) | Slice A reset-token storage decision |
 | 2026-06-04 | Noted dev provider switches must stay at safe defaults in prod; mock-IPN passphrase is dev-only | Slice C dev payment simulation (ADR-22) |
 | 2026-06-05 | Added dev video switch (`VIDEO_PROVIDER=mock`) + `/dev/video/*`/`/dev/worker/*` + `VIDEO_MOCK_SECRET` must-not-be-prod note (§A05) | Slice D (F05 video & lifecycle) |
+| 2026-06-11 | Re-pointed the state-machine single-authority ref to the `transition()` writer in `modules/appointment/service.js` (merged) | Folder-structure restructure (ADR-26); behavior unchanged |

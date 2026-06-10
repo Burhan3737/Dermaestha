@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.2                                                           |
+| Version          | 1.3                                                           |
 | Last updated     | 2026-06-05                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
@@ -522,7 +522,7 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 
 **Releasing / terminal states excluded from the index:** `cancelled_refunded`, `doctor_cancelled`, `patient_no_show`, `doctor_no_show`. When an appointment reaches one of these states, its `(doctor_id, slot_start)` pair is no longer covered by the index, which means the slot becomes rebookable. A second insert for a currently-held slot fails at write time (a unique violation), not at application-level validation time — this is intentional.
 
-**Migration caveat:** This index must be re-applied whenever the `appointments` table is recreated via a destructive migration. See `prisma/schema.prisma` header and `CONFIG.md §7`.
+**Migration caveat:** This index must be re-applied whenever the `appointments` table is recreated via a destructive migration. See the `prisma/schema.prisma` header (this §4b is the canonical caveat).
 
 ### 4c. Query indexes (non-unique)
 
@@ -597,3 +597,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-01 | Initial creation | Faithful re-presentation of `prisma/schema.prisma` + `ARCHITECTURE.md §5` |
 | 2026-06-03 | Added `reset_token_hash` + `reset_token_expires_at` to `users` (§2b, §6 F01) | Slice A password-reset storage (F01.03); schema change per change-impact matrix |
 | 2026-06-05 | Added `doctor_joined_at` + `patient_joined_at` nullable TIMESTAMPTZ columns to `appointments` (§2e); migration `20260604141222_add_video_join_columns` | Slice D (F05 video & lifecycle) |
+| 2026-06-11 | Dropped the deprecated `CONFIG.md §7` pointer from the §4b migration caveat (this section is the canonical home) | Deprecated-doc hygiene (design §8.1) |

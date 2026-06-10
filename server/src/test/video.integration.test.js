@@ -6,8 +6,8 @@ process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
 
 const request = (await import('supertest')).default;
 const { createApp } = await import('../index.js');
-const { prisma } = await import('../lib/prisma.js');
-const { evaluateDueAppointments } = await import('../services/evaluation.service.js');
+const { prisma } = await import('../lib/prisma/prisma.js');
+const { evaluateDueAppointments } = await import('../modules/appointment/service.js');
 
 const app = createApp();
 const uniq = () => `sliced_${Date.now()}_${Math.floor(Math.random() * 1e6)}@test.local`;

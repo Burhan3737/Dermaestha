@@ -4,7 +4,7 @@
 | -------------------- | ---------------------------------- |
 | **Document ID**      | 03-ARCHITECTURE_DOCUMENT           |
 | **Status**           | Canonical                          |
-| **Version**          | 1.3                                |
+| **Version**          | 1.4                                |
 | **Last updated**     | 2026-06-05                         |
 | **Sources absorbed** | `docs/engineering/ARCHITECTURE.md` |
 | **Related docs**     | 02, 04, 05, 10, 14, 15             |
@@ -39,7 +39,7 @@ Dermestha v1 is a **single-deployable, same-origin monolith**: one JavaScript Ex
 - **Database** — Durable store for all domain data and server sessions. PostgreSQL (managed).
 - **Reconciliation worker** — Hourly query of PayFast for unconfirmed payments; reconcile missed webhooks. `node-cron` (in-process).
 - **Notification worker** — Schedule and dispatch the 6 email triggers; retry/backoff; reminder invalidation. `node-cron` (in-process).
-- **Appointment-evaluation worker** — Advance `confirmed→in_progress`, resolve `completed`/no-show within the grace window. `node-cron` (in-process). **Now implemented** (`server/src/workers/`; `evaluation.service.js`; ADR-25): owns all non-payment §4.3 transitions (`confirmed→in_progress` at slot-start; `in_progress→completed` at slot-end+5m; no-show resolution at slot+15m with doctor-absence precedence per ADR-12).
+- **Appointment-evaluation worker** — Advance `confirmed→in_progress`, resolve `completed`/no-show within the grace window. `node-cron` (in-process). **Now implemented** (`server/src/workers/`; `evaluateDueAppointments` in `server/src/modules/appointment/service.js`; ADR-25): owns all non-payment §4.3 transitions (`confirmed→in_progress` at slot-start; `in_progress→completed` at slot-end+5m; no-show resolution at slot+15m with doctor-absence precedence per ADR-12).
 - **Payment adapter** — Hosted checkout, signed webhook verify, refund API, reconciliation query. PayFast.
 - **Video adapter** — Per-appointment rooms, time-bound participant tokens. Daily.co.
 - **Email adapter** — Transactional sends + bounce/failure signal. Resend.
@@ -93,6 +93,18 @@ flowchart TB
     Application -- "Prisma client" --> Data
     Adapters --> Externals
 ```
+
+### 3a.1. Code organization & folder conventions
+
+The three logical layers above (routes → controllers → services) are organized **feature-first**, not in top-level `routes/`/`controllers/`/`services/` directories (ADR-26). The physical layout:
+
+**Server (`server/src/`):** each domain is a self-contained module — `modules/<domain>/` with `index.js` (routes), `controller.js`, `service.js`, and a co-located `test.js` — for `auth`, `doctor` (incl. availability), `appointment` (the whole booking → cancellation → refund → evaluation lifecycle in one `service.js`), `payment`, and `video`. A central `routes.js` (`registerRoutes`) mounts every module. Cross-cutting infrastructure stays top-level and folder-grouped: `config/` (flat `constants.js`), `http/` (flat `AppError.js`), `lib/<name>/<name>.js`, `middleware/<name>/<name>.js`, `integrations/`, `workers/`, plus shared cross-module services in `services/` (today: `audit/`). `health/` and `dev/` are standalone.
+
+**Client (`client/src/`):** each feature is `modules/<feature>/` with `views/<View>/`, feature-local `components/`, **one `use<Feature>` hook** owning the feature's data/mutations (views keep render + pure UI state only), and a `*.routes.jsx`. Cross-feature UI primitives live in `shared/<Name>/`; cross-cutting React state in `context/` (`context/session/` for session state; `context/AppProviders.jsx` composing Query + Router + Session providers); pure utilities in `lib/<name>/<name>.js`; page shells in `layouts/<Name>/`. `routes.jsx` aggregates each module's routes via `buildRoutes(session)` and `App.jsx` renders only the route table. One-shot auth actions live in `modules/auth/useAuth.js`; the session **context holds cross-cutting state only**.
+
+**Shared (`shared/schemas/`):** Zod request DTOs are the client↔server validation contract, organized per-domain (`auth/`, `doctor/`, `appointment/`) behind an `index.js` barrel.
+
+**Data layer — Prisma vs Zod.** There is no Mongoose-style model file: `prisma/schema.prisma` is the single declarative model (`prisma generate` → typed client, accessed via the `lib/prisma/` singleton), with model-shape safety at edit-time (`@ts-check` + JSDoc) plus DB constraints; `shared/schemas/*` (Zod) validate incoming HTTP requests at the API boundary. They overlap in fields but are intentionally distinct (e.g. Zod `password` → Prisma `passwordHash`). Generating Zod from Prisma is a possible future improvement, out of scope.
 
 ### 3b. Booking → Payment → Confirmation sequence
 
@@ -182,3 +194,4 @@ There are no message queues or other third-party infrastructure services. The th
 | 2026-06-03 | Noted frontend state stack (Context + TanStack Query) in §2 | Reflects ADR-20 (Slice A) |
 | 2026-06-03 | Noted `date-fns-tz` in the frontend/stack row | Reflects ADR-21 (Slice B) |
 | 2026-06-05 | Noted appointment-evaluation worker as implemented (§1 components) | Slice D (F05 video & lifecycle; ADR-25) |
+| 2026-06-11 | Added §3a.1 "Code organization & folder conventions" (feature-first layout, view→hook rule, Prisma-vs-Zod note); re-pointed the evaluation-worker ref to `modules/appointment/service.js` | Folder-structure restructure (ADR-26); behavior unchanged |

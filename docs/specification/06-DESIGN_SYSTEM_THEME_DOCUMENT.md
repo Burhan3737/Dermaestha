@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.0                                                                                       |
+| Version          | 1.1                                                                                       |
 | Last updated     | 2026-06-01                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -304,7 +304,7 @@ All hex values are copied verbatim from `mockups/assets/css/tokens.css`.
 
 ### Type scale
 
-Values from `tokens.css`; line heights, weights, and tracking from `DESIGN.md §2.2`.
+Values from `tokens.css`; line heights, weights, and tracking defined in this document.
 
 | Role    | CSS variable   | Size                    | Line height | Weight | Family  | Tracking           |
 | ------- | -------------- | ----------------------- | ----------- | ------ | ------- | ------------------ |
@@ -542,3 +542,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | Date       | Change           | Why                                                                 |
 | ---------- | ---------------- | ------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of DESIGN.md + tokens.css + components.css |
+| 2026-06-11 | Repointed the type-scale `DESIGN.md §2.2` ref into this document (DESIGN.md deprecated-by-policy) | Deprecated-doc hygiene |

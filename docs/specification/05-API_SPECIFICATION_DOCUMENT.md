@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.5                           |
+| Version          | 1.7                           |
 | Last updated     | 2026-06-09                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
@@ -122,7 +122,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | Method · Path                    | Role           | Purpose                                                     | Notes                                                    |
 | -------------------------------- | -------------- | ----------------------------------------------------------- | -------------------------------------------------------- |
 | `POST /api/auth/signup`          | public         | Patient sign-up + ToS consent → session                     | rate-limited; records `tosAcceptedAt`; patient role only |
-| `POST /api/auth/login`           | public         | Shared login, routes by `role` (DA2)                        | rate-limited + lockout (`CONFIG.md`); audit-logged       |
+| `POST /api/auth/login`           | public         | Shared login, routes by `role` (DA2)                        | rate-limited + lockout (doc 15); audit-logged       |
 | `POST /api/auth/logout`          | any            | Destroy session                                             | `204`                                                    |
 | `GET /api/auth/me`               | any            | Bootstrap SPA: `{ id, role, fullName, mustChangePassword }` | drives client role-guards (convenience only)             |
 | `POST /api/auth/forgot-password` | public         | Email reset token (1h, P2)                                  | rate-limited; **enumeration-safe**                       |
@@ -178,7 +178,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | `POST /api/webhooks/daily`   | system | Participant join/leave events → evaluation worker | feeds no-show resolution                                                                                                 |
 | `POST /api/webhooks/resend`  | system | Bounce/complaint signal                           | flags email failures to A3                                                                                               |
 
-> Refunds have **no patient/doctor route** — they are a side-effect of cancel/no-show transitions, orchestrated by `refund.service` with the per-appointment idempotency key (#10), retried with backoff, admin-alerted on exhaustion. No in-app manual retry (admin acts in the gateway dashboard if needed).
+> Refunds have **no patient/doctor route** — they are a side-effect of cancel/no-show transitions, orchestrated by the refund logic in `modules/appointment/service.js` with the per-appointment idempotency key (#10), retried with backoff, admin-alerted on exhaustion. No in-app manual retry (admin acts in the gateway dashboard if needed).
 
 > **Dev-only, non-canonical:** when `PAYMENT_PROVIDER=mock`, the app mounts `GET /dev/checkout` + `POST /dev/payment/complete` to simulate PayFast's hosted page by emitting a real signed IPN to `/api/webhooks/payfast` (ADR-22, doc 14 §2). These `/dev/*` routes are not part of the canonical API surface and are never mounted in production.
 
@@ -222,7 +222,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                | Role       | Purpose                  | Notes                                                          |
 | ---------------------------- | ---------- | ------------------------ | -------------------------------------------------------------- |
-| `POST /api/analytics/events` | public/any | Ingest a telemetry event | `{ type, networkType?, meta? }`; see `INTEGRATIONS.md` catalog |
+| `POST /api/analytics/events` | public/any | Ingest a telemetry event | `{ type, networkType?, meta? }`; see doc 14 (analytics catalog) |
 
 ---
 
@@ -234,7 +234,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 ## 5. Appointment state-machine transition table
 
-The **only** module that performs transitions is `appointmentState.service`. It validates `from → to` against the table below, writes the audit entry, then fires side-effects (refund, email, video token). Controllers and the three workers call it; none mutate `state` directly.
+The **only** writer that performs transitions is the `transition()` function in `modules/appointment/service.js`. It validates `from → to` against the table below, writes the audit entry, then fires side-effects (refund, email, video token). Controllers and the three workers call it; none mutate `state` directly.
 
 `slot_available` = **no row** (absence). Booking inserts at `slot_locked`.
 
@@ -254,7 +254,7 @@ The **only** module that performs transitions is `appointmentState.service`. It 
 | `completed`           | `prescription_issued`       | doctor submits prescription (doctor)     | immutable write (#4); "prescription ready" email                                          |
 | `prescription_issued` | `prescription_issued`       | additional prescription (doctor)         | new linked row, chronological (#4) — state unchanged                                      |
 
-**Derived (not a stored state):** `awaiting_prescription` — a `completed` appointment with no prescription after 12h raises an A3 alert (`CONFIG.md`).
+**Derived (not a stored state):** `awaiting_prescription` — a `completed` appointment with no prescription after 12h raises an A3 alert (doc 15).
 
 **Orthogonal flag:** `disputed` may attach to any terminal state without a transition.
 
@@ -269,7 +269,7 @@ The **only** module that performs transitions is `appointmentState.service`. It 
 | P1 browse                     | `GET /api/doctors`, `GET /api/doctors/:id`                                   |
 | P2 signup/login/reset/consent | `auth/*` (signup, login, forgot/reset-password); ToS at signup               |
 | P3 book slot                  | `slots`, `appointments/lock`, `appointments/:id/pay`                         |
-| P4 reminders                  | notification worker (no route) — see `INTEGRATIONS.md`                       |
+| P4 reminders                  | notification worker (no route) — see doc 14                       |
 | P5 join call                  | `appointments/:id/video-token`                                               |
 | P6 cancel                     | `appointments/:id/cancel`                                                    |
 | P7 view/download Rx           | `GET .../prescriptions` + client PDF                                         |
@@ -320,3 +320,5 @@ The **only** module that performs transitions is `appointmentState.service`. It 
 | 2026-06-04 | Added `409` codes `ACTIVE_LOCK_EXISTS`/`OVERLAP`/`INVALID_TRANSITION` + `422` `SLOT_NOT_BOOKABLE`; noted dev-only `/dev/*` checkout routes | Slice C booking/payment (F03/F04) |
 | 2026-06-05 | Added `VIDEO_WINDOW_CLOSED` to §3.2 `422` example codes | Slice D (F05 video & lifecycle) |
 | 2026-06-09 | Completed the `POST /api/appointments/lock` Notes cell to list `ACTIVE_LOCK_EXISTS`/`OVERLAP`/`SLOT_NOT_BOOKABLE` (already in §3.2 status table) | Gap-analysis O2 — endpoint-note completeness |
+| 2026-06-11 | Re-pointed the state-machine writer + refund-orchestration prose to the merged `modules/appointment/service.js` | Folder-structure restructure (ADR-26); behavior unchanged |
+| 2026-06-11 | Repointed deprecated `CONFIG.md`/`INTEGRATIONS.md` refs to docs 15/14 | Deprecated-doc hygiene |

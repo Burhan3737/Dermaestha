@@ -1,0 +1,32 @@
+// @ts-check
+import { AppError } from './http/AppError.js';
+import { env } from './config/env/env.js';
+import { mustChangePasswordGate } from './middleware/mustChangePassword/mustChangePassword.js';
+import { authRouter } from './modules/auth/index.js';
+import { doctorsRouter, availabilityRouter } from './modules/doctor/index.js';
+import { appointmentsRouter } from './modules/appointment/index.js';
+import { paymentWebhookRouter } from './modules/payment/index.js';
+import { videoWebhookRouter } from './modules/video/index.js';
+import { healthRouter } from './health/index.js';
+import { devCheckoutRouter } from './dev/devCheckout.js';
+import { devVideoRouter } from './dev/devVideo.js';
+
+/** Mount all API + dev routes onto the app, in order (extracted from index.js, behavior unchanged). */
+export function registerRoutes(app) {
+  // API routes first.
+  app.use('/api', mustChangePasswordGate); // DA3 gate, after session, before feature routers
+  app.use('/api/auth', authRouter);
+  app.use('/api/doctors', doctorsRouter);
+  app.use('/api/availability', availabilityRouter);
+  app.use('/api/appointments', appointmentsRouter);
+  // Each domain module owns its own webhook route; both mount under /api/webhooks (D11).
+  app.use('/api/webhooks', paymentWebhookRouter); // POST /api/webhooks/payfast
+  app.use('/api/webhooks', videoWebhookRouter); // POST /api/webhooks/daily
+  app.use('/api', healthRouter);
+  // Unknown /api path → JSON 404 envelope (never the SPA HTML).
+  app.use('/api', (_req, _res, next) => next(new AppError('NOT_FOUND', 'Not found.', 404)));
+
+  // Dev-only simulators. NEVER mounted in production.
+  if (env.PAYMENT_PROVIDER === 'mock') app.use('/dev', devCheckoutRouter);
+  if (env.VIDEO_PROVIDER === 'mock') app.use('/dev', devVideoRouter);
+}

@@ -3,7 +3,7 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.2                                          |
+| Version          | 1.4                                          |
 | Last updated     | 2026-06-05                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
@@ -95,7 +95,7 @@ Workers use `node-cron`, running in-process. **Single-instance assumption (v1):*
 | ---------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Reconciliation         | **hourly** (`0 * * * *`)       | PayFast unconfirmed-payments query, last 24 h (edge #6/#6a)                                                                            |
 | Notification           | **every minute** (`* * * * *`) | Dispatch due emails; **re-check appointment state immediately before send**; suppress reminders if no longer `confirmed`/`in_progress` |
-| Appointment-evaluation | **every minute** (`* * * * *`) | `confirmed→in_progress` at slot-start; resolve `completed`/no-show in grace window; never strand `in_progress` past slot-end+5 min. **Implemented** (`server/src/workers/`; `evaluation.service.js`; ADR-25). |
+| Appointment-evaluation | **every minute** (`* * * * *`) | `confirmed→in_progress` at slot-start; resolve `completed`/no-show in grace window; never strand `in_progress` past slot-end+5 min. **Implemented** (`server/src/workers/`; `evaluateDueAppointments` in `server/src/modules/appointment/service.js`; ADR-25). |
 
 ---
 
@@ -161,7 +161,7 @@ Source: CONFIG.md §7. Cross-reference: [doc 04 — Database Document](04-DATABA
 
 ## 8. Environment Variable Contract
 
-Source: `.env.example`. Copy to `.env` for local dev; set real values in Railway/host for production. Pairs with `docs/engineering/CONFIG.md` and `docs/engineering/ARCHITECTURE.md §14.5`.
+Source: `.env.example`. Copy to `.env` for local dev; set real values in Railway/host for production. See doc 10 (deployment) for host/runtime topology.
 
 ### Core
 
@@ -227,7 +227,7 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 
 ### Tunable Defaults
 
-These mirror `docs/engineering/CONFIG.md`; runtime A6 `settings` table entries override `minBookingLeadMinutes` and other booking-lead values without a redeploy.
+Runtime A6 `settings` table entries override `minBookingLeadMinutes` and other booking-lead values without a redeploy.
 
 | Variable               | Purpose                                              | Default |
 | ---------------------- | ---------------------------------------------------- | ------- |
@@ -265,3 +265,5 @@ These mirror `docs/engineering/CONFIG.md`; runtime A6 `settings` table entries o
 | 2026-06-01 | Initial creation | Faithful re-presentation of CONFIG.md + .env.example |
 | 2026-06-04 | Added `PAYMENT_PROVIDER` + `EMAIL_PROVIDER` provider-selection switches; noted `PAYFAST_PASSPHRASE` dual use as the dev mock-IPN signing key | Slice C dev payment/email simulation (ADR-22) |
 | 2026-06-05 | Added `VIDEO_PROVIDER` + `VIDEO_MOCK_SECRET` provider-selection switches (§8); noted appointment-evaluation worker as Implemented (§3) | Slice D (F05 video & lifecycle) |
+| 2026-06-11 | Re-pointed the evaluation-worker logic ref to `modules/appointment/service.js` (merged) | Folder-structure restructure (ADR-26); `config/constants.js` ref unchanged (stayed flat) |
+| 2026-06-11 | Dropped deprecated `CONFIG.md`/`ARCHITECTURE.md §14.5` live pointers (this doc is the config canon; deployment topology -> doc 10) | Deprecated-doc hygiene |

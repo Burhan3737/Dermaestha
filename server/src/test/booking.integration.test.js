@@ -5,7 +5,7 @@ process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
 
 const request = (await import('supertest')).default;
 const { createApp } = await import('../index.js');
-const { prisma } = await import('../lib/prisma.js');
+const { prisma } = await import('../lib/prisma/prisma.js');
 const { buildSignedIpn } = await import('../integrations/payment/payfast.mock.js');
 const { formatInTimeZone } = await import('date-fns-tz');
 
