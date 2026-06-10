@@ -9,3 +9,4 @@ coverage/
 # local agent state
 .claude/
 .superpowers/
+.playwright-mcp/

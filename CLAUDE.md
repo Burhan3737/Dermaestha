@@ -1,19 +1,40 @@
 # CLAUDE.md
 
-## Project Rules
-
-Refer to PROJECT_RULES.md on every load. It contains project specific rules that must be followed.
-
 ## RULES YOU MUST FOLLOW (RULES CAN ONLY BE EDITED BY HUMANS)
 
-- ONLY IF you are activating a skill ALWAYS inform the user about it and give them an option to opt out of it.
-- After completing a plan, give a executive summary and list of changes to be made in the plan as well.
-- The canonical documentation suite is `docs/specification/` (`00`–`15`) — the **sole source of truth**. The older `docs/product/`, `docs/engineering/`, and `docs/design/` files are **deprecated-by-policy**; do not treat them as canon. 
-- Based on `docs/specification/00-INDEX_AND_GOVERNANCE.md`, stay alert for a change that requires updates in the documentation suite `docs/specification/` (`00`–`15`), **DO NOT SKIP**. When editing any spec, follow the change protocol and change-impact matrix in `docs/specification/00-INDEX_AND_GOVERNANCE.md`. Inform and list down the update recommendations to the user and make changes after their approval.
-- Maintain a **single combined change log per working session** in the `agentChangeLogs/` folder. Create it as `${YYYY-MM-DD-HHmm}-${kebab-session-name}.md` (ISO date + 24-hour time first so files sort chronologically; no colon — Windows-safe) by copying `agentChangeLogs/_TEMPLATE.md`, and **update it as you make changes — not only at the end**. Follow the template's section order **exactly**: keep every section, writing "None"/"N/A"/"Not verified" rather than omitting one. A single doc covers both the narrative (status, goal, context, decisions, findings, verification, next steps) and the file-level change table (each file changed + the reason).
-- Keep `agentChangeLogs/index.md` current with one line per session, newest last, in the format `${YYYY-MM-DD-HHmm}-${kebab-session-name}: <one-line summary>`.
-- Per CLAUDE.md, a working session keeps **one** combined changelog. When dispatching subagents for a multi-document or multi-file task, the **controller owns** that single session changelog and its `agentChangeLogs/index.md` entry. Subagents must **not** create per-task changelog files or edit anything under `agentChangeLogs/` — instruct them explicitly, because they otherwise infer the CLAUDE.md changelog rule and fragment the log.
-- You are NOT allowed to perform deployment actions, you need approval from the user and need to clearly inform them.
+### Skills
+
+- Before activating any skill, STOP: tell the user which skill you are about to use and why, and let them decline. Never activate a skill silently.
+- After you fully understand the request, recommend the best-fit skill(s) for the task and let the user choose whether to use them.
+- If the user proposes a skill that does not fit the current task, tell them it is unsuitable before doing anything else.
+
+### Specs
+
+- At the START of any task, read `docs/specification/00-INDEX_AND_GOVERNANCE.md` first. Treat it as the authoritative source of project context and specifications.
+- Treat the documentation suite `docs/specification/` files `00`–`15` as the SOLE source of truth.
+- As you work, actively check after each change whether it requires updates to any file in `docs/specification/` (`00`–`15`). This check is mandatory — DO NOT SKIP it.
+- Before editing any spec, follow the change protocol and change-impact matrix defined in `docs/specification/00-INDEX_AND_GOVERNANCE.md`.
+- Before making any spec change, list your proposed updates to the user and wait for their explicit approval. Do not edit until approved.
+
+### Agent Logs
+
+- Maintain exactly ONE combined change log per working session, in `agentChangeLogs/`:
+  - Create it by copying `agentChangeLogs/_TEMPLATE.md`.
+  - Name it `${YYYY-MM-DD-HHmm}-${kebab-session-name}.md` (ISO date + 24-hour time first so files sort chronologically; no colon, to stay Windows-safe).
+  - Update it AS YOU MAKE CHANGES — not only at the end.
+  - Follow the template's section order EXACTLY. Keep every section; if a section is empty, write "None" / "N/A" / "Not verified" — never omit a section.
+  - This one document holds both the narrative (status, goal, context, decisions, findings, verification, next steps) AND the file-level change table (each file changed + the reason).
+- Keep `agentChangeLogs/index.md` current: one line per session, newest last, formatted as `${YYYY-MM-DD-HHmm}-${kebab-session-name}: <one-line summary>`.
+- One session = one changelog. When you dispatch subagents for a multi-document or multi-file task:
+  - YOU (the controller) own the single session changelog and its `agentChangeLogs/index.md` entry.
+  - Subagents must NOT create per-task changelog files and must NOT edit anything under `agentChangeLogs/`.
+  - Instruct subagents about this explicitly in their task — otherwise they will infer the CLAUDE.md changelog rule on their own and fragment the log.
+
+### Actions — require approval, STOP and ask first
+
+- Do NOT `git push`. Stop, clearly tell the user, and wait for their approval.
+- Do NOT perform any deployment action. Stop, clearly tell the user, and wait for their approval.
+- Do NOT create a new branch. Stop, clearly tell the user, and wait for their approval.
 
 ## Behavioral guidelines
 
@@ -79,7 +100,6 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
 
 ### 5. Accuracy and verification
 
