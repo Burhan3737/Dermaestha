@@ -4,7 +4,7 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.3                                |
+| Version          | 1.4                                |
 | Last updated     | 2026-06-05                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
@@ -180,7 +180,7 @@ The concrete Daily.co network adapter is not yet wired; the production default (
 
 ## 5. Email merge-variable catalog (7 triggers)
 
-Retry/backoff lives in the notification worker (`CONFIG.md §3`); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final copy is M4.
+Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final copy is M4.
 
 | `EmailTemplate`        | Trigger                                   | Merge vars                                                   |
 | ---------------------- | ----------------------------------------- | ------------------------------------------------------------ |
@@ -216,7 +216,7 @@ Keep the catalog closed: adding an event = adding a row here first, so the KPI d
 
 ## 7. Error envelope
 
-Shared by all `/api` routes (repeated from `API.md §1.1`):
+Shared by all `/api` routes (repeated from doc 05):
 
 ```json
 { "error": { "code": "SCREAMING_SNAKE", "message": "display-safe", "details": {} } }
@@ -234,3 +234,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-03 | Added `password_reset` email template (§5) | Slice A: F01.03 reset email was missing from the catalog |
 | 2026-06-04 | Documented the dev `payfast.mock` adapter + `/dev/checkout` simulation (§2) | Slice C: offline payment simulation via real signed IPN (ADR-22) |
 | 2026-06-05 | Added dev `daily.mock` simulation note (§3) | Slice D (F05 video & lifecycle; ADR-24) |
+| 2026-06-11 | Repointed deprecated `CONFIG.md §3` -> doc 15 and `API.md §1.1` -> doc 05 | Deprecated-doc hygiene |

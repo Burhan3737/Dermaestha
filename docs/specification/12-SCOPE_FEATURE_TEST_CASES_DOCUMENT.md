@@ -282,3 +282,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | ---------- | ---------------- | -------------------------------------------- |
 | 2026-06-01 | Initial creation | Derived from docs 02 (scope) + 08 (security) |
 | 2026-06-05 | Added TC-F05-010 through TC-F05-015 (video-token window, evaluation worker activation, no-show resolution branches, completion cutoff, zero-join-data alert) | Slice D (F05 video & lifecycle) |
+| 2026-06-11 | Re-pointed the TC-F05-011 transition-via ref to the `transition()` writer in `modules/appointment/service.js` | Folder-structure restructure (ADR-26); test expectation unchanged |

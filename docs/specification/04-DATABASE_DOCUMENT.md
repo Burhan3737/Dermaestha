@@ -597,3 +597,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-01 | Initial creation | Faithful re-presentation of `prisma/schema.prisma` + `ARCHITECTURE.md §5` |
 | 2026-06-03 | Added `reset_token_hash` + `reset_token_expires_at` to `users` (§2b, §6 F01) | Slice A password-reset storage (F01.03); schema change per change-impact matrix |
 | 2026-06-05 | Added `doctor_joined_at` + `patient_joined_at` nullable TIMESTAMPTZ columns to `appointments` (§2e); migration `20260604141222_add_video_join_columns` | Slice D (F05 video & lifecycle) |
+| 2026-06-11 | Dropped the deprecated `CONFIG.md §7` pointer from the §4b migration caveat (this section is the canonical home) | Deprecated-doc hygiene (design §8.1) |

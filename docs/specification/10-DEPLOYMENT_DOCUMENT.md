@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
 | Status           | Canonical                                                                                               |
-| Version          | 1.3                                                                                                     |
+| Version          | 1.4                                                                                                     |
 | Last updated     | 2026-06-05                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
 | Related docs     | 03, 08, 15                                                                                              |
@@ -86,7 +86,7 @@ Complete every item before triggering a production deploy.
 - [ ] **Tests green** — run `npm test` (Vitest); all tests must pass before shipping.
 - [ ] **Lint clean** — run `npm run lint`; resolve any reported errors.
 - [ ] **Migrations ready** — verify `prisma/migrations/` contains all new migration files for this release.
-- [ ] **Append the `uniq_active_slot` partial index** — Prisma's DSL cannot express partial (`WHERE`) indexes; the no-double-booking constraint must be hand-edited into the generated migration SQL. See doc 04 §5 and ARCHITECTURE.md §5 constraint #1. The SQL to append is:
+- [ ] **Append the `uniq_active_slot` partial index** — Prisma's DSL cannot express partial (`WHERE`) indexes; the no-double-booking constraint must be hand-edited into the generated migration SQL. See doc 04 §4b (no-double-booking partial index, invariant #1). The SQL to append is:
 
   ```sql
   CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
@@ -98,7 +98,7 @@ Complete every item before triggering a production deploy.
 
   Confirm this index is present in the migration before deploying.
 
-- [ ] **Prisma version pinned** — `package.json` must pin `prisma@6.x` and `@prisma/client@6.x` (Prisma 7 dropped in-schema `datasource.url`). Current pin is `6.19.3`. See doc 15 §CONFIG.md §7.
+- [ ] **Prisma version pinned** — `package.json` must pin `prisma@6.x` and `@prisma/client@6.x` (Prisma 7 dropped in-schema `datasource.url`). Current pin is `6.19.3`. See doc 15 §7 (Migration Caveats).
 - [ ] **Environment variables set** — all required vars from doc 15 are configured in Railway's environment dashboard; no var is left empty for production.
 - [ ] **Secrets rotated per environment** — `SESSION_SECRET`, `PAYFAST_*`, `DAILY_API_KEY`, `RESEND_API_KEY`, `ERROR_TRACKING_DSN`.
 - [ ] **PayFast KYC complete** — merchant account must be fully verified before `PAYFAST_MODE=live` can process payments (ARCHITECTURE.md §12).
@@ -321,3 +321,4 @@ A formal version scheme and Git tagging convention have not been established. At
 | 2026-06-01 | Initial creation | Faithful re-presentation of ARCH §13/§14 + Dockerfile + docker-compose + package.json |
 | 2026-06-04 | Added pre-deploy check: dev provider switches OFF in prod (no mock gateway / `/dev` routes) | Slice C dev payment simulation (ADR-22) |
 | 2026-06-05 | Added pre-deploy check: `VIDEO_PROVIDER` must not be `mock` in production (§3) | Slice D (F05 video & lifecycle) |
+| 2026-06-11 | Re-pointed the refund-exhaustion alert ref to `modules/appointment/service.js`; fixed two deprecated/broken deploy-checklist pointers (`ARCHITECTURE.md §5` -> doc 04 §4b; malformed `doc 15 §CONFIG.md §7` -> doc 15 §7) | Restructure (ADR-26) + deprecated-doc hygiene |
