@@ -161,6 +161,8 @@ Per tick, `dispatchDueNotifications(now)`:
 
 ## 6. Fidelity fixes (gap report Part 1)
 
+> **Reality note (2026-06-11, plan stage):** source re-read during planning confirmed the 2026-06-09 gap-fix session already landed G5, G2's route half (slots 404 via `getPublicDoctor`), and G1's visibility half (`refundStatus:'failed'` on error). The implementation plan therefore builds only: G1 retry semantics + worker, G2's booking half (`lockSlot` guard), G3, and G4.
+
 | Gap | Fix |
 | --- | --- |
 | **G2** | Slots endpoint + booking re-validation require doctor exists **and** `active`; otherwise **404** (parity with profile route; closes invariant #9 before Slice G ships deactivation) |

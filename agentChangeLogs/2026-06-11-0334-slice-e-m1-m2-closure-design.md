@@ -24,6 +24,8 @@ M1 ~85% / M2 ~75% (slices A–D merged, 180 tests green) but the spec's mileston
 | `docs/superpowers/specs/2026-06-11-slice-e-m1-m2-closure-design.md` | Created | Approved Slice E design (outbox + 3 workers + G1–G5 fixes + Resend adapter) + E→F→G→H roadmap so future sessions need no conversational context |
 | `agentChangeLogs/2026-06-11-0334-slice-e-m1-m2-closure-design.md` | Created | This session log |
 | `agentChangeLogs/index.md` | Modified | Added this session's entry |
+| `docs/superpowers/plans/2026-06-11-slice-e-m1-m2-closure.md` | Created | 16-task TDD implementation plan (writing-plans skill), grounded in source re-reads; includes canon-doc approval gate (Task 16) |
+| `docs/superpowers/specs/2026-06-11-slice-e-m1-m2-closure-design.md` | Modified | Reality note added to §6: G5, G2-route, G1-visibility already fixed in the 2026-06-09 session — plan scopes only the open remainder |
 
 ## Dependencies / config / schema
 
@@ -40,6 +42,7 @@ None this session (design only). The design *plans*: one Prisma migration (`Noti
 
 ## Notable findings
 
+- The 2026-06-09 gap-fix session already landed G5 (`replaceWeeklyBlocks` expired-lock exclusion), G2's route half (slots gate via `getPublicDoctor`), and G1's visibility half (`refundStatus:'failed'` in `initiateRefund`'s catch); the confirmation email is also already fire-and-forget post-commit. Still open: G2 booking half (`lockSlot` unguarded), G3, G4, all three workers.
 - `RefundStatus` enum already has `retrying`/`failed`; `REFUND_MAX_ATTEMPTS`/`REFUND_BACKOFF_BASE_SEC` exist with zero consumers — schema/constants anticipated the retry worker.
 - No notification/outbox model exists anywhere in the schema; F07.03 is unimplementable without persistence.
 - `workers/index.js` comment explicitly reserves seats for the notification + reconciliation workers (ADR-08 pattern).
