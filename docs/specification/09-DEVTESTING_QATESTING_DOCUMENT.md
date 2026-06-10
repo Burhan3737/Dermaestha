@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------- |
 | Document ID      | `09-DEVTESTING_QATESTING_DOCUMENT`                |
 | Status           | Canonical                                         |
-| Version          | 1.0                                               |
+| Version          | 1.1                                               |
 | Last updated     | 2026-06-01                                        |
 | Sources absorbed | `docs/specification/02, 04, 08; vitest.config.js` |
 | Related docs     | 02, 04, 08, 12                                    |
@@ -37,7 +37,7 @@ This document defines the testing strategy, scope, environments, case structure,
 
 The v1 testing programme spans four layers.
 
-**Unit testing** covers isolated service-layer logic: the appointment state-machine transition table (`appointmentState.service.js`), the ten data-integrity invariants from doc 04, password hashing, Zod schema validation, role middleware, and audit-service record emission. The runner is **Vitest** (root `vitest.config.js`, `environment: 'node'`, glob `server/src/**/*.test.js`). A separate client-side Vitest config (`client/vitest.config.js`, `environment: 'jsdom'`) is available for React component tests, though no `.test.jsx` files exist yet in the client source tree.
+**Unit testing** covers isolated service-layer logic: the appointment state-machine transition table (now merged into `server/src/modules/appointment/service.js`), the ten data-integrity invariants from doc 04, password hashing, Zod schema validation, role middleware, and audit-service record emission. The runner is **Vitest** (root `vitest.config.js`, `environment: 'node'`, globs `server/src/**/*.test.js` + `server/src/**/test.js` — the co-located domain-module tests — plus `shared/**/*.test.js`). A separate client-side Vitest config (`client/vitest.config.js`, `environment: 'jsdom'`) is available for React component tests, though no `.test.jsx` files exist yet in the client source tree.
 
 **Integration testing** covers the live application stack: Express routes exercised against a real PostgreSQL instance (using the `DATABASE_URL` env var loaded via Vite's `loadEnv`). The same Vitest runner and config are used. Integration test files live under `server/src/test/`.
 
@@ -276,3 +276,4 @@ The release recommendation is a brief document (or structured comment) that stat
 | Date       | Change           | Why                                          |
 | ---------- | ---------------- | -------------------------------------------- |
 | 2026-06-01 | Initial creation | Derived from docs 02/04/08 + repo test setup |
+| 2026-06-11 | Re-pointed the transition-table ref to `modules/appointment/service.js` (merged) and updated the Vitest glob to include `server/src/**/test.js` + `shared/**/*.test.js` | Folder-structure restructure (ADR-26); domain-module tests are co-located as `test.js` |

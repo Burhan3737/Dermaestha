@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
 | Status           | Canonical                                                                                               |
-| Version          | 1.2                                                                                                     |
+| Version          | 1.3                                                                                                     |
 | Last updated     | 2026-06-05                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
 | Related docs     | 03, 08, 15                                                                                              |
@@ -268,7 +268,7 @@ The in-app admin alert feed (view A-03) surfaces operational events that require
 | Alert category              | Trigger                                                                   |
 | --------------------------- | ------------------------------------------------------------------------- |
 | Webhook mismatch            | PayFast IPN with invalid or missing signature                             |
-| Refund exhaustion           | `refund.service` has exhausted all retry attempts (`REFUND_MAX_ATTEMPTS`) |
+| Refund exhaustion           | the refund logic (`modules/appointment/service.js`) has exhausted all retry attempts (`REFUND_MAX_ATTEMPTS`) |
 | Email failure               | Notification worker has exhausted retries for an email trigger            |
 | Awaiting prescription > 12h | Appointment completed but no prescription submitted after 12 hours        |
 | Sustained login abuse       | Failed-login rate exceeds lockout threshold (§3.6 / doc 08)               |

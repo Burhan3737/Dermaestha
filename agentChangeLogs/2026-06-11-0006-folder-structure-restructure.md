@@ -1,11 +1,11 @@
 # 2026-06-11-0006 — folder-structure-restructure
 
-**Status:** Partial
+**Status:** Completed
 **Goal:** Execute the feature-first folder restructure of `client/`, `server/`, and `shared/schemas/` per the approved spec + plan — pure relocation, no behavior/API/schema/dependency change.
 **Skill(s) used:** superpowers:executing-plans (user opted in via `/executing-plans`)
 **Ticket / issue:** None
 **Branch:** `refactor/folder-restructure` (created with user approval)
-**Commits / PR:** None (commits GATED — working tree only until human approves)
+**Commits / PR:** `776bdb1` (code restructure) + a docs-alignment commit (Phase 6); not pushed (push GATED).
 **Last updated:** 2026-06-11-0210
 **Tags:** #refactor #migration
 
@@ -73,6 +73,11 @@ Two dev notes flagged inconsistent client/server folder layouts. The approved de
 - All changes are verbatim relocations behind a two-suite green gate. Revert = `git checkout .` / delete the branch (nothing committed yet).
 - Env-only: to restore canonical setup, stop `dermestha-db-5433`, set `.env` back per local preference; native PG18 untouched.
 
+## Phase 6 — spec edits (applied, user-approved after a docs↔code alignment re-review)
+A read-only review agent audited all 16 canon docs against the restructure; the scope expanded from an initial 2-doc path estimate to **9 docs** (03, 05, 08, 09, 10, 11, 12, 13, 15). Applied (each + version bump + revision-footer row): ADR-26 (doc 11) + doc 03 §3a.1 "Code organization & folder conventions"; repointed all stale file-path refs + the merged-service conceptual names; updated doc 09's Vitest glob (`+ server/src/**/test.js` + `shared/**`); fixed doc 13 prose (AppProviders, `buildRoutes`, session state/action split). Pure relocation → no DB (04), API-endpoint (05 surface), or config-key changes.
+
 ## Open items / next session
-- Phases 1–5 (code moves) then Phase 6 (spec edits: ADR-26 + doc 03 + path audit) — Phase 6 is GATED, presented for approval, applied only after the code lands.
-- Final: ask human about committing (branch approval) before any commit/push.
+- **Deliberately left (mentioned):** (1) ADR-19 (doc 11 §ADR-19) still names `refund.service` in its *historical* decision text — left as a point-in-time record, superseded by ADR-26's cross-ref. (2) Doc 09's "no `.test.jsx` files exist yet in the client source tree" clause is **pre-existing** drift (client tests existed since Slice A), unrelated to this restructure — not touched per the surgical-edit rule.
+- **Out of scope (design §8.1):** `prisma/schema.prisma` headers cite deprecated `docs/engineering/*`; a later hygiene pass could repoint to docs 04/15.
+- Push remains GATED (CLAUDE.md) — not pushed.
+- `.gitignore` + `CLAUDE.md` had pre-existing (non-mine) working-tree edits; left uncommitted.

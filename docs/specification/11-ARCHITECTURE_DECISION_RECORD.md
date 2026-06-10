@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.4                                                                                                |
+| Version          | 1.5                                                                                                |
 | Last updated     | 2026-06-05                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -39,6 +39,7 @@
 24. [ADR-23 — Lazy slot-lock expiry (no background worker)](#adr-23--lazy-slot-lock-expiry-no-background-worker)
 25. [ADR-24 — Dev video simulation: mock provider + real webhook + dev simulator](#adr-24--dev-video-simulation-mock-provider--real-webhook--dev-simulator)
 26. [ADR-25 — Appointment-evaluation worker: in-process node-cron (realizing ADR-08)](#adr-25--appointment-evaluation-worker-in-process-node-cron-realizing-adr-08)
+27. [ADR-26 — Feature-first client modules + domain-based server modules](#adr-26--feature-first-client-modules--domain-based-server-modules)
 
 ---
 
@@ -306,7 +307,7 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Context:** Doctor availability is authored as `Asia/Karachi` wall-times ("HH:mm" + weekday) but stored and served as UTC instants (doc 04/15). Generating 30-minute slots for a calendar date requires converting a local wall-time to the correct UTC instant, and the availability guard must map a UTC `slotStart` back to a Karachi weekday/time. A hand-rolled fixed +05:00 offset works today (Pakistan observes no DST) but is brittle and easy to get subtly wrong. (docs/superpowers/specs/2026-06-03-slice-b-discovery-availability-design.md)
 
-**Decision:** Use `date-fns-tz` **server-side** for the conversions (`fromZonedTime`) and zone-aware formatting (`formatInTimeZone`) in slot generation and the block guard, isolated in `server/src/lib/tz.js`. The **client** renders UTC → Karachi with the **native `Intl.DateTimeFormat({ timeZone: 'Asia/Karachi' })`** — no client-side TZ dependency.
+**Decision:** Use `date-fns-tz` **server-side** for the conversions (`fromZonedTime`) and zone-aware formatting (`formatInTimeZone`) in slot generation and the block guard, isolated in `server/src/lib/tz/tz.js`. The **client** renders UTC → Karachi with the **native `Intl.DateTimeFormat({ timeZone: 'Asia/Karachi' })`** — no client-side TZ dependency.
 
 **Consequences:** Correct, DST-proof conversions behind one small helper; the client bundle gains no dependency. One server dependency is added (`date-fns-tz`) — a deliberate exception to the lean-scaffold principle (ADR-16), justified by correctness on the load-bearing slot path. If the platform ever serves regions beyond Pakistan, the same helper handles their zones.
 
@@ -354,9 +355,29 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Context:** The non-payment lifecycle transitions (`confirmed→in_progress` at slot start, `in_progress→completed` at slot-end+5m, no-show resolution at slot+15m) fire as push side-effects (refund + apology email) even when no one reads the appointment — so the lazy approach used for lock-expiry (ADR-23) is insufficient here. ADR-08 anticipated in-process `node-cron` workers; Slice D builds the first one.
 
-**Decision:** A pure, clock-injected `evaluateDueAppointments(now)` (`server/src/services/evaluation.service.js`) performs activation, ADR-12 no-show resolution, and completion — transitioning ONLY via `appointmentState.service` and reusing the shared best-effort `safeRefund` (`refundSideEffects.js`). It is driven by an in-process `node-cron` job (`* * * * *`) in a new `server/src/workers/` seam, started ONLY in the server run guard (never under tests). A dev-only `/dev/worker/evaluate` triggers one pass on demand. Each appointment is wrapped in its own try/catch so one failing row cannot poison the batch (retried next tick). Hard guarantee: no appointment remains `in_progress` past slot-end+5m. The `evaluation_data_gap` admin alert is scoped to the zero-join-data ("resolved blind") case — a deliberate v1 narrowing of ADR-12's "missing/ambiguous".
+**Decision:** A pure, clock-injected `evaluateDueAppointments(now)` (originally `server/src/services/evaluation.service.js`; since merged into `server/src/modules/appointment/service.js` — ADR-26) performs activation, ADR-12 no-show resolution, and completion — transitioning ONLY via the `transition()` writer and reusing the shared best-effort `safeRefund` (all now co-located in that same appointment module). It is driven by an in-process `node-cron` job (`* * * * *`) in a new `server/src/workers/` seam, started ONLY in the server run guard (never under tests). A dev-only `/dev/worker/evaluate` triggers one pass on demand. Each appointment is wrapped in its own try/catch so one failing row cannot poison the batch (retried next tick). Hard guarantee: no appointment remains `in_progress` past slot-end+5m. The `evaluation_data_gap` admin alert is scoped to the zero-join-data ("resolved blind") case — a deliberate v1 narrowing of ADR-12's "missing/ambiguous".
 
 **Consequences:** Establishes the worker seam the deferred notification (F07) and reconciliation (F04.03) workers will reuse. Single-instance assumption per doc 15 §3 (no leader election); horizontal scaling would need a distributed lock or worker extraction. `node-cron` is added as the first worker dependency. Clock injection keeps every transition branch unit-testable without timers.
+
+---
+
+## ADR-26 — Feature-first client modules + domain-based server modules
+
+**Date:** 2026-06-11
+
+**Status:** Accepted
+
+**Context:** The client (`views/`/`components/`/`lib/` with data logic living inside views, plus a split `App.jsx`↔`routes.jsx`) and the server (`controllers/`/`services/`/`routes/` layer-first) trees had grown inconsistent and hard to navigate, and render concerns were entangled with business logic. Two dev notes requested a maintainability restructure. (docs/superpowers/specs/2026-06-10-folder-restructure-design.md)
+
+**Decision:** Adopt a **feature-first** organization — a pure relocation with no behavior, API, DB-schema, or dependency change.
+
+- **Server:** domain `modules/<domain>/` each `index.js` + `controller.js` + `service.js` + `test.js` for `auth`, `doctor` (absorbs `availability`), `appointment`, `payment`, `video`. The seven appointment-domain services (`appointment`, `booking`, `appointmentState`, `cancellation`, `refund`, `refundSideEffects`, `evaluation`) merge into one `modules/appointment/service.js`; `doctor` + `availability` merge into one `modules/doctor/service.js`. `webhook.controller.js` and `routes/webhooks.js` are **deleted**, split by domain (payfast → `payment`, daily → `video`). `audit.service` → shared `services/audit/`. Cross-cutting infra stays top-level and folder-grouped (`config/`, `http/`, `lib/<name>/<name>.js`, `middleware/<name>/<name>.js`, `integrations/`, `workers/`); flat exceptions are `config/constants.js` and `http/AppError.js`. A central `server/src/routes.js` (`registerRoutes`) replaces the inline mount block in `index.js`; `health/` and `dev/` are standalone.
+- **Client:** feature `modules/<feature>/` each with `views/<View>/`, feature `components/`, one `use<Feature>` hook owning the module's data/mutations, and a `*.routes.jsx`. Views keep render + pure UI state only. Cross-feature primitives → `shared/<Name>/`; cross-cutting state → `context/` (`context/session/session.jsx` + `context/AppProviders.jsx`); pure utilities → `lib/<name>/<name>.js`; page shells → `layouts/<Name>/`. The session context is split: **state** (session/loading/refresh/setSession) stays in `context/session`, while the **one-shot auth actions** (login/signup/logout/forgot/reset/change) move to `modules/auth/useAuth.js`. Routing consolidates: each module exposes a `*.routes.jsx`, aggregated by `routes.jsx`'s `buildRoutes(session)`; `App.jsx` renders only the table + catch-alls.
+- **Shared:** Zod request schemas remain the client↔server contract in `shared/schemas/`, reorganized per-domain (`auth/`, `doctor/` [absorbs availability], `appointment/`) behind the `index.js` barrel.
+- **Tests** are co-located: server domain-module tests are `modules/<x>/test.js` (not `*.test.js`), so `vitest.config.js`'s include adds `server/src/**/test.js`. One sanctioned test-internals pattern: merged services `import * as self` and route test-stubbed intra-module calls through `self.` so `vi.spyOn` can intercept them under ESM (a bare local call cannot be spied).
+- **Prisma schema stays centralized** (`prisma/schema.prisma`) — idiomatic single generated client.
+
+**Consequences:** One obvious home per concept; everything a feature needs is co-located; the view layer is separated from logic; client and server routing are symmetric. Trade-offs: deeper relative-import paths in client module views, and the `self.`-import test convention. Invalidates path references in earlier ADRs (ADR-21 `lib/tz.js` → `lib/tz/tz.js`; ADR-25 `evaluation.service.js`/`refundSideEffects.js`/`appointmentState.service` → merged `modules/appointment/service.js`) and doc 13's file inventory — corrected in the same pass. Extends the lean-scaffold intent (ADR-16) and the faithful-re-presentation discipline (ADR-19): no new behavior, only structure. Wiring the client to consume `shared/schemas` (replacing hand-rolled validation) remains a noted follow-up.
 
 ---
 
@@ -369,3 +390,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-03 | Added ADR-21 (Asia/Karachi ↔ UTC via date-fns-tz) | Slice B slot-generation timezone decision; new server dependency `date-fns-tz` |
 | 2026-06-04 | Added ADR-22 (dev mock payment gateway, signed IPN) + ADR-23 (lazy lock-expiry, no worker) | Slice C booking/payment decisions |
 | 2026-06-05 | Added ADR-24 (dev video simulation: mock provider + real webhook) + ADR-25 (appointment-evaluation worker, node-cron) | Slice D (F05 video & lifecycle) |
+| 2026-06-11 | Added ADR-26 (feature-first client + domain server modules); re-pointed ADR-21 (`lib/tz/tz.js`) + ADR-25 (merged `modules/appointment/service.js`) path refs | Folder-structure restructure for maintainability; behavior unchanged |
