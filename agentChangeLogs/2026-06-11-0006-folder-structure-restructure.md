@@ -5,7 +5,7 @@
 **Skill(s) used:** superpowers:executing-plans (user opted in via `/executing-plans`)
 **Ticket / issue:** None
 **Branch:** `refactor/folder-restructure` (created with user approval)
-**Commits / PR:** `776bdb1` (code restructure) + a docs-alignment commit (Phase 6); not pushed (push GATED).
+**Commits / PR:** 5 commits `776bdb1`..`47e6fff` on `refactor/folder-restructure`; **merged to `main` no-ff (`9ec415e`) and pushed to `origin/main`** (user-approved). Branch also pushed to origin.
 **Last updated:** 2026-06-11-0210
 **Tags:** #refactor #migration
 
@@ -83,5 +83,5 @@ A read-only review agent audited all 16 canon docs against the restructure; the 
 - **Broader deprecated-pointer cleanup (done, user-approved):** repointed live "see X" pointers to deprecated docs → canon: doc 05 (×4: `CONFIG.md`→15, `INTEGRATIONS.md`→14), doc 14 (×2: `CONFIG.md §3`→15, `API.md §1.1`→05), doc 15 (`CONFIG.md`/`ARCHITECTURE.md §14.5` "pairs/mirror" → dropped/→doc 10), doc 06 (`DESIGN.md §2.2`→in-doc), doc 10 (`ARCHITECTURE.md §5`→doc 04 §4b; **fixed a malformed `doc 15 §CONFIG.md §7`**→doc 15 §7). Version bumps + footers on all.
 - **Provenance left intact (by design):** "Sources absorbed" headers, "faithful re-presentation of X" intros, per-ADR `(ARCHITECTURE.md §N)` *context citations*, and `Source: CONFIG.md §N` lines record what each section was **derived from** — doc 00 §7 keeps the deprecated docs "for history," so these historical-lineage citations stay (not stale pointers).
 - **Process note:** a PowerShell `anchor+newrow` footer-append silently failed on several docs (version bumped, footer row missing); caught by a version-vs-footer-count audit and fixed by robust line-insertion. Two such rows (docs 10, 12) had been committed missing in `966ccf7` — corrected in the follow-up commit.
-- Push remains GATED (CLAUDE.md) — not pushed.
+- **Merged + pushed (done):** user approved; merged no-ff (`9ec415e`), `origin/main` updated; both suites re-verified green on merged main (139 + 41).
 - `.gitignore` + `CLAUDE.md` had pre-existing (non-mine) working-tree edits; left uncommitted.
