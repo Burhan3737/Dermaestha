@@ -16,11 +16,15 @@ vi.mock('../../integrations/email/index.js', () => ({
   emailProvider: { send: vi.fn().mockResolvedValue({ providerId: 'x' }) },
 }));
 vi.mock('../appointment/service.js', () => ({ transition: vi.fn().mockResolvedValue({}) }));
+vi.mock('../notification/service.js', () => ({
+  enqueueBookingEmails: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
 import { emailProvider } from '../../integrations/email/index.js';
 import * as state from '../appointment/service.js';
+import * as notification from '../notification/service.js';
 import { createIntent, processWebhook } from './service.js';
 
 beforeEach(() => vi.clearAllMocks());
@@ -69,7 +73,7 @@ describe('payment.createIntent', () => {
 });
 
 describe('payment.processWebhook', () => {
-  it('on success commits state+payment in one $transaction', async () => {
+  it('on success commits state+payment+outbox in one $transaction', async () => {
     prisma.payment.findFirst.mockResolvedValue({
       id: 'p1',
       appointmentId: 'a1',
@@ -79,22 +83,41 @@ describe('payment.processWebhook', () => {
       id: 'a1',
       state: 'slot_locked',
       patientUserId: 'u1',
+      doctorId: 'd1',
+      slotStart: new Date('2099-01-06T09:00:00Z'),
     });
-    prisma.$transaction.mockImplementation(async (fn) => fn({ payment: { update: vi.fn() } }));
-    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
+    const tx = {
+      payment: { update: vi.fn() },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ email: 'p@t.test', fullName: 'P' }),
+      },
+      doctor: {
+        findUnique: vi.fn().mockResolvedValue({ user: { fullName: 'Dr. D' } }),
+      },
+    };
+    prisma.$transaction.mockImplementation(async (fn) => fn(tx));
     await processWebhook({
       event: 'payment.success',
       providerRef: 'mock_1',
       amount: 250000,
       gatewayFee: 6000,
     });
-    expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(state.transition).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'confirmed',
         data: { feeAtBooking: 250000, lockExpiresAt: null },
       }),
     );
+    expect(notification.enqueueBookingEmails).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointment: expect.objectContaining({ id: 'a1' }),
+        patient: { email: 'p@t.test', fullName: 'P' },
+        doctorName: 'Dr. D',
+        fee: 250000,
+        client: tx,
+      }),
+    );
+    expect(emailProvider.send).not.toHaveBeenCalled(); // no direct send path remains
   });
 
   it('on an already-confirmed appointment is an idempotent no-op', async () => {
@@ -130,26 +153,4 @@ describe('payment.processWebhook', () => {
     expect(prisma.payment.update).not.toHaveBeenCalled();
   });
 
-  it('does not block the webhook ack on a hung confirmation email (fire-and-forget)', async () => {
-    prisma.payment.findFirst.mockResolvedValue({
-      id: 'p1',
-      appointmentId: 'a1',
-      providerRef: 'mock_1',
-    });
-    prisma.appointment.findUnique.mockResolvedValue({
-      id: 'a1',
-      state: 'slot_locked',
-      patientUserId: 'u1',
-    });
-    prisma.$transaction.mockImplementation(async (fn) => fn({ payment: { update: vi.fn() } }));
-    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
-    emailProvider.send.mockReturnValue(new Promise(() => {})); // never resolves — a hung provider
-    const out = await processWebhook({
-      event: 'payment.success',
-      providerRef: 'mock_1',
-      amount: 250000,
-      gatewayFee: 6000,
-    });
-    expect(out).toEqual({ ok: true });
-  }, 2000);
 });

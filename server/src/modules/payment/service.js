@@ -2,10 +2,9 @@
 import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import { env } from '../../config/env/env.js';
-import { logger } from '../../lib/logger/logger.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
-import { emailProvider } from '../../integrations/email/index.js';
 import * as appointmentState from '../appointment/service.js';
+import * as notification from '../notification/service.js';
 
 /** Create (or reuse) the idempotent payment intent and return the hosted-checkout redirect. */
 export async function createIntent({ patientUserId, appointmentId }) {
@@ -78,22 +77,25 @@ export async function processWebhook({ event, providerRef, amount, gatewayFee })
       where: { id: payment.id },
       data: { status: 'success', gatewayFee: gatewayFee ?? null },
     });
-  });
-
-  // Post-commit, best-effort confirmation email — fire-and-forget so a slow/hung provider
-  // cannot delay acknowledging the IPN (the transition is already committed).
-  prisma.user
-    .findUnique({
-      where: { id: appt.patientUserId },
-      select: { email: true, fullName: true },
-    })
-    .then((patient) =>
-      emailProvider.send({
-        template: 'booking_confirmation',
-        to: patient.email,
-        vars: { patientName: patient.fullName, appointmentRef: appt.id },
+    // Outbox (F07): the confirmation + reminder jobs commit atomically with `confirmed` —
+    // a crash after commit can never lose the email, and the IPN ack never waits on a send.
+    const [patient, doctor] = await Promise.all([
+      tx.user.findUnique({
+        where: { id: appt.patientUserId },
+        select: { email: true, fullName: true },
       }),
-    )
-    .catch(() => logger.warn('confirmation email not sent', { appointmentId: appt.id }));
+      tx.doctor.findUnique({
+        where: { id: appt.doctorId },
+        select: { user: { select: { fullName: true } } },
+      }),
+    ]);
+    await notification.enqueueBookingEmails({
+      appointment: appt,
+      patient,
+      doctorName: doctor.user.fullName,
+      fee: amount,
+      client: tx,
+    });
+  });
   return { ok: true };
 }
