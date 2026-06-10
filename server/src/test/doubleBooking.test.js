@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { prisma } from '../lib/prisma.js';
+import { prisma } from '../lib/prisma/prisma.js';
 
 describe('no-double-booking partial index (PRD #1)', () => {
   let doctorId;

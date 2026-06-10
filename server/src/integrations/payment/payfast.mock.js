@@ -1,6 +1,6 @@
 // @ts-check
 import crypto from 'node:crypto';
-import { env } from '../../config/env.js';
+import { env } from '../../config/env/env.js';
 import { AppError } from '../../http/AppError.js';
 
 const PASSPHRASE = env.PAYFAST_PASSPHRASE || 'dev-mock-passphrase';

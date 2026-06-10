@@ -2,21 +2,12 @@
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { env } from './config/env.js';
-import { sessionMiddleware } from './middleware/session.js';
-import { errorHandler } from './http/errorHandler.js';
-import { AppError } from './http/AppError.js';
-import { healthRouter } from './routes/health.js';
-import { authRouter } from './routes/auth.js';
-import { doctorsRouter } from './routes/doctors.js';
-import { availabilityRouter } from './routes/availability.js';
-import { appointmentsRouter } from './routes/appointments.js';
-import { webhooksRouter } from './routes/webhooks.js';
-import { devCheckoutRouter } from './routes/devCheckout.js';
-import { devVideoRouter } from './routes/devVideo.js';
-import { mustChangePasswordGate } from './middleware/mustChangePassword.js';
-import { initErrorTracking } from './lib/errorTracking.js';
-import { logger } from './lib/logger.js';
+import { env } from './config/env/env.js';
+import { sessionMiddleware } from './middleware/session/session.js';
+import { errorHandler } from './http/errorHandler/errorHandler.js';
+import { registerRoutes } from './routes.js';
+import { initErrorTracking } from './lib/errorTracking/errorTracking.js';
+import { logger } from './lib/logger/logger.js';
 import { startWorkers } from './workers/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -30,20 +21,8 @@ export function createApp() {
   app.use(express.json());
   app.use(sessionMiddleware);
 
-  // API routes first.
-  app.use('/api', mustChangePasswordGate); // DA3 gate, after session, before feature routers
-  app.use('/api/auth', authRouter);
-  app.use('/api/doctors', doctorsRouter);
-  app.use('/api/availability', availabilityRouter);
-  app.use('/api/appointments', appointmentsRouter);
-  app.use('/api/webhooks', webhooksRouter);
-  app.use('/api', healthRouter);
-  // Unknown /api path → JSON 404 envelope (never the SPA HTML).
-  app.use('/api', (_req, _res, next) => next(new AppError('NOT_FOUND', 'Not found.', 404)));
-
-  // Dev-only simulated payment gateway. NEVER mounted in production.
-  if (env.PAYMENT_PROVIDER === 'mock') app.use('/dev', devCheckoutRouter);
-  if (env.VIDEO_PROVIDER === 'mock') app.use('/dev', devVideoRouter);
+  // All /api + /dev routes (see routes.js).
+  registerRoutes(app);
 
   // Static SPA + catch-all LAST (ARCHITECTURE §14.3).
   app.use(express.static(CLIENT_DIST));

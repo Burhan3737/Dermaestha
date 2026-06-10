@@ -1,5 +1,5 @@
 // @ts-check
-import { logger } from '../../lib/logger.js';
+import { logger } from '../../lib/logger/logger.js';
 
 /** Dev email adapter: logs instead of sending. Selected when EMAIL_PROVIDER=console. */
 /** @type {import('./index.js').EmailProvider} */

@@ -1,7 +1,7 @@
 // @ts-check
 import { payfastStub } from './payfast.stub.js';
 import { payfastMock } from './payfast.mock.js';
-import { env } from '../../config/env.js';
+import { env } from '../../config/env/env.js';
 
 /**
  * @typedef {Object} PaymentProvider
