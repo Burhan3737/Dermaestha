@@ -1,5 +1,5 @@
 // Dermestha — Prisma schema
-// Source of truth: docs/engineering/ARCHITECTURE.md §5 (Data Model) + docs/product/PRD.md §3.3 (invariants).
+// Source of truth: docs/specification/04-DATABASE_DOCUMENT.md (data model + data-integrity invariants #1–#10).
 // Conventions: money is Int PKR-paisa (no floats); all instants are timestamptz/UTC,
 // rendered Asia/Karachi (no DST) in the UI. Models are PascalCase; tables are snake_case via @@map.
 //
@@ -15,7 +15,7 @@
 // Releasing/terminal states (cancelled_refunded, doctor_cancelled, patient_no_show, doctor_no_show)
 // are excluded so a freed slot rebooks.
 // A second insert for a held slot then fails at WRITE time, not validation time.
-// See docs/engineering/CONFIG.md → "Migration caveats".
+// See docs/specification/04-DATABASE_DOCUMENT.md §4b (partial-index "Migration caveat").
 // ───────────────────────────────────────────────────────────────────────────────────────────
 
 generator client {

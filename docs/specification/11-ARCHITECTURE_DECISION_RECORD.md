@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.6                                                                                                |
+| Version          | 1.7                                                                                                |
 | Last updated     | 2026-06-05                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -135,9 +135,9 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
                   'prescription_issued','cancelled_no_refund');
 ```
 
-Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index is added by hand-editing the generated migration SQL. The caveat is documented in `prisma/schema.prisma` header and `CONFIG.md §7`.
+Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index is added by hand-editing the generated migration SQL. The caveat is documented in the `prisma/schema.prisma` header and doc 04 §4b.
 
-**Consequences:** A second insert for a held slot fails at the database write — not at validation — making a double-booking impossible regardless of concurrency. Releasing states are excluded so freed slots are immediately rebookable. The hand-edited migration must be re-applied manually if the `init` migration is ever recreated (see `CONFIG.md §7`). This is the single highest-risk maintenance rule in the codebase: the index must never be accidentally dropped.
+**Consequences:** A second insert for a held slot fails at the database write — not at validation — making a double-booking impossible regardless of concurrency. Releasing states are excluded so freed slots are immediately rebookable. The hand-edited migration must be re-applied manually if the `init` migration is ever recreated (see doc 04 §4b). This is the single highest-risk maintenance rule in the codebase: the index must never be accidentally dropped.
 
 ---
 
@@ -259,9 +259,9 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Context:** During M0 scaffold execution, Prisma 7 was evaluated. Prisma 7 removed support for `datasource.url` declared directly in `schema.prisma`, requiring a `prisma.config.ts` file and driver adapters — a heavier configuration model than v1 needs. (agentChangeLogs/2026-05-31-1509-architecture-coding-base.md; agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md)
 
-**Decision:** Prisma pinned to exactly `6.19.3` (not `^6` or `^7`) in `package.json`. This pin is documented in `CONFIG.md §7` and in the `.env.example` `DATABASE_URL` comment.
+**Decision:** Prisma pinned to exactly `6.19.3` (not `^6` or `^7`) in `package.json`. This pin is documented in doc 15 §7 (Migration Caveats) and in the `.env.example` `DATABASE_URL` comment.
 
-**Consequences:** The `datasource.url` syntax in `schema.prisma` continues to work. The exact pin (not a caret range) prevents an inadvertent major-version bump during `npm install`. When upgrading Prisma in future, the CONFIG.md §7 caveat and any `prisma.config.ts` migration requirements must be assessed first.
+**Consequences:** The `datasource.url` syntax in `schema.prisma` continues to work. The exact pin (not a caret range) prevents an inadvertent major-version bump during `npm install`. When upgrading Prisma in future, the doc 15 §7 caveat and any `prisma.config.ts` migration requirements must be assessed first.
 
 ---
 
@@ -391,4 +391,5 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-04 | Added ADR-22 (dev mock payment gateway, signed IPN) + ADR-23 (lazy lock-expiry, no worker) | Slice C booking/payment decisions |
 | 2026-06-05 | Added ADR-24 (dev video simulation: mock provider + real webhook) + ADR-25 (appointment-evaluation worker, node-cron) | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Added ADR-26 (feature-first client + domain server modules); re-pointed ADR-21 (`lib/tz/tz.js`) + ADR-25 (merged `modules/appointment/service.js`) path refs | Folder-structure restructure for maintainability; behavior unchanged |
-| 2026-06-11 | Normalized ADR-19's `refund.service` decision ref to the merged `modules/appointment/service.js` (cross-ref ADR-26) | Docs↔code alignment follow-up |
+| 2026-06-11 | Normalized ADR-11's `refund.service` decision ref to the merged `modules/appointment/service.js` (cross-ref ADR-26) | Docs↔code alignment follow-up |
+| 2026-06-11 | Repointed deprecated `CONFIG.md §7` refs (ADR-07 partial-index caveat -> doc 04 §4b; ADR-17 Prisma pin/upgrade -> doc 15 §7) | Deprecated-doc hygiene (design §8.1) |
