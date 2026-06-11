@@ -11,7 +11,9 @@ async function downloadPdf(p) {
   const a = document.createElement('a');
   a.href = url;
   a.download = `prescription-${String(p.issuedAt).slice(0, 10)}.pdf`;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 }
 

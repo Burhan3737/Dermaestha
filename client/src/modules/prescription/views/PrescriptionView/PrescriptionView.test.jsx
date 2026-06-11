@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PrescriptionView } from './PrescriptionView.jsx';
@@ -48,9 +48,24 @@ describe('P-13 prescription view', () => {
     setup();
     await waitFor(() => expect(screen.getByText('Adapalene Gel')).toBeTruthy());
     expect(api.get).toHaveBeenCalledWith('/appointments/a1/prescriptions');
-    expect(screen.getByText(/not priced$/i)).toBeTruthy();
+    expect(screen.getByText(/^\(not priced\)$/i)).toBeTruthy();
     expect(screen.getByText(/total/i).textContent).toContain('Rs 300');
     expect(screen.getByText(/1 item\(s\) not priced/i)).toBeTruthy();
+  });
+
+  it('Download PDF renders bytes through the boundary and triggers the anchor download', async () => {
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:x'),
+      revokeObjectURL: vi.fn(),
+    });
+    api.get.mockResolvedValue({ data: [RX()] });
+    setup();
+    await waitFor(() => expect(screen.getByRole('button', { name: /download pdf/i })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /download pdf/i }));
+    const { renderPrescriptionPdf } = await import('../../../../lib/pdf/renderPrescriptionPdf.js');
+    await waitFor(() => expect(renderPrescriptionPdf).toHaveBeenCalledWith(expect.objectContaining({ id: 'rx1' })));
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalled());
+    vi.unstubAllGlobals();
   });
 
   it('renders corrections chronologically, each with its own Download button', async () => {
