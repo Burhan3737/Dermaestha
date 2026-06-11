@@ -28,7 +28,11 @@ describe('notification outbox — atomicity, idempotency, suppression', () => {
   let agent, email, doctorId, slotStart, appointmentId, payment;
 
   beforeAll(async () => {
-    const d = await prisma.doctor.findFirst({ where: { isActive: true, status: 'active' } });
+    // Second seeded doctor (dr.bilal): booking.integration uses findFirst (dr.ayesha);
+    // distinct doctors keep the two parallel files from racing for the same slot.
+    const d = await prisma.doctor.findFirst({
+      where: { isActive: true, status: 'active', user: { email: 'dr.bilal@dermestha.dev' } },
+    });
     doctorId = d.id;
     slotStart = await pickFutureSlot(doctorId);
     email = uniq();
