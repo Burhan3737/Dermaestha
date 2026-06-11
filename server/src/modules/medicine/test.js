@@ -73,10 +73,16 @@ describe('medicine.create / update (F11.02/.03)', () => {
     );
   });
 
-  it('update of an unknown id maps to 404 NOT_FOUND', async () => {
-    prisma.medicine.update.mockRejectedValue(new Error('P2025'));
+  it('update of an unknown id (P2025) maps to 404 NOT_FOUND', async () => {
+    prisma.medicine.update.mockRejectedValue(Object.assign(new Error('not found'), { code: 'P2025' }));
     await expect(update({ id: 'nope', data: { unitPrice: 1 }, actorId: 'a' })).rejects.toMatchObject(
       { code: 'NOT_FOUND', status: 404 },
     );
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('a non-P2025 failure propagates instead of masquerading as 404', async () => {
+    prisma.medicine.update.mockRejectedValue(Object.assign(new Error('db down'), { code: 'P1001' }));
+    await expect(update({ id: 'm1', data: { unitPrice: 1 }, actorId: 'a' })).rejects.toThrow('db down');
   });
 });

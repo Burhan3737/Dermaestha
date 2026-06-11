@@ -34,7 +34,10 @@ export async function create({ data, actorId }) {
 }
 
 export async function update({ id, data, actorId }) {
-  const med = await prisma.medicine.update({ where: { id }, data }).catch(() => null);
+  const med = await prisma.medicine.update({ where: { id }, data }).catch((e) => {
+    if (e?.code === 'P2025') return null; // record not found
+    throw e;
+  });
   if (!med) throw new AppError('NOT_FOUND', 'Medicine not found.', 404);
   await audit.record({
     eventType: 'medicine.updated',
