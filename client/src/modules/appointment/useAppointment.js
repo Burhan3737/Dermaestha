@@ -4,13 +4,16 @@ import { api } from '../../lib/apiClient/apiClient.js';
 
 /**
  * Appointment module data/mutations (D2). Behavior identical to the prior Upcoming view.
- * @param {{ detailId?: string|null }} [opts]
+ * @param {{ detailId?: string|null, scope?: string|null }} [opts]
  */
 export function useAppointment(opts = {}) {
-  const { detailId = null } = opts;
+  const { detailId = null, scope = null } = opts;
   const qc = useQueryClient();
 
-  const list = useQuery({ queryKey: ['appointments'], queryFn: () => api.get('/appointments') });
+  const list = useQuery({
+    queryKey: ['appointments', scope],
+    queryFn: () => api.get(scope === 'history' ? '/appointments?scope=history' : '/appointments'),
+  });
 
   const detail = useQuery({
     queryKey: ['appointment', detailId],

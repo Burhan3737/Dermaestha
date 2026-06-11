@@ -4,6 +4,7 @@ import { doctorRoutes } from './modules/doctor/doctor.routes.jsx';
 import { bookingRoutes } from './modules/booking/booking.routes.jsx';
 import { appointmentRoutes } from './modules/appointment/appointment.routes.jsx';
 import { videoRoutes } from './modules/video/video.routes.jsx';
+import { prescriptionRoutes } from './modules/prescription/prescription.routes.jsx';
 
 /**
  * Aggregated route table (D3). Each module owns its own *.routes.jsx (incl. its RoleRoute wrapping);
@@ -15,4 +16,5 @@ export const buildRoutes = (session) => [
   ...bookingRoutes(session),
   ...appointmentRoutes(session),
   ...videoRoutes(session),
+  ...prescriptionRoutes(session),
 ];

@@ -3,3 +3,5 @@
 export * from './auth/auth.js';
 export * from './doctor/doctor.js';
 export * from './appointment/appointment.js';
+export * from './medicine/medicine.js';
+export * from './prescription/prescription.js';

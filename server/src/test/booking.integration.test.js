@@ -26,7 +26,11 @@ describe('booking + payment integration', () => {
   let agent, email, doctorId, slotStart, appointmentId;
 
   beforeAll(async () => {
-    const d = await prisma.doctor.findFirst({ where: { isActive: true, status: 'active' } });
+    // First seeded doctor (dr.ayesha): notification.integration pins dr.bilal;
+    // explicit pins on both sides keep the parallel files off each other's slots.
+    const d = await prisma.doctor.findFirst({
+      where: { isActive: true, status: 'active', user: { email: 'dr.ayesha@dermestha.dev' } },
+    });
     doctorId = d.id;
     slotStart = await pickSlot(doctorId);
     email = uniq();

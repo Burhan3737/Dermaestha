@@ -69,4 +69,61 @@ describe('D-02 DoctorToday', () => {
     await waitFor(() => expect(screen.getByText('Past P')).toBeTruthy());
     expect(api.get).toHaveBeenCalledWith('/appointments?scope=history');
   });
+
+  it('history: completed row gets Write prescription + Awaiting badge after 12h', async () => {
+    const old = new Date(Date.now() - 13 * 3600 * 1000).toISOString();
+    api.get.mockResolvedValue({
+      data: [
+        {
+          id: 'a-old',
+          slotStart: old,
+          slotEnd: old,
+          state: 'completed',
+          forSelf: true,
+          subjectName: null,
+          patientName: 'P One',
+          hasPrescription: false,
+        },
+        {
+          id: 'a-done',
+          slotStart: old,
+          slotEnd: old,
+          state: 'prescription_issued',
+          forSelf: true,
+          subjectName: null,
+          patientName: 'P Two',
+          hasPrescription: true,
+        },
+      ],
+    });
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    await waitFor(() => expect(screen.getByText('P One')).toBeTruthy());
+    const links = screen.getAllByRole('link', { name: /write prescription/i });
+    expect(links).toHaveLength(2); // completed AND prescription_issued (corrections)
+    expect(links[0].getAttribute('href')).toContain('/doctor/appointments/a-old/prescribe');
+    expect(screen.getAllByText(/awaiting prescription/i)).toHaveLength(1); // only the unprescribed one
+  });
+
+  it('history: completed row <12h old shows no Awaiting badge', async () => {
+    const recent = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    api.get.mockResolvedValue({
+      data: [
+        {
+          id: 'a-new',
+          slotStart: recent,
+          slotEnd: recent,
+          state: 'completed',
+          forSelf: true,
+          subjectName: null,
+          patientName: 'P New',
+          hasPrescription: false,
+        },
+      ],
+    });
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    await waitFor(() => expect(screen.getByText('P New')).toBeTruthy());
+    expect(screen.queryByText(/awaiting prescription/i)).toBeNull();
+  });
 });

@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.4                                                           |
-| Last updated     | 2026-06-11                                                    |
+| Version          | 1.5                                                           |
+| Last updated     | 2026-06-12                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
 
@@ -315,7 +315,7 @@ model Prescription {
   appointmentId     String   @map("appointment_id")
   appointment       Appointment @relation(fields: [appointmentId], references: [id])
   issuedAt          DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
-  /// Durable doctor identity at issue-time (#3): name, pmcNumber, specialization, signature.
+  /// Durable doctor identity at issue-time (#3): name, pmcNumber, specialization.
   doctorSnapshot    Json     @map("doctor_snapshot")
   /// Durable patient/subject identity at issue-time (P8): for_self, name, age, relation.
   patientIdSnapshot Json     @map("patient_id_snapshot")
@@ -329,7 +329,7 @@ model Prescription {
 }
 ```
 
-**`doctorSnapshot` shape (jsonb):** captures `name`, `pmcNumber`, `specialization`, and `signature` at the moment of prescription issuance (invariant #3). This is the mechanism by which a doctor's public profile can be updated without altering the historical record on a prescription.
+**`doctorSnapshot` shape (jsonb):** captures `name`, `pmcNumber`, and `specialization` at the moment of prescription issuance (invariant #3). (The `Doctor` model has no `signature` field in v1.) This is the mechanism by which a doctor's public profile can be updated without altering the historical record on a prescription.
 
 **`patientIdSnapshot` shape (jsonb):** captures `forSelf`, `name`, `age`, and `relation` at the moment of issuance (PRD P8). Supports the "booking for a third party" scenario end-to-end on the printed prescription.
 
@@ -500,6 +500,9 @@ model NotificationJob {
   /// Merge-vars snapshot at enqueue time (doc 14 §5 contract).
   vars           Json?
   scheduledFor   DateTime           @map("scheduled_for") @db.Timestamptz(6)
+  /// Distinguishes repeatable sends of the same type for one appointment (Slice F:
+  /// one prescription_ready per prescription). '' for singleton types (Slice E semantics).
+  dedupeKey      String             @default("") @map("dedupe_key")
   status         NotificationStatus @default(pending)
   attempts       Int                @default(0)
   nextAttemptAt  DateTime?          @map("next_attempt_at") @db.Timestamptz(6)
@@ -508,15 +511,15 @@ model NotificationJob {
   createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  /// Idempotent enqueue: a webhook replay cannot duplicate a job. Slice F relaxes
-  /// this if prescription_ready needs to repeat per prescription (YAGNI now).
-  @@unique([appointmentId, type])
+  /// Idempotent enqueue: a replay cannot duplicate a job. dedupeKey='' keeps Slice E
+  /// types singleton-per-appointment; prescription_ready uses the prescription id.
+  @@unique([appointmentId, type, dedupeKey])
   @@index([status, scheduledFor])
   @@map("notification_jobs")
 }
 ```
 
-`recipientEmail` and `vars` are snapshots taken at enqueue time (doc 14 §5 merge-var contract) — no PHI beyond what `appointments`/`users` already hold. The `@@unique([appointmentId, type])` makes enqueue idempotent (a replayed `payment.success` IPN re-runs enqueue as a no-op upsert). `onDelete: Cascade` matters: the `payment.failed` webhook path and the edge-#6a reconciliation path delete `slot_locked` appointments, and a leftover job row must not block that. The `@@index([status, scheduledFor])` feeds the dispatch worker's due-rows query.
+`recipientEmail` and `vars` are snapshots taken at enqueue time (doc 14 §5 merge-var contract) — no PHI beyond what `appointments`/`users` already hold. The `@@unique([appointmentId, type, dedupeKey])` makes enqueue idempotent (a replayed `payment.success` IPN re-runs enqueue as a no-op upsert). `dedupeKey` defaults to `''`, preserving the Slice E singleton-per-`(appointment, type)` semantics; Slice F (migration `20260612003907_slice_f_outbox_dedupe_key`) widened the constraint to a 3-column composite so `prescription_ready` can set `dedupeKey` to the prescription id and thus enqueue one email per prescription (including corrections). `onDelete: Cascade` matters: the `payment.failed` webhook path and the edge-#6a reconciliation path delete `slot_locked` appointments, and a leftover job row must not block that. The `@@index([status, scheduledFor])` feeds the dispatch worker's due-rows query.
 
 ---
 
@@ -553,7 +556,7 @@ erDiagram
 | `prescription_items`  | `prescription_id` | `prescriptions` | Many items per prescription                            |
 | `notification_jobs`   | `appointment_id`  | `appointments`  | Outbox rows; `onDelete: Cascade` (a deleted lock drops its jobs) |
 
-**Why doctor name is not on `appointments` (invariant #3):** The `appointments` table stores only `doctor_id` (a FK), never the doctor's name, specialization, or fee. If a doctor's display name were stored directly on the appointment and the doctor's profile were later updated, historical records would either change (incorrect) or diverge (inconsistent). Historical doctor identity is instead captured at the moment of prescription issuance in `Prescription.doctorSnapshot` (a jsonb snapshot of name, pmcNumber, specialization, signature). The appointment row itself is only the booking record; the prescription is the legal document that needs the durable identity.
+**Why doctor name is not on `appointments` (invariant #3):** The `appointments` table stores only `doctor_id` (a FK), never the doctor's name, specialization, or fee. If a doctor's display name were stored directly on the appointment and the doctor's profile were later updated, historical records would either change (incorrect) or diverge (inconsistent). Historical doctor identity is instead captured at the moment of prescription issuance in `Prescription.doctorSnapshot` (a jsonb snapshot of name, pmcNumber, specialization). The appointment row itself is only the booking record; the prescription is the legal document that needs the durable identity.
 
 **Prescription / appointment 1..n relation (invariant #4):** A single appointment may have multiple prescription rows. This is intentional: prescriptions are immutable once written, so a correction cannot update an existing row — instead the doctor submits a new prescription linked to the same appointment. The patient always sees the chronological list; the most-recent row supersedes earlier ones for display.
 
@@ -572,7 +575,7 @@ erDiagram
 | `doctors`  | `@@unique`                      | `pmc_number`                    | PMC number uniqueness           |
 | `payments` | `@@unique` (name: `intent_key`) | `(patient_user_id, slot_start)` | Payment-intent idempotency (#7) |
 | `payments` | `@unique`                       | `refund_idempotency_key`        | Refund idempotency (#10)        |
-| `notification_jobs` | `@@unique`            | `(appointment_id, type)`        | Idempotent enqueue (replay-safe outbox, F07) |
+| `notification_jobs` | `@@unique`            | `(appointment_id, type, dedupe_key)` | Idempotent enqueue (replay-safe outbox, F07); `dedupe_key=''` = singleton per type, prescription id = per-prescription (Slice F) |
 
 ### 4b. The no-double-booking partial unique index (invariant #1)
 
@@ -664,3 +667,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-05 | Added `doctor_joined_at` + `patient_joined_at` nullable TIMESTAMPTZ columns to `appointments` (§2e); migration `20260604141222_add_video_join_columns` | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Dropped the deprecated `CONFIG.md §7` pointer from the §4b migration caveat (this section is the canonical home) | Deprecated-doc hygiene (design §8.1) |
 | 2026-06-11 | Added `NotificationType`/`NotificationStatus` enums (§2a), `NotificationJob` model (§2n), `Appointment.notificationJobs` relation (§2e), `Payment.refund_attempts`/`next_refund_retry_at` (§2f), relationship + index + F07 scope entries; migration `20260610231617_slice_e_notification_outbox` | Slice E (F07 outbox + F06.03 refund-retry); schema change per change-impact matrix |
+| 2026-06-12 | Added `NotificationJob.dedupe_key` (default `''`) and widened the `@@unique` to `(appointment_id, type, dedupe_key)` (§2n, §4a); migration `20260612003907_slice_f_outbox_dedupe_key`; aligned `doctorSnapshot` shape to drop the non-existent `signature` field (§2g, §3) | Slice F (F08 prescriptions): per-prescription `prescription_ready` enqueue; doctor model has no signature in v1 |

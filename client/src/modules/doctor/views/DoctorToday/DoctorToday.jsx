@@ -62,6 +62,18 @@ export function DoctorToday() {
                   </button>
                 ))}
               {tab === 'history' && <span className="badge">{a.state}</span>}
+              {(a.state === 'completed' || a.state === 'prescription_issued') && (
+                <Link className="btn btn--secondary" to={`/doctor/appointments/${a.id}/prescribe`}>
+                  Write prescription
+                </Link>
+              )}
+              {a.state === 'completed' &&
+                !a.hasPrescription &&
+                Date.now() - new Date(a.slotEnd).getTime() > 12 * 3600 * 1000 && (
+                  // awaiting_prescription derived condition (doc 02 §4.3) — doctor-facing nudge;
+                  // the F12/A3 admin alert is Slice G.
+                  <span className="badge badge--warning">Awaiting prescription</span>
+                )}
               {a.state === 'confirmed' && tab === 'today' && (
                 <button type="button" className="btn btn--ghost" onClick={() => setCancelId(a.id)}>
                   Cancel

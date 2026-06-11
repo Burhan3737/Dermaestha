@@ -245,6 +245,9 @@ model NotificationJob {
   /// Merge-vars snapshot at enqueue time (doc 14 §5 contract).
   vars           Json?
   scheduledFor   DateTime           @map("scheduled_for") @db.Timestamptz(6)
+  /// Distinguishes repeatable sends of the same type for one appointment (Slice F:
+  /// one prescription_ready per prescription). '' for singleton types (Slice E semantics).
+  dedupeKey      String             @default("") @map("dedupe_key")
   status         NotificationStatus @default(pending)
   attempts       Int                @default(0)
   nextAttemptAt  DateTime?          @map("next_attempt_at") @db.Timestamptz(6)
@@ -253,9 +256,9 @@ model NotificationJob {
   createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  /// Idempotent enqueue: a webhook replay cannot duplicate a job. Slice F relaxes
-  /// this if prescription_ready needs to repeat per prescription (YAGNI now).
-  @@unique([appointmentId, type])
+  /// Idempotent enqueue: a replay cannot duplicate a job. dedupeKey='' keeps Slice E
+  /// types singleton-per-appointment; prescription_ready uses the prescription id.
+  @@unique([appointmentId, type, dedupeKey])
   @@index([status, scheduledFor])
   @@map("notification_jobs")
 }
@@ -267,7 +270,7 @@ model Prescription {
   appointmentId     String   @map("appointment_id")
   appointment       Appointment @relation(fields: [appointmentId], references: [id])
   issuedAt          DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
-  /// Durable doctor identity at issue-time (#3): name, pmcNumber, specialization, signature.
+  /// Durable doctor identity at issue-time (#3): name, pmcNumber, specialization.
   doctorSnapshot    Json     @map("doctor_snapshot")
   /// Durable patient/subject identity at issue-time (P8): for_self, name, age, relation.
   patientIdSnapshot Json     @map("patient_id_snapshot")

@@ -15,6 +15,14 @@ export function Upcoming() {
   return (
     <PatientLayout>
       <section className="section-card">
+        <div className="tabs" role="tablist">
+          <Link className="tab tab--active" to="/appointments">
+            Upcoming
+          </Link>
+          <Link className="tab" to="/appointments/history">
+            Past
+          </Link>
+        </div>
         <h1>Upcoming appointments</h1>
         {list.isPending && <p className="help">Loading…</p>}
         {list.data && rows.length === 0 && (
