@@ -151,6 +151,19 @@ describe('appointment.listForRole (doctor)', () => {
   });
 });
 
+describe('listForRole doctor scope (F05.02)', () => {
+  it("default scope is bounded to today's Karachi day", async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    prisma.appointment.findMany.mockResolvedValue([]);
+    await listForRole({ role: 'doctor', userId: 'u-doc' });
+    const where = prisma.appointment.findMany.mock.calls[0][0].where;
+    expect(where.state).toEqual({ in: ['confirmed', 'in_progress'] });
+    expect(where.slotStart.gte).toBeInstanceOf(Date);
+    expect(where.slotStart.lt).toBeInstanceOf(Date);
+    expect(where.slotStart.lt.getTime() - where.slotStart.gte.getTime()).toBe(24 * 3600 * 1000);
+  });
+});
+
 describe('booking.lockSlot', () => {
   const slotStart = '2099-01-04T13:00:00.000Z';
   const bookable = () =>

@@ -3,7 +3,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import { logger } from '../../lib/logger/logger.js';
-import { KARACHI } from '../../lib/tz/tz.js';
+import { KARACHI, karachiWallTimeToUtc } from '../../lib/tz/tz.js';
 import {
   SLOT_GRANULARITY_MIN,
   SLOT_LOCK_TTL_MIN,
@@ -67,10 +67,18 @@ export async function listForRole({ role, userId, scope = 'active' }) {
     'cancelled_no_refund',
     'doctor_cancelled',
   ];
+  // F05.02: the default doctor view is TODAY's appointments (Karachi day); history is separate.
+  const todayYMD = formatInTimeZone(new Date(), KARACHI, 'yyyy-MM-dd');
+  const dayStart = karachiWallTimeToUtc(todayYMD, '00:00');
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const where =
     scope === 'history'
       ? { doctorId: doctor.id, state: { in: TERMINAL } }
-      : { doctorId: doctor.id, state: { in: UPCOMING } };
+      : {
+          doctorId: doctor.id,
+          state: { in: UPCOMING },
+          slotStart: { gte: dayStart, lt: dayEnd },
+        };
   const rows = await prisma.appointment.findMany({
     where,
     orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
