@@ -1,6 +1,6 @@
 # 2026-06-12-0034 — slice-f-prescriptions-build
 
-**Status:** Completed (build + canon sweep; merge decision pending with user)
+**Status:** Completed (built, reviewed, canon-swept, MERGED to main no-ff 830e16d and PUSHED to origin/main — both user-approved)
 **Goal:** Execute the Slice F (Prescriptions, M3) implementation plan subagent-driven on branch `feature/slice-f`.
 **Skill(s) used:** superpowers:subagent-driven-development (user chose); plan: `docs/superpowers/plans/2026-06-12-slice-f-prescriptions.md`
 **Ticket / issue:** None
@@ -95,5 +95,5 @@ Additive schema migration (default '' column + widened unique — backward compa
 
 1. ~~Execute Tasks 1–15~~ — done, all reviewed.
 2. ~~Task 16 canon-doc edits~~ — approved + applied (0b8aa6c).
-3. Merge decision (finishing-a-development-branch): merge feature/slice-f → main (no-ff, matches prior slices) needs user approval; no push without approval.
+3. ~~Merge decision~~ — merged no-ff (830e16d) + pushed to origin/main with user approval; both suites re-verified green on merged main (202 + 59). Local branch feature/slice-f retained (not deleted).
 4. Deferred (recorded, deliberate): D-02 today-tab surfacing decision (F05.02 scope keeps completed rows in History — fine as built, revisit only if doctors ask); POST /prescriptions envelope wart; listbox blur-close + aria-activedescendant (M4 a11y polish); PDF pagination >15 items (M4); final email template copy (M4).
