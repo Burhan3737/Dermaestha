@@ -1,17 +1,17 @@
 # 2026-06-11-2350 — slice-f-prescriptions-design
 
-**Status:** Partial
-**Goal:** Brainstorm and write the approved design for Slice F (Prescriptions, M3) — the next slice after the merged Slice E.
-**Skill(s) used:** superpowers:brainstorming (user-invoked); superpowers:writing-plans pending after spec review
+**Status:** Completed (design + plan; build is the next session)
+**Goal:** Brainstorm and write the approved design for Slice F (Prescriptions, M3) — the next slice after the merged Slice E — then turn it into the implementation plan.
+**Skill(s) used:** superpowers:brainstorming (user-invoked); superpowers:writing-plans (announced, user approved)
 **Ticket / issue:** None
 **Branch:** main
-**Commits / PR:** pending (design doc commit)
-**Last updated:** 2026-06-11-2359
-**Tags:** #design #feature #prescriptions #m3
+**Commits / PR:** b48b93a (design doc); plan commit follows
+**Last updated:** 2026-06-12-0030
+**Tags:** #design #plan #feature #prescriptions #m3
 
 ## Summary
 
-Explored post-Slice-E state (M1/M2 functionally closed; doc 13's "Video chrome: Not started" row found stale — VideoRoom/DoctorToday exist), confirmed direction with the user (Slice F — Prescriptions over admin panel / vendor adapters), resolved four scope decisions via Q&A, and wrote the approved design to `docs/superpowers/specs/2026-06-11-slice-f-prescriptions-design.md`. No production code changed.
+Explored post-Slice-E state (M1/M2 functionally closed; doc 13's "Video chrome: Not started" row found stale — VideoRoom/DoctorToday exist), confirmed direction with the user (Slice F — Prescriptions over admin panel / vendor adapters), resolved four scope decisions via Q&A, and wrote the approved design to `docs/superpowers/specs/2026-06-11-slice-f-prescriptions-design.md`. After user spec approval, wrote the 16-task TDD implementation plan to `docs/superpowers/plans/2026-06-12-slice-f-prescriptions.md` (every task grounded in verified source: schema field names, enqueue upsert shape, LEGAL map, listForRole branches, client view/test patterns, seed credentials). No production code changed.
 
 ## Context / why
 
@@ -22,6 +22,7 @@ Slice E (notification outbox + workers + G1–G4 fixes) is merged; user asked to
 | File | Action | What & why |
 |---|---|---|
 | `docs/superpowers/specs/2026-06-11-slice-f-prescriptions-design.md` | Created | Approved Slice F design (scope, architecture, migration, API, services, frontend, errors, testing, gated canon-doc impact) |
+| `docs/superpowers/plans/2026-06-12-slice-f-prescriptions.md` | Created | 16-task TDD implementation plan (outbox dedupeKey migration → medicine/prescription modules → state machine → read-model → client P-09/P-13/D-05/D-02 → integration → gated canon sweep) |
 | `agentChangeLogs/2026-06-11-2350-slice-f-prescriptions-design.md` | Created | This session log |
 | `agentChangeLogs/index.md` | Modified | Added this session's line |
 
@@ -55,7 +56,8 @@ None — documentation only. Revert = drop the design doc + this log.
 
 ## Open items / next session
 
-1. User reviews the written spec (gate before planning).
-2. Invoke superpowers:writing-plans → implementation plan for Slice F.
-3. Build session: branch question (needs user approval per CLAUDE.md), then execute plan.
-4. Canon-doc edits (design §9 table) remain GATED on explicit user approval at build time.
+1. ~~User reviews the written spec~~ — approved 2026-06-12.
+2. ~~Invoke superpowers:writing-plans~~ — plan written: `docs/superpowers/plans/2026-06-12-slice-f-prescriptions.md`.
+3. Build session: branch question (needs user approval per CLAUDE.md, plan asks at execution start), then execute the plan (subagent-driven or inline — user to choose).
+4. Canon-doc edits (plan Task 16) remain GATED on explicit user approval at build time.
+5. Plan-noted findings for the build: ESM red-step for Task 8 relies on import-linking failure; Vite build should show a separate pdf-lib chunk (Task 16 Step 3 verifies the lazy import).
