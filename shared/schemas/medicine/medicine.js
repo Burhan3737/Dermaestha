@@ -11,7 +11,7 @@ export const medicineCreateSchema = z.object({
   name: z.string().trim().min(1).max(200),
   genericName: z.string().trim().min(1).max(200).optional(),
   dosageForms: z.array(z.string().trim().min(1).max(60)).min(1),
-  unitPrice: z.number().int().positive(),
+  unitPrice: z.number().int().positive().max(2_147_483_647),
 });
 
 /** PATCH /api/admin/medicines/:id (F11.03). Partial edit + deactivate toggle. */

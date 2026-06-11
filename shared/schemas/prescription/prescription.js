@@ -12,6 +12,7 @@ const itemSchema = z
   })
   .refine((i) => !!i.medicineId !== !!i.medicineName, {
     message: 'Provide exactly one of medicineId or medicineName',
+    path: ['medicineId'],
   });
 
 /** POST /api/appointments/:id/prescriptions */
