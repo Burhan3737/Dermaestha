@@ -11,7 +11,7 @@ vi.mock('../../lib/prisma/prisma.js', () => ({
       delete: vi.fn(),
       update: vi.fn(),
     },
-    doctor: { findUnique: vi.fn() },
+    doctor: { findUnique: vi.fn(), findFirst: vi.fn() },
     user: { findUnique: vi.fn() },
     payment: { findFirst: vi.fn(), update: vi.fn(), findMany: vi.fn() },
     settings: { findUnique: vi.fn() },
@@ -160,6 +160,7 @@ describe('booking.lockSlot', () => {
 
   beforeEach(() => {
     prisma.appointment.findFirst.mockResolvedValue(null); // no existing lock / no overlap by default
+    prisma.doctor.findFirst.mockResolvedValue({ id: 'd1' }); // active doctor by default
   });
 
   it('rejects a slot that is not bookable', async () => {
@@ -210,6 +211,18 @@ describe('booking.lockSlot', () => {
     await expect(
       lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }),
     ).rejects.toMatchObject({ code: 'SLOT_TAKEN', status: 409 });
+  });
+
+  it('rejects locking a slot of an inactive/unknown doctor with 404 (invariant #9, no leak)', async () => {
+    prisma.doctor.findFirst.mockResolvedValue(null); // inactive or missing — same answer
+    await expect(
+      lockSlot({
+        patientUserId: 'u1',
+        doctorId: 'd-gone',
+        slotStart: '2099-01-06T09:00:00.000Z',
+        forSelf: true,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 });
 

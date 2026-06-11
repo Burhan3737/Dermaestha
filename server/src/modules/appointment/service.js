@@ -143,6 +143,14 @@ export async function lockSlot({ patientUserId, doctorId, slotStart, forSelf, su
   const slotEnd = new Date(slotStartDate.getTime() + SLOT_GRANULARITY_MIN * 60 * 1000);
   const now = new Date();
 
+  // Invariant #9 (F10.03): a deactivated/unknown doctor takes NO new bookings.
+  // 404-no-leak — same answer as the public profile route.
+  const activeDoctor = await prisma.doctor.findFirst({
+    where: { id: doctorId, isActive: true, status: 'active' },
+    select: { id: true },
+  });
+  if (!activeDoctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
+
   // 1. The slot must currently be a real, future, lead-time-valid, un-taken slot.
   const dateYMD = formatInTimeZone(slotStartDate, KARACHI, 'yyyy-MM-dd');
   const slots = await generateSlots(doctorId, dateYMD);
