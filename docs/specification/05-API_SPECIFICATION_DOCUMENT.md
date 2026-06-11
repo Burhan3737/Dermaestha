@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.8                           |
-| Last updated     | 2026-06-11                    |
+| Version          | 1.9                           |
+| Last updated     | 2026-06-12                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -84,7 +84,7 @@ Validation is Zod-first (`shared/schemas`), then the controller calls a service;
 | `401`  | Not authenticated                                            | `UNAUTHENTICATED`                                                     |
 | `403`  | Wrong role / not owner (DA6); or session must change password (DA3) | `FORBIDDEN`, `MUST_CHANGE_PASSWORD`                                                           |
 | `404`  | Not found _or_ not visible to caller (avoid existence leaks) | `NOT_FOUND`                                                           |
-| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `LOCK_EXPIRED`, `IMMUTABLE_FIELD`, `ALREADY_PRESCRIBED`, `BLOCK_HAS_BOOKINGS`, `ACTIVE_LOCK_EXISTS`, `OVERLAP`, `INVALID_TRANSITION` |
+| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `LOCK_EXPIRED`, `IMMUTABLE_FIELD`, `INVALID_STATE`, `BLOCK_HAS_BOOKINGS`, `ACTIVE_LOCK_EXISTS`, `OVERLAP`, `INVALID_TRANSITION` |
 | `422`  | Well-formed but semantically rejected                        | `BOOKING_TOO_SOON`, `REFUND_INELIGIBLE`, `SLOT_NOT_BOOKABLE`, `VIDEO_WINDOW_CLOSED` |
 | `429`  | Rate-limited / locked out                                    | `RATE_LIMITED`, `ACCOUNT_LOCKED`                                      |
 | `500`  | Unexpected; logged to error tracking                         | `INTERNAL`                                                            |
@@ -162,8 +162,8 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | --------------------------------------- | -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `POST /api/appointments/lock`           | patient              | Create `slot_locked` (10-min hold) + "who-for" (P3/P8)      | a concurrent 2nd lock fails via the partial unique index → 409 `SLOT_TAKEN` (#1); validation also returns 409 `ACTIVE_LOCK_EXISTS`/`OVERLAP` (single-lock / no-overlap) and 422 `SLOT_NOT_BOOKABLE` (non-bookable or expired-lock collision, ADR-23) |
 | `POST /api/appointments/:id/pay`        | patient              | Create idempotent payment intent → PayFast handoff URL (P3) | idempotent on `(patient, slot)` (#7); 409 `LOCK_EXPIRED` if hold gone  |
-| `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant             |
-| `GET /api/appointments/:id`             | patient/doctor/admin | Detail, ownership-checked                                   | 404 (not 403) when not visible                                         |
+| `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant; `?scope=history` returns terminal-state rows newest-first; list rows (both roles) include `hasPrescription` |
+| `GET /api/appointments/:id`             | patient/doctor/admin | Detail, ownership-checked                                   | 404 (not 403) when not visible; detail adds `subjectAge`, `subjectRelation`, `patientName` |
 | `POST /api/appointments/:id/cancel`     | patient/doctor       | Cancel (P6/D5) → state transition + refund per policy       | see §5 transition table for ≥2h vs <2h vs doctor                       |
 | `POST /api/appointments/:id/dispute`    | admin                | Set/clear `disputed` flag (A5)                              | flag only — not a state transition; audit-logged                       |
 | `GET /api/appointments/:id/video-token` | patient/doctor       | Time-bound Daily token (P5/D3)                              | issued only within slot-start−10m … slot-end+5m                        |
@@ -198,9 +198,9 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                              | Role                 | Purpose                                                 | Notes                                                                                |
 | ------------------------------------------ | -------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `POST /api/appointments/:id/prescriptions` | doctor               | Submit immutable prescription + items (D4)              | only on `completed`/`prescription_issued`; snapshots doctor (#3) + items' price (#5) |
-| `GET /api/appointments/:id/prescriptions`  | patient/doctor/admin | Chronological list for the appointment (P7)             | role-scoped                                                                          |
-| — _(no `PUT`/`DELETE`)_                    | —                    | **Immutability (#4)** — corrections are new linked rows | a 2nd submit appends, never edits                                                    |
+| `POST /api/appointments/:id/prescriptions` | doctor (owner)       | Submit immutable prescription + items (D4)              | 404-no-leak if not the owning doctor; state must be `completed`/`prescription_issued` else 409 `INVALID_STATE`; each item is `medicineId` XOR `medicineName` with dosage/duration/instructions, unknown `medicineId` → 400 `VALIDATION_FAILED`; one `$transaction`: create + items (server-side name/price snapshot #3/#5; free-text price `null`) → first-issue `completed→prescription_issued` transition → `prescription_ready` outbox enqueue (`dedupeKey` = prescription id) → `201` |
+| `GET /api/appointments/:id/prescriptions`  | patient/doctor/admin | Chronological list for the appointment (P7)             | role-scoped (patient-owner / doctor-owner / admin); `{ data: [...] }` ordered `issuedAt` asc, items included |
+| — _(no `PUT`/`DELETE`)_                    | —                    | **Immutability (#4)** — corrections are new linked rows | a 2nd submit appends a new row (+ a 2nd `prescription_ready` email) and leaves state unchanged, never edits |
 
 ---
 
@@ -208,10 +208,9 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                        | Role         | Purpose                         | Notes                                           |
 | ------------------------------------ | ------------ | ------------------------------- | ----------------------------------------------- |
-| `GET /api/medicines?q=`              | doctor/admin | Search for the builder / manage | active filter for builder                       |
-| `POST /api/medicines`                | admin        | Add catalogue entry (A2)        | unit price in paisa                             |
-| `PATCH /api/medicines/:id`           | admin        | Edit name/price/forms (A2)      | does **not** affect existing prescriptions (#5) |
-| `POST /api/medicines/:id/deactivate` | admin        | Soft-disable                    | —                                               |
+| `GET /api/medicines?search=`         | doctor/admin | Search for the builder          | `{ data: [...] }` active-only, name-sorted; `search` matches `name` + `genericName` |
+| `POST /api/admin/medicines`          | admin        | Add catalogue entry (A2)        | unit price in paisa; `201`; audit `medicine.created`                    |
+| `PATCH /api/admin/medicines/:id`     | admin        | Edit fields + `isActive` toggle (A2) | partial edit; **deactivate-only, no `DELETE`**; does **not** affect existing prescriptions (#5); unknown id → 404; audit `medicine.updated` (`meta.fields`) |
 
 ---
 
@@ -245,6 +244,8 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 ## 5. Appointment state-machine transition table
 
 The **only** writer that performs transitions is the `transition()` function in `modules/appointment/service.js`. It validates `from → to` against the table below, writes the audit entry, then fires side-effects (refund, email, video token). Controllers and the three workers call it; none mutate `state` directly.
+
+The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND state = :from`, so a concurrent transition that already moved the row loses (matched-count 0 → 409 `INVALID_TRANSITION`) instead of silently double-applying. This closes the double-apply race (e.g. two concurrent first-issue prescription submits) — exactly one wins.
 
 `slot_available` = **no row** (absence). Booking inserts at `slot_locked`.
 
@@ -333,3 +334,4 @@ The **only** writer that performs transitions is the `transition()` function in 
 | 2026-06-11 | Re-pointed the state-machine writer + refund-orchestration prose to the merged `modules/appointment/service.js` | Folder-structure restructure (ADR-26); behavior unchanged |
 | 2026-06-11 | Repointed deprecated `CONFIG.md`/`INTEGRATIONS.md` refs to docs 15/14 | Deprecated-doc hygiene |
 | 2026-06-11 | Added dev-only worker trigger routes (`POST /dev/worker/*`); added F04.03 reconciliation-reuses-webhook-confirm note | Slice E (F04.03 reconciliation + F07 workers); schema/feature cascade |
+| 2026-06-12 | Aligned F08/F11 endpoint inventory to the built routes (prescription submit error codes incl. 409 `INVALID_STATE` + 400 `VALIDATION_FAILED`; medicine search `?search=`, admin `POST/PATCH /api/admin/medicines`, deactivate-only via `isActive`); added `?scope=history`/`hasPrescription` + detail `subjectAge`/`subjectRelation`/`patientName`; documented the state-guarded transition write (concurrent loser → 409); replaced the never-built `ALREADY_PRESCRIBED` 409 code with `INVALID_STATE` | Slice F (F08 prescriptions + F11 backend) |

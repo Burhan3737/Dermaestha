@@ -4,8 +4,8 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.5                                |
-| Last updated     | 2026-06-11                         |
+| Version          | 1.6                                |
+| Last updated     | 2026-06-12                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
 
@@ -215,7 +215,7 @@ Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v
 | `booking_confirmation` | `→confirmed`                              | `patientName, doctorName, slotStartLocal, fee, dashboardUrl` |
 | `reminder_24h`         | 24 h before slot (skipped for short-lead) | `patientName, doctorName, slotStartLocal, joinUrl`           |
 | `reminder_1h`          | 1 h before slot (skipped for short-lead)  | same as `reminder_24h`                                       |
-| `prescription_ready`   | `→prescription_issued`                    | `patientName, doctorName, prescriptionUrl`                   |
+| `prescription_ready`   | every prescription submit (incl. corrections); `dedupeKey` = prescription id | `patientName, doctorName, prescriptionUrl`                   |
 | `refund_confirmation`  | refund `settled`                          | `patientName, amount, refundRef, appointmentRef`             |
 | `cancellation_apology` | `doctor_cancelled` / `doctor_no_show`     | `patientName, doctorName, slotStartLocal, refundAmount`      |
 | `refund_delayed`       | edge #30 patient delay notice             | `patientName, appointmentRef`                               |
@@ -265,3 +265,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-05 | Added dev `daily.mock` simulation note (§3) | Slice D (F05 video & lifecycle; ADR-24) |
 | 2026-06-11 | Repointed deprecated `CONFIG.md §3` -> doc 15 and `API.md §1.1` -> doc 05 | Deprecated-doc hygiene |
 | 2026-06-11 | Added `queryPaymentStatus` to PaymentProvider contract + `QueryPaymentStatusArgs`/`Result` typedefs + mock/stub notes (§1-2); real Resend HTTP adapter + boot-time selection + production caveat (§4); `refund_delayed` merge-var row + Asia/Karachi timezone note (§5) | Slice E (reconciliation adapter + real Resend); new external integration cascade |
+| 2026-06-12 | Updated the `prescription_ready` trigger (§5) to fire on every prescription submit incl. corrections, with `dedupeKey` = prescription id (vars unchanged) | Slice F (F08): per-prescription enqueue via outbox `dedupe_key` |

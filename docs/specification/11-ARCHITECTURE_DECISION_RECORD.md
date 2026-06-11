@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.8                                                                                                |
-| Last updated     | 2026-06-11                                                                                         |
+| Version          | 1.9                                                                                                |
+| Last updated     | 2026-06-12                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -41,6 +41,7 @@
 26. [ADR-25 — Appointment-evaluation worker: in-process node-cron (realizing ADR-08)](#adr-25--appointment-evaluation-worker-in-process-node-cron-realizing-adr-08)
 27. [ADR-26 — Feature-first client modules + domain-based server modules](#adr-26--feature-first-client-modules--domain-based-server-modules)
 28. [ADR-27 — Notification outbox + in-process dispatch/retry/reconciliation workers](#adr-27--notification-outbox--in-process-dispatchretryreconciliation-workers)
+29. [ADR-28 — State-guarded transition write + per-prescription outbox dedupe key](#adr-28--state-guarded-transition-write--per-prescription-outbox-dedupe-key)
 
 ---
 
@@ -396,6 +397,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-28 — State-guarded transition write + per-prescription outbox dedupe key
+
+**Date:** 2026-06-12
+
+**Status:** Accepted
+
+**Context:** Slice F (F08 prescriptions) adds two transitions into the single state-writer (ADR-25): `completed → prescription_issued` on first issue, with corrections appending a new linked row while the state stays `prescription_issued` (#4). Two gaps surfaced. (1) The `transition()` writer validated `from → to` with a read-then-write, so two concurrent first-issue submits could both pass validation and double-apply (a second transition, a duplicate side-effect). (2) The Slice E outbox was unique on `(appointmentId, type)`, which made `prescription_ready` a singleton-per-appointment — it could not enqueue one email per prescription (corrections would be deduped away), the YAGNI deferral ADR-27 anticipated.
+
+**Decision:** Make the single-writer's write **state-guarded**: the update is `updateMany WHERE id = :id AND state = :from`; a matched-count of 0 means a concurrent transition already moved the row, so it raises `409 INVALID_TRANSITION` instead of silently double-applying. Relax the outbox unique to the 3-column composite `(appointmentId, type, dedupeKey)` with `dedupeKey` defaulting to `''` (migration `20260612003907_slice_f_outbox_dedupe_key`): Slice E types keep `''` (singleton semantics unchanged), and `prescription_ready` sets `dedupeKey` = the prescription id, enqueuing one email per prescription including corrections.
+
+**Consequences:** The double-apply race is closed at the database boundary — exactly one concurrent first-issue submit wins, the loser's `$transaction` (its prescription row included) rolls back atomically; proven by a Postgres row-lock integration test. The state machine remains the sole writer (ADR-25 unchanged). The outbox stays idempotent on replay while gaining per-prescription granularity, with no behaviour change for Slice E triggers. Cost: one extra column and a slightly wider unique index (doc 04 §2n/§4a).
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -409,3 +424,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-11 | Normalized ADR-11's `refund.service` decision ref to the merged `modules/appointment/service.js` (cross-ref ADR-26) | Docs↔code alignment follow-up |
 | 2026-06-11 | Repointed deprecated `CONFIG.md §7` refs (ADR-07 partial-index caveat -> doc 04 §4b; ADR-17 Prisma pin/upgrade -> doc 15 §7) | Deprecated-doc hygiene (design §8.1) |
 | 2026-06-11 | Added ADR-27 (notification outbox + in-process dispatch/retry/reconciliation workers; rejected sent-flags) | Slice E (F07 outbox + F04.03/F06.03 workers); new architectural decision |
+| 2026-06-12 | Added ADR-28 (state-guarded transition write closing the double-apply race; per-prescription outbox `dedupe_key` relaxation actioning ADR-27's YAGNI deferral) | Slice F (F08 prescriptions); new architectural decision |
