@@ -4,8 +4,8 @@
 
 ### Skills
 
-- Before activating any skill, STOP: tell the user which skill you are about to use and why, and let them decline. Never activate a skill silently.
 - After you fully understand the request, recommend the best-fit skill(s) for the task and let the user choose whether to use them.
+- Before activating any skill, STOP: tell the user which skill you are about to use and why, and let them decline. Never activate a skill silently.
 - If the user proposes a skill that does not fit the current task, tell them it is unsuitable before doing anything else.
 
 ### Specs
