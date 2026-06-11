@@ -684,3 +684,23 @@ describe('refund retry (F06.03 / edge #30)', () => {
     expect(success.nextRefundRetryAt).toBeNull();
   });
 });
+
+describe('transition: prescription issuance (F08.02)', () => {
+  it('allows completed → prescription_issued', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'completed' });
+    prisma.appointment.update.mockResolvedValue({ id: 'a1', state: 'prescription_issued' });
+    const out = await transition({
+      appointmentId: 'a1',
+      to: 'prescription_issued',
+      actorType: 'doctor',
+    });
+    expect(out.state).toBe('prescription_issued');
+  });
+
+  it('rejects any transition OUT of prescription_issued (terminal)', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'prescription_issued' });
+    await expect(
+      transition({ appointmentId: 'a1', to: 'completed', actorType: 'system' }),
+    ).rejects.toMatchObject({ code: 'INVALID_TRANSITION', status: 409 });
+  });
+});

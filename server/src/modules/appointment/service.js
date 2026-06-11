@@ -234,7 +234,7 @@ async function createWithReclaim(data, doctorId, slotStartDate, now) {
   }
 }
 
-/** Legal transitions (doc 05 §5). Slice C: slot_locked/confirmed entries. Slice D: added in_progress. */
+/** Legal transitions (doc 05 §5). Slice C: slot_locked/confirmed. Slice D: in_progress. Slice F: completed. */
 const LEGAL = {
   slot_locked: new Set(['confirmed']),
   confirmed: new Set([
@@ -244,6 +244,7 @@ const LEGAL = {
     'in_progress',
   ]),
   in_progress: new Set(['completed', 'patient_no_show', 'doctor_no_show']),
+  completed: new Set(['prescription_issued']),
 };
 
 /**
