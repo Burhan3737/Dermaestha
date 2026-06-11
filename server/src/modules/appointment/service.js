@@ -10,6 +10,8 @@ import {
   ACTIVE_APPOINTMENT_STATES,
   NO_SHOW_GRACE_MIN,
   VIDEO_TOKEN_POST_MIN,
+  REFUND_MAX_ATTEMPTS,
+  REFUND_BACKOFF_BASE_SEC,
 } from '../../config/constants.js';
 import { generateSlots } from '../doctor/service.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
@@ -293,17 +295,43 @@ export async function initiateRefund({ appointmentId }) {
       idempotencyKey: key,
     });
   } catch (e) {
-    // Record the failure so the dashboard/refund-status view reflects it and a future
-    // retry is idempotency-keyed; re-throw so the best-effort caller still audits (#10).
+    // Edge #30: schedule an exponential-backoff retry; on exhaustion alert the admin and
+    // notify the patient of the delay. Idempotency key (#10) makes every retry safe.
+    const attempts = (payment.refundAttempts ?? 0) + 1;
+    const exhausted = attempts >= REFUND_MAX_ATTEMPTS;
     await prisma.payment.update({
       where: { id: payment.id },
-      data: { refundIdempotencyKey: key, refundStatus: 'failed' },
+      data: {
+        refundIdempotencyKey: key,
+        refundStatus: exhausted ? 'failed' : 'retrying',
+        refundAttempts: attempts,
+        nextRefundRetryAt: exhausted
+          ? null
+          : new Date(Date.now() + REFUND_BACKOFF_BASE_SEC * 1000 * 2 ** attempts),
+      },
     });
+    if (exhausted) {
+      await audit
+        .record({
+          eventType: 'payment.refund_exhausted',
+          actorType: 'system',
+          targetRef: appointmentId,
+          reason: String(e?.message ?? e),
+          meta: { providerRef: payment.providerRef ?? null, attempts },
+        })
+        .catch(() => {});
+      await enqueueRefundDelayed(appointmentId).catch(() => {});
+    }
     throw e;
   }
   await prisma.payment.update({
     where: { id: payment.id },
-    data: { refundIdempotencyKey: key, refundRef: result.refundRef, refundStatus: result.status },
+    data: {
+      refundIdempotencyKey: key,
+      refundRef: result.refundRef,
+      refundStatus: result.status,
+      nextRefundRetryAt: null,
+    },
   });
   return result;
 }
@@ -322,6 +350,34 @@ export async function safeRefund(appointmentId) {
         reason: String(e?.message ?? e),
       })
       .catch(() => {});
+  }
+}
+
+async function enqueueRefundDelayed(appointmentId) {
+  const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+  if (!appt) return;
+  const patient = await prisma.user.findUnique({
+    where: { id: appt.patientUserId },
+    select: { email: true, fullName: true },
+  });
+  if (!patient) return;
+  await notification.enqueue({
+    type: 'refund_delayed',
+    appointmentId,
+    recipientEmail: patient.email,
+    scheduledFor: new Date(),
+    vars: { patientName: patient.fullName, appointmentRef: appointmentId },
+  });
+}
+
+/** Minute-cron worker body (F06.03): re-run due refund retries. Clock-injected. */
+export async function retryDueRefunds(now = new Date()) {
+  const due = await prisma.payment.findMany({
+    where: { refundStatus: 'retrying', nextRefundRetryAt: { lte: now } },
+  });
+  for (const p of due) {
+    // Best-effort per row; initiateRefund itself reschedules/exhausts on failure.
+    await self.initiateRefund({ appointmentId: p.appointmentId }).catch(() => {});
   }
 }
 

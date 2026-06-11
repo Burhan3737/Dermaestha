@@ -13,7 +13,7 @@ vi.mock('../../lib/prisma/prisma.js', () => ({
     },
     doctor: { findUnique: vi.fn() },
     user: { findUnique: vi.fn() },
-    payment: { findFirst: vi.fn(), update: vi.fn() },
+    payment: { findFirst: vi.fn(), update: vi.fn(), findMany: vi.fn() },
     settings: { findUnique: vi.fn() },
   },
 }));
@@ -35,7 +35,7 @@ import * as notification from '../notification/service.js';
 import * as svc from './service.js';
 
 // Direct (real) handles for functions tested head-on; intra-cluster seams are spied per-suite on `svc`.
-const { listForRole, getForRole, lockSlot, transition, quoteRefund, initiateRefund, cancel, evaluateDueAppointments } =
+const { listForRole, getForRole, lockSlot, transition, quoteRefund, initiateRefund, cancel, evaluateDueAppointments, retryDueRefunds } =
   svc;
 
 // clearAllMocks resets call history but preserves mock IMPLEMENTATIONS, so the cross-module factory
@@ -315,7 +315,7 @@ describe('refund.initiateRefund', () => {
     });
     expect(prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'p1' },
-      data: { refundIdempotencyKey: 'rf_a1', refundRef: 'refund_rf_a1', refundStatus: 'settled' },
+      data: { refundIdempotencyKey: 'rf_a1', refundRef: 'refund_rf_a1', refundStatus: 'settled', nextRefundRetryAt: null },
     });
   });
 
@@ -325,7 +325,7 @@ describe('refund.initiateRefund', () => {
     expect(paymentProvider.refund).not.toHaveBeenCalled();
   });
 
-  it('marks refundStatus=failed (idempotency-keyed) and re-throws when the provider fails', async () => {
+  it('marks refundStatus=retrying (idempotency-keyed) on first failure and re-throws', async () => {
     prisma.payment.findFirst.mockResolvedValue({
       id: 'p1',
       appointmentId: 'a1',
@@ -333,14 +333,17 @@ describe('refund.initiateRefund', () => {
       gatewayFee: 6000,
       providerRef: 'mock_1',
       refundIdempotencyKey: null,
+      refundAttempts: 0,
     });
     prisma.settings.findUnique.mockResolvedValue({ fallbackFeePctBps: 0, fallbackFeeFixed: 0 });
     paymentProvider.refund.mockRejectedValue(new Error('provider down'));
     await expect(initiateRefund({ appointmentId: 'a1' })).rejects.toThrow('provider down');
-    expect(prisma.payment.update).toHaveBeenCalledWith({
-      where: { id: 'p1' },
-      data: { refundIdempotencyKey: 'rf_a1', refundStatus: 'failed' },
-    });
+    expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'p1' },
+        data: expect.objectContaining({ refundIdempotencyKey: 'rf_a1', refundStatus: 'retrying', refundAttempts: 1 }),
+      }),
+    );
   });
 });
 
@@ -582,5 +585,76 @@ describe('evaluateDueAppointments', () => {
     });
     await evaluateDueAppointments(new Date('2026-06-04T10:05:00.000Z'));
     expect(state.transition).not.toHaveBeenCalled();
+  });
+});
+
+describe('refund retry (F06.03 / edge #30)', () => {
+  // The cancellation suite's beforeEach stubs svc.initiateRefund via vi.spyOn+mockResolvedValue.
+  // vi.clearAllMocks() (global) keeps that stub alive. Restore and re-install a call-through spy
+  // so self.initiateRefund inside retryDueRefunds hits the real implementation. Factory mocks
+  // (paymentProvider.refund, notification.enqueue, etc.) are unaffected.
+  beforeEach(() => {
+    svc.initiateRefund.mockRestore?.();       // remove stub spy if present, restore real fn
+    // Re-install as a call-through spy: any existing stub's mockResolvedValue is gone; the spy
+    // delegates to the real initiateRefund so self.initiateRefund inside retryDueRefunds works.
+    vi.spyOn(svc, 'initiateRefund').mockImplementation((...args) => initiateRefund(...args));
+  });
+
+  const failedPayment = {
+    id: 'p1',
+    appointmentId: 'a1',
+    providerRef: 'mock_1',
+    amount: 250000,
+    gatewayFee: 6000,
+    refundIdempotencyKey: null,
+    refundAttempts: 0,
+  };
+
+  it('on provider failure marks retrying with attempts+1 and a backoff schedule', async () => {
+    prisma.payment.findFirst.mockResolvedValue(failedPayment);
+    prisma.settings.findUnique.mockResolvedValue(null);
+    paymentProvider.refund.mockRejectedValue(new Error('gateway 500'));
+    await expect(initiateRefund({ appointmentId: 'a1' })).rejects.toThrow('gateway 500');
+    const data = prisma.payment.update.mock.calls[0][0].data;
+    expect(data.refundStatus).toBe('retrying');
+    expect(data.refundAttempts).toBe(1);
+    expect(data.nextRefundRetryAt).toBeInstanceOf(Date);
+  });
+
+  it('at REFUND_MAX_ATTEMPTS marks failed, audits exhaustion, and enqueues refund_delayed', async () => {
+    prisma.payment.findFirst.mockResolvedValue({ ...failedPayment, refundAttempts: 4 }); // 5th try
+    prisma.settings.findUnique.mockResolvedValue(null);
+    prisma.appointment.findUnique.mockResolvedValue({
+      id: 'a1',
+      patientUserId: 'u1',
+      slotStart: new Date('2099-01-06T09:00:00Z'),
+      doctorId: 'd1',
+    });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
+    paymentProvider.refund.mockRejectedValue(new Error('gateway 500'));
+    await expect(initiateRefund({ appointmentId: 'a1' })).rejects.toThrow();
+    const data = prisma.payment.update.mock.calls[0][0].data;
+    expect(data.refundStatus).toBe('failed');
+    expect(data.nextRefundRetryAt).toBeNull();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'payment.refund_exhausted', targetRef: 'a1' }),
+    );
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'refund_delayed', appointmentId: 'a1' }),
+    );
+  });
+
+  it('retryDueRefunds re-runs initiateRefund for due retrying payments', async () => {
+    prisma.payment.findMany.mockResolvedValue([{ ...failedPayment, refundStatus: 'retrying' }]);
+    prisma.payment.findFirst.mockResolvedValue({ ...failedPayment, refundAttempts: 1 });
+    prisma.settings.findUnique.mockResolvedValue(null);
+    paymentProvider.refund.mockResolvedValue({ refundRef: 'r1', status: 'settled' });
+    await retryDueRefunds(new Date('2099-01-04T08:00:00Z'));
+    expect(paymentProvider.refund).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: 'rf_a1' }),
+    );
+    const success = prisma.payment.update.mock.calls.at(-1)[0].data;
+    expect(success.refundStatus).toBe('settled');
+    expect(success.nextRefundRetryAt).toBeNull();
   });
 });
