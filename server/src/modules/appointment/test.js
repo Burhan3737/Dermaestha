@@ -695,12 +695,27 @@ describe('transition: prescription issuance (F08.02)', () => {
       actorType: 'doctor',
     });
     expect(out.state).toBe('prescription_issued');
+    expect(prisma.appointment.update).toHaveBeenCalledWith({
+      where: { id: 'a1' },
+      data: expect.objectContaining({ state: 'prescription_issued' }),
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'appointment.prescription_issued',
+        actorType: 'doctor',
+        targetRef: 'a1',
+      }),
+      prisma,
+    );
   });
 
-  it('rejects any transition OUT of prescription_issued (terminal)', async () => {
-    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'prescription_issued' });
-    await expect(
-      transition({ appointmentId: 'a1', to: 'completed', actorType: 'system' }),
-    ).rejects.toMatchObject({ code: 'INVALID_TRANSITION', status: 409 });
-  });
+  it.each(['completed', 'confirmed', 'in_progress'])(
+    'rejects prescription_issued → %s (terminal state)',
+    async (to) => {
+      prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'prescription_issued' });
+      await expect(transition({ appointmentId: 'a1', to, actorType: 'system' })).rejects.toMatchObject(
+        { code: 'INVALID_TRANSITION', status: 409 },
+      );
+    },
+  );
 });
