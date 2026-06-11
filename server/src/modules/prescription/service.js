@@ -114,3 +114,28 @@ export async function submit({ appointmentId, doctorUserId, items, notes, follow
     return created;
   });
 }
+
+/**
+ * Chronological read (F08.01): all prescriptions for one appointment, oldest first —
+ * corrections (policy #9) are all visible and each is downloadable separately.
+ * This JSON is exactly what the client PDF renders (§3.5).
+ */
+export async function listByAppointment({ appointmentId, role, userId }) {
+  const appt = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: { patientUserId: true, doctorId: true },
+  });
+  const visible =
+    appt &&
+    ((role === 'patient' && appt.patientUserId === userId) ||
+      (role === 'doctor' &&
+        (await prisma.doctor.findUnique({ where: { userId }, select: { id: true } }))?.id ===
+          appt.doctorId) ||
+      role === 'admin');
+  if (!visible) throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
+  return prisma.prescription.findMany({
+    where: { appointmentId },
+    orderBy: { issuedAt: 'asc' },
+    include: { items: true },
+  });
+}

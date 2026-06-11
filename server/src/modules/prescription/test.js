@@ -15,7 +15,7 @@ vi.mock('../notification/service.js', () => ({ enqueue: vi.fn().mockResolvedValu
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as appointmentState from '../appointment/service.js';
 import * as notification from '../notification/service.js';
-import { submit } from './service.js'; // Task 8 adds listByAppointment to this import
+import { submit, listByAppointment } from './service.js';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -219,5 +219,36 @@ describe('prescription.submit (F08.02)', () => {
     const data2 = tx.prescription.create.mock.calls[1][0].data;
     expect(data2.notes).toBeNull();
     expect(data2.followUpDate).toBeNull();
+  });
+});
+
+describe('prescription.listByAppointment (F08.01)', () => {
+  const RX = [{ id: 'rx1', issuedAt: new Date('2099-01-01T10:00:00Z'), items: [] }];
+
+  it('patient-owner reads chronologically (issuedAt asc) with items', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', patientUserId: 'u1', doctorId: 'd1' });
+    prisma.prescription.findMany.mockResolvedValue(RX);
+    const out = await listByAppointment({ appointmentId: 'a1', role: 'patient', userId: 'u1' });
+    expect(out).toEqual(RX);
+    expect(prisma.prescription.findMany).toHaveBeenCalledWith({
+      where: { appointmentId: 'a1' },
+      orderBy: { issuedAt: 'asc' },
+      include: { items: true },
+    });
+  });
+
+  it('doctor-owner and admin read; a stranger gets 404 (no-leak)', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', patientUserId: 'u1', doctorId: 'd1' });
+    prisma.prescription.findMany.mockResolvedValue(RX);
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    await expect(
+      listByAppointment({ appointmentId: 'a1', role: 'doctor', userId: 'u-doc' }),
+    ).resolves.toEqual(RX);
+    await expect(
+      listByAppointment({ appointmentId: 'a1', role: 'admin', userId: 'u-adm' }),
+    ).resolves.toEqual(RX);
+    await expect(
+      listByAppointment({ appointmentId: 'a1', role: 'patient', userId: 'u-other' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 });
