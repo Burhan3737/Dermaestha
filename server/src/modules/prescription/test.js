@@ -97,14 +97,14 @@ describe('prescription.submit (F08.02)', () => {
   });
 
   it('first issue transitions completed → prescription_issued inside the tx', async () => {
-    arrangeTx();
+    const tx = arrangeTx();
     await submit({
       appointmentId: 'a1',
       doctorUserId: 'u-doc',
       items: [{ medicineId: 'm1', dosage: '1x', duration: '7d', instructions: 'x' }],
     });
     expect(appointmentState.transition).toHaveBeenCalledWith(
-      expect.objectContaining({ appointmentId: 'a1', to: 'prescription_issued' }),
+      expect.objectContaining({ appointmentId: 'a1', to: 'prescription_issued', client: tx }),
     );
   });
 
@@ -195,6 +195,29 @@ describe('prescription.submit (F08.02)', () => {
         doctorUserId: 'u-doc',
         items: [{ medicineId: 'm-gone', dosage: '1x', duration: '7d', instructions: 'x' }],
       }),
-    ).rejects.toMatchObject({ code: 'VALIDATION', status: 400 });
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
+  });
+
+  it('maps notes and followUpDate onto the created row (date-only → Date, absent → null)', async () => {
+    const tx = arrangeTx();
+    await submit({
+      appointmentId: 'a1',
+      doctorUserId: 'u-doc',
+      items: [{ medicineId: 'm1', dosage: '1x', duration: '7d', instructions: 'x' }],
+      notes: 'Avoid sun.',
+      followUpDate: '2099-01-18',
+    });
+    const data = tx.prescription.create.mock.calls[0][0].data;
+    expect(data.notes).toBe('Avoid sun.');
+    expect(data.followUpDate).toEqual(new Date('2099-01-18'));
+
+    await submit({
+      appointmentId: 'a1',
+      doctorUserId: 'u-doc',
+      items: [{ medicineId: 'm1', dosage: '1x', duration: '7d', instructions: 'x' }],
+    });
+    const data2 = tx.prescription.create.mock.calls[1][0].data;
+    expect(data2.notes).toBeNull();
+    expect(data2.followUpDate).toBeNull();
   });
 });

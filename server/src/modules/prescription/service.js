@@ -44,7 +44,7 @@ export async function submit({ appointmentId, doctorUserId, items, notes, follow
   const itemRows = items.map((i) => {
     if (i.medicineId) {
       const m = byId.get(i.medicineId);
-      if (!m) throw new AppError('VALIDATION', `Unknown medicine: ${i.medicineId}`, 400);
+      if (!m) throw new AppError('VALIDATION_FAILED', `Unknown medicine: ${i.medicineId}`, 400);
       return {
         medicineName: m.name,
         dosage: i.dosage,

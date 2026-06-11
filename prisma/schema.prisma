@@ -270,7 +270,7 @@ model Prescription {
   appointmentId     String   @map("appointment_id")
   appointment       Appointment @relation(fields: [appointmentId], references: [id])
   issuedAt          DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
-  /// Durable doctor identity at issue-time (#3): name, pmcNumber, specialization, signature.
+  /// Durable doctor identity at issue-time (#3): name, pmcNumber, specialization.
   doctorSnapshot    Json     @map("doctor_snapshot")
   /// Durable patient/subject identity at issue-time (P8): for_self, name, age, relation.
   patientIdSnapshot Json     @map("patient_id_snapshot")

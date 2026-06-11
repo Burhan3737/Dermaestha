@@ -279,10 +279,17 @@ export async function transition({
   if (!allowed || !allowed.has(to)) {
     throw new AppError('INVALID_TRANSITION', `Cannot move ${appt.state} → ${to}.`, 409);
   }
-  const updated = await client.appointment.update({
-    where: { id: appointmentId },
+  // State-guarded write: under READ COMMITTED a concurrent transition re-evaluates this
+  // WHERE after the row lock clears, so a lost-update race fails here (409) instead of
+  // silently double-applying (e.g. two first-issue prescription submits).
+  const guarded = await client.appointment.updateMany({
+    where: { id: appointmentId, state: appt.state },
     data: { state: to, ...data },
   });
+  if (guarded.count === 0) {
+    throw new AppError('INVALID_TRANSITION', `Cannot move ${appt.state} → ${to}.`, 409);
+  }
+  const updated = await client.appointment.findUnique({ where: { id: appointmentId } });
   await audit.record(
     { eventType: `appointment.${to}`, actorType, actorId, targetRef: appointmentId, reason },
     client,
