@@ -2,26 +2,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../lib/prisma/prisma.js', () => ({
   prisma: {
-    appointment: { findUnique: vi.fn() },
+    appointment: { findUnique: vi.fn(), deleteMany: vi.fn() },
     doctor: { findUnique: vi.fn() },
-    payment: { upsert: vi.fn(), update: vi.fn(), findFirst: vi.fn() },
+    payment: { upsert: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
 vi.mock('../../integrations/payment/index.js', () => ({
-  paymentProvider: { createCheckout: vi.fn() },
+  paymentProvider: { createCheckout: vi.fn(), refund: vi.fn(), queryPaymentStatus: vi.fn() },
 }));
+vi.mock('../../services/audit/audit.service.js', () => ({ record: vi.fn().mockResolvedValue({}) }));
 vi.mock('../../integrations/email/index.js', () => ({
   emailProvider: { send: vi.fn().mockResolvedValue({ providerId: 'x' }) },
 }));
 vi.mock('../appointment/service.js', () => ({ transition: vi.fn().mockResolvedValue({}) }));
+vi.mock('../notification/service.js', () => ({
+  enqueueBookingEmails: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
 import { emailProvider } from '../../integrations/email/index.js';
 import * as state from '../appointment/service.js';
-import { createIntent, processWebhook } from './service.js';
+import * as notification from '../notification/service.js';
+import * as audit from '../../services/audit/audit.service.js';
+import { createIntent, processWebhook, reconcileUnconfirmed } from './service.js';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -69,7 +75,7 @@ describe('payment.createIntent', () => {
 });
 
 describe('payment.processWebhook', () => {
-  it('on success commits state+payment in one $transaction', async () => {
+  it('on success commits state+payment+outbox in one $transaction', async () => {
     prisma.payment.findFirst.mockResolvedValue({
       id: 'p1',
       appointmentId: 'a1',
@@ -79,22 +85,41 @@ describe('payment.processWebhook', () => {
       id: 'a1',
       state: 'slot_locked',
       patientUserId: 'u1',
+      doctorId: 'd1',
+      slotStart: new Date('2099-01-06T09:00:00Z'),
     });
-    prisma.$transaction.mockImplementation(async (fn) => fn({ payment: { update: vi.fn() } }));
-    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
+    const tx = {
+      payment: { update: vi.fn() },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ email: 'p@t.test', fullName: 'P' }),
+      },
+      doctor: {
+        findUnique: vi.fn().mockResolvedValue({ user: { fullName: 'Dr. D' } }),
+      },
+    };
+    prisma.$transaction.mockImplementation(async (fn) => fn(tx));
     await processWebhook({
       event: 'payment.success',
       providerRef: 'mock_1',
       amount: 250000,
       gatewayFee: 6000,
     });
-    expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(state.transition).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'confirmed',
         data: { feeAtBooking: 250000, lockExpiresAt: null },
       }),
     );
+    expect(notification.enqueueBookingEmails).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointment: expect.objectContaining({ id: 'a1' }),
+        patient: { email: 'p@t.test', fullName: 'P' },
+        doctorName: 'Dr. D',
+        fee: 250000,
+        client: tx,
+      }),
+    );
+    expect(emailProvider.send).not.toHaveBeenCalled(); // no direct send path remains
   });
 
   it('on an already-confirmed appointment is an idempotent no-op', async () => {
@@ -130,26 +155,106 @@ describe('payment.processWebhook', () => {
     expect(prisma.payment.update).not.toHaveBeenCalled();
   });
 
-  it('does not block the webhook ack on a hung confirmation email (fire-and-forget)', async () => {
-    prisma.payment.findFirst.mockResolvedValue({
-      id: 'p1',
-      appointmentId: 'a1',
-      providerRef: 'mock_1',
+});
+
+describe('payment.reconcileUnconfirmed (F04.03)', () => {
+  const NOW = new Date('2099-01-04T12:00:00Z');
+  const pendingPayment = {
+    id: 'p1',
+    appointmentId: 'a1',
+    providerRef: 'mock_1',
+    amount: 250000,
+    refundIdempotencyKey: null,
+    createdAt: new Date('2099-01-04T10:00:00Z'), // 2h old: inside [1h, 24h]
+  };
+
+  beforeEach(() => {
+    prisma.payment.findMany.mockResolvedValue([pendingPayment]);
+  });
+
+  it('confirms a gateway-paid payment via the shared atomic commit', async () => {
+    paymentProvider.queryPaymentStatus.mockResolvedValue({
+      status: 'paid',
+      amount: 250000,
+      gatewayFee: 6000,
     });
     prisma.appointment.findUnique.mockResolvedValue({
       id: 'a1',
       state: 'slot_locked',
       patientUserId: 'u1',
+      doctorId: 'd1',
+      slotStart: new Date('2099-01-06T09:00:00Z'),
     });
-    prisma.$transaction.mockImplementation(async (fn) => fn({ payment: { update: vi.fn() } }));
-    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
-    emailProvider.send.mockReturnValue(new Promise(() => {})); // never resolves — a hung provider
-    const out = await processWebhook({
-      event: 'payment.success',
-      providerRef: 'mock_1',
-      amount: 250000,
-      gatewayFee: 6000,
+    const tx = {
+      payment: { update: vi.fn() },
+      user: { findUnique: vi.fn().mockResolvedValue({ email: 'p@t.test', fullName: 'P' }) },
+      doctor: { findUnique: vi.fn().mockResolvedValue({ user: { fullName: 'Dr. D' } }) },
+    };
+    prisma.$transaction.mockImplementation(async (fn) => fn(tx));
+    await reconcileUnconfirmed(NOW);
+    expect(state.transition).toHaveBeenCalledWith(expect.objectContaining({ to: 'confirmed' }));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'payment.reconciled_confirmed', targetRef: 'a1' }),
+    );
+  });
+
+  it('edge #6a: slot conflict → full gross refund, no second appointment, admin alert', async () => {
+    paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'paid', amount: 250000 });
+    prisma.appointment.findUnique.mockResolvedValue({
+      id: 'a1',
+      state: 'slot_locked',
+      patientUserId: 'u1',
+      doctorId: 'd1',
+      slotStart: new Date('2099-01-06T09:00:00Z'),
     });
-    expect(out).toEqual({ ok: true });
-  }, 2000);
+    prisma.$transaction.mockRejectedValue(
+      Object.assign(new Error('unique constraint'), { code: 'P2002' }),
+    );
+    paymentProvider.refund.mockResolvedValue({ refundRef: 'r1', status: 'settled' });
+    await reconcileUnconfirmed(NOW);
+    expect(paymentProvider.refund).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 250000, idempotencyKey: 'rf_a1' }), // FULL amount
+    );
+    expect(prisma.appointment.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'a1', state: 'slot_locked' },
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'payment.reconciliation_refund', targetRef: 'a1' }),
+    );
+  });
+
+  it('edge #6a variant: locked appointment row already gone → full refund', async () => {
+    paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'paid', amount: 250000 });
+    prisma.appointment.findUnique.mockResolvedValue(null);
+    paymentProvider.refund.mockResolvedValue({ refundRef: 'r1', status: 'settled' });
+    await reconcileUnconfirmed(NOW);
+    expect(paymentProvider.refund).toHaveBeenCalled();
+  });
+
+  it('gateway-failed → same cleanup as the failed-IPN path', async () => {
+    paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'failed' });
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'slot_locked' });
+    await reconcileUnconfirmed(NOW);
+    expect(prisma.appointment.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'a1', state: 'slot_locked' },
+    });
+    expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'failed' } }),
+    );
+  });
+
+  it('gateway-unknown → leaves the payment for the next pass', async () => {
+    paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'unknown' });
+    await reconcileUnconfirmed(NOW);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(paymentProvider.refund).not.toHaveBeenCalled();
+  });
+
+  it('a provider query error audits a reconciliation mismatch and continues', async () => {
+    paymentProvider.queryPaymentStatus.mockRejectedValue(new Error('gateway down'));
+    await reconcileUnconfirmed(NOW);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'payment.reconciliation_mismatch' }),
+    );
+  });
 });

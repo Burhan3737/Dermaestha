@@ -11,29 +11,31 @@ vi.mock('../../lib/prisma/prisma.js', () => ({
       delete: vi.fn(),
       update: vi.fn(),
     },
-    doctor: { findUnique: vi.fn() },
+    doctor: { findUnique: vi.fn(), findFirst: vi.fn() },
     user: { findUnique: vi.fn() },
-    payment: { findFirst: vi.fn(), update: vi.fn() },
+    payment: { findFirst: vi.fn(), update: vi.fn(), findMany: vi.fn() },
     settings: { findUnique: vi.fn() },
   },
 }));
 // Cross-module collaborators stay real module-mocks (these seams remain cross-module after the merge).
 vi.mock('../doctor/service.js', () => ({ generateSlots: vi.fn() }));
 vi.mock('../../services/audit/audit.service.js', () => ({ record: vi.fn().mockResolvedValue({}) }));
-vi.mock('../../integrations/email/index.js', () => ({
-  emailProvider: { send: vi.fn().mockResolvedValue({ providerId: 'x' }) },
-}));
 vi.mock('../../integrations/payment/index.js', () => ({ paymentProvider: { refund: vi.fn() } }));
+vi.mock('../notification/service.js', () => ({
+  enqueue: vi.fn().mockResolvedValue({}),
+  enqueueBookingEmails: vi.fn().mockResolvedValue(undefined),
+  slotStartLocal: vi.fn().mockReturnValue('Mon, 06 Jan 2099 09:00'),
+}));
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as availability from '../doctor/service.js';
 import * as audit from '../../services/audit/audit.service.js';
-import { emailProvider } from '../../integrations/email/index.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
+import * as notification from '../notification/service.js';
 import * as svc from './service.js';
 
 // Direct (real) handles for functions tested head-on; intra-cluster seams are spied per-suite on `svc`.
-const { listForRole, getForRole, lockSlot, transition, quoteRefund, initiateRefund, cancel, evaluateDueAppointments } =
+const { listForRole, getForRole, lockSlot, transition, quoteRefund, initiateRefund, cancel, evaluateDueAppointments, retryDueRefunds } =
   svc;
 
 // clearAllMocks resets call history but preserves mock IMPLEMENTATIONS, so the cross-module factory
@@ -149,6 +151,19 @@ describe('appointment.listForRole (doctor)', () => {
   });
 });
 
+describe('listForRole doctor scope (F05.02)', () => {
+  it("default scope is bounded to today's Karachi day", async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    prisma.appointment.findMany.mockResolvedValue([]);
+    await listForRole({ role: 'doctor', userId: 'u-doc' });
+    const where = prisma.appointment.findMany.mock.calls[0][0].where;
+    expect(where.state).toEqual({ in: ['confirmed', 'in_progress'] });
+    expect(where.slotStart.gte).toBeInstanceOf(Date);
+    expect(where.slotStart.lt).toBeInstanceOf(Date);
+    expect(where.slotStart.lt.getTime() - where.slotStart.gte.getTime()).toBe(24 * 3600 * 1000);
+  });
+});
+
 describe('booking.lockSlot', () => {
   const slotStart = '2099-01-04T13:00:00.000Z';
   const bookable = () =>
@@ -158,6 +173,7 @@ describe('booking.lockSlot', () => {
 
   beforeEach(() => {
     prisma.appointment.findFirst.mockResolvedValue(null); // no existing lock / no overlap by default
+    prisma.doctor.findFirst.mockResolvedValue({ id: 'd1' }); // active doctor by default
   });
 
   it('rejects a slot that is not bookable', async () => {
@@ -208,6 +224,18 @@ describe('booking.lockSlot', () => {
     await expect(
       lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }),
     ).rejects.toMatchObject({ code: 'SLOT_TAKEN', status: 409 });
+  });
+
+  it('rejects locking a slot of an inactive/unknown doctor with 404 (invariant #9, no leak)', async () => {
+    prisma.doctor.findFirst.mockResolvedValue(null); // inactive or missing — same answer
+    await expect(
+      lockSlot({
+        patientUserId: 'u1',
+        doctorId: 'd-gone',
+        slotStart: '2099-01-06T09:00:00.000Z',
+        forSelf: true,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 });
 
@@ -313,7 +341,7 @@ describe('refund.initiateRefund', () => {
     });
     expect(prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'p1' },
-      data: { refundIdempotencyKey: 'rf_a1', refundRef: 'refund_rf_a1', refundStatus: 'settled' },
+      data: { refundIdempotencyKey: 'rf_a1', refundRef: 'refund_rf_a1', refundStatus: 'settled', nextRefundRetryAt: null },
     });
   });
 
@@ -323,7 +351,7 @@ describe('refund.initiateRefund', () => {
     expect(paymentProvider.refund).not.toHaveBeenCalled();
   });
 
-  it('marks refundStatus=failed (idempotency-keyed) and re-throws when the provider fails', async () => {
+  it('marks refundStatus=retrying (idempotency-keyed) on first failure and re-throws', async () => {
     prisma.payment.findFirst.mockResolvedValue({
       id: 'p1',
       appointmentId: 'a1',
@@ -331,14 +359,17 @@ describe('refund.initiateRefund', () => {
       gatewayFee: 6000,
       providerRef: 'mock_1',
       refundIdempotencyKey: null,
+      refundAttempts: 0,
     });
     prisma.settings.findUnique.mockResolvedValue({ fallbackFeePctBps: 0, fallbackFeeFixed: 0 });
     paymentProvider.refund.mockRejectedValue(new Error('provider down'));
     await expect(initiateRefund({ appointmentId: 'a1' })).rejects.toThrow('provider down');
-    expect(prisma.payment.update).toHaveBeenCalledWith({
-      where: { id: 'p1' },
-      data: { refundIdempotencyKey: 'rf_a1', refundStatus: 'failed' },
-    });
+    expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'p1' },
+        data: expect.objectContaining({ refundIdempotencyKey: 'rf_a1', refundStatus: 'retrying', refundAttempts: 1 }),
+      }),
+    );
   });
 });
 
@@ -358,12 +389,16 @@ describe('cancellation.cancel', () => {
       patientUserId: 'u1',
       slotStart: future(180),
     });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
     const out = await cancel({ appointmentId: 'a1', actorType: 'patient', actorId: 'u1' });
     expect(state.transition).toHaveBeenCalledWith(
       expect.objectContaining({ to: 'cancelled_refunded' }),
     );
     expect(refund.initiateRefund).toHaveBeenCalledWith({ appointmentId: 'a1' });
     expect(out.state).toBe('cancelled_refunded');
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'refund_confirmation', appointmentId: 'a1' }),
+    );
   });
 
   it('patient <2h before → cancelled_no_refund, no refund', async () => {
@@ -390,6 +425,7 @@ describe('cancellation.cancel', () => {
       slotStart: future(30),
     });
     prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
     const out = await cancel({
       appointmentId: 'a1',
       actorType: 'doctor',
@@ -401,6 +437,9 @@ describe('cancellation.cancel', () => {
     );
     expect(refund.initiateRefund).toHaveBeenCalled();
     expect(out.state).toBe('doctor_cancelled');
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'cancellation_apology', appointmentId: 'a1' }),
+    );
   });
 
   it('doctor cancel without a reason → 400', async () => {
@@ -515,7 +554,7 @@ describe('evaluateDueAppointments', () => {
       expect.objectContaining({ appointmentId: 'a1', to: 'patient_no_show' }),
     );
     expect(safeRefund).not.toHaveBeenCalled();
-    expect(emailProvider.send).not.toHaveBeenCalled();
+    expect(notification.enqueue).not.toHaveBeenCalled();
     expect(audit.record).not.toHaveBeenCalled();
   });
 
@@ -551,12 +590,16 @@ describe('evaluateDueAppointments', () => {
         },
       ],
     });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
     await evaluateDueAppointments(new Date('2026-06-04T10:36:00.000Z'));
     expect(state.transition).toHaveBeenCalledWith(
       expect.objectContaining({ appointmentId: 'a1', to: 'doctor_no_show' }),
     );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'appointment.evaluation_data_gap' }),
+    );
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'cancellation_apology' }),
     );
   });
 
@@ -568,5 +611,76 @@ describe('evaluateDueAppointments', () => {
     });
     await evaluateDueAppointments(new Date('2026-06-04T10:05:00.000Z'));
     expect(state.transition).not.toHaveBeenCalled();
+  });
+});
+
+describe('refund retry (F06.03 / edge #30)', () => {
+  // The cancellation suite's beforeEach stubs svc.initiateRefund via vi.spyOn+mockResolvedValue.
+  // vi.clearAllMocks() (global) keeps that stub alive. Restore and re-install a call-through spy
+  // so self.initiateRefund inside retryDueRefunds hits the real implementation. Factory mocks
+  // (paymentProvider.refund, notification.enqueue, etc.) are unaffected.
+  beforeEach(() => {
+    svc.initiateRefund.mockRestore?.();       // remove stub spy if present, restore real fn
+    // Re-install as a call-through spy: any existing stub's mockResolvedValue is gone; the spy
+    // delegates to the real initiateRefund so self.initiateRefund inside retryDueRefunds works.
+    vi.spyOn(svc, 'initiateRefund').mockImplementation((...args) => initiateRefund(...args));
+  });
+
+  const failedPayment = {
+    id: 'p1',
+    appointmentId: 'a1',
+    providerRef: 'mock_1',
+    amount: 250000,
+    gatewayFee: 6000,
+    refundIdempotencyKey: null,
+    refundAttempts: 0,
+  };
+
+  it('on provider failure marks retrying with attempts+1 and a backoff schedule', async () => {
+    prisma.payment.findFirst.mockResolvedValue(failedPayment);
+    prisma.settings.findUnique.mockResolvedValue(null);
+    paymentProvider.refund.mockRejectedValue(new Error('gateway 500'));
+    await expect(initiateRefund({ appointmentId: 'a1' })).rejects.toThrow('gateway 500');
+    const data = prisma.payment.update.mock.calls[0][0].data;
+    expect(data.refundStatus).toBe('retrying');
+    expect(data.refundAttempts).toBe(1);
+    expect(data.nextRefundRetryAt).toBeInstanceOf(Date);
+  });
+
+  it('at REFUND_MAX_ATTEMPTS marks failed, audits exhaustion, and enqueues refund_delayed', async () => {
+    prisma.payment.findFirst.mockResolvedValue({ ...failedPayment, refundAttempts: 4 }); // 5th try
+    prisma.settings.findUnique.mockResolvedValue(null);
+    prisma.appointment.findUnique.mockResolvedValue({
+      id: 'a1',
+      patientUserId: 'u1',
+      slotStart: new Date('2099-01-06T09:00:00Z'),
+      doctorId: 'd1',
+    });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
+    paymentProvider.refund.mockRejectedValue(new Error('gateway 500'));
+    await expect(initiateRefund({ appointmentId: 'a1' })).rejects.toThrow();
+    const data = prisma.payment.update.mock.calls[0][0].data;
+    expect(data.refundStatus).toBe('failed');
+    expect(data.nextRefundRetryAt).toBeNull();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'payment.refund_exhausted', targetRef: 'a1' }),
+    );
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'refund_delayed', appointmentId: 'a1' }),
+    );
+  });
+
+  it('retryDueRefunds re-runs initiateRefund for due retrying payments', async () => {
+    prisma.payment.findMany.mockResolvedValue([{ ...failedPayment, refundStatus: 'retrying' }]);
+    prisma.payment.findFirst.mockResolvedValue({ ...failedPayment, refundAttempts: 1 });
+    prisma.settings.findUnique.mockResolvedValue(null);
+    paymentProvider.refund.mockResolvedValue({ refundRef: 'r1', status: 'settled' });
+    await retryDueRefunds(new Date('2099-01-04T08:00:00Z'));
+    expect(paymentProvider.refund).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: 'rf_a1' }),
+    );
+    const success = prisma.payment.update.mock.calls.at(-1)[0].data;
+    expect(success.refundStatus).toBe('settled');
+    expect(success.nextRefundRetryAt).toBeNull();
   });
 });

@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.3                                                           |
-| Last updated     | 2026-06-05                                                    |
+| Version          | 1.4                                                           |
+| Last updated     | 2026-06-11                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
 
@@ -90,6 +90,23 @@ enum AuditActorType {
   doctor
   admin
   system
+}
+
+enum NotificationType {
+  booking_confirmation
+  reminder_24h
+  reminder_1h
+  prescription_ready
+  refund_confirmation
+  cancellation_apology
+  refund_delayed
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+  suppressed
 }
 ```
 
@@ -227,6 +244,7 @@ model Appointment {
 
   payments      Payment[]
   prescriptions Prescription[]
+  notificationJobs NotificationJob[]
 
   // The UNIQUE no-double-booking guarantee is the partial index added in the migration
   // (see file header). These are plain query indexes only.
@@ -265,6 +283,9 @@ model Payment {
   refundIdempotencyKey String?       @unique @map("refund_idempotency_key")
   refundRef            String?       @map("refund_ref")
   refundStatus         RefundStatus? @map("refund_status")
+  /// Refund-retry bookkeeping (F06.03 / edge #30). The refund-retry worker polls retrying+due rows.
+  refundAttempts    Int       @default(0)  @map("refund_attempts")
+  nextRefundRetryAt DateTime? @map("next_refund_retry_at") @db.Timestamptz(6)
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -277,6 +298,8 @@ model Payment {
 ```
 
 `patientUserId` and `slotStart` are denormalized scalars (not a separate FK relation) specifically to form the `intent_key` composite unique. `gatewayFee` (paisa) drives refund math and cancellation fee estimates under policy #5. When the gateway does not report a fee, the Settings fallback model applies.
+
+`refundAttempts` and `nextRefundRetryAt` (Slice E, migration `20260610231617_slice_e_notification_outbox`) back the refund-retry worker (F06.03 / edge #30): on a provider failure `refundStatus` becomes `retrying`, `refundAttempts` increments, and `nextRefundRetryAt` is set to an exponential-backoff time; the minute-cron worker polls `refundStatus = retrying AND nextRefundRetryAt ≤ now`. At `REFUND_MAX_ATTEMPTS` the row flips to `refundStatus = failed`, `nextRefundRetryAt = null`, an audit alert (`payment.refund_exhausted`) is written, and a `refund_delayed` notification is enqueued.
 
 ---
 
@@ -459,6 +482,44 @@ model Session {
 
 ---
 
+### 2n. NotificationJob (Slice E)
+
+Transactional email outbox (F07). The intent-to-send persists in the same database — and, for event emails, the same `$transaction` — as the state change that promised it, so a crash between commit and send can never lose an email and the PayFast IPN ack never waits on a send. The minute-cron dispatch worker delivers due rows, retries with exponential backoff, and suppresses reminders the appointment has invalidated (F07.03).
+
+```prisma
+/// Transactional email outbox (F07): the intent-to-send persists in the same DB (and, for
+/// event emails, the same $transaction) as the state change that promised it. The dispatch
+/// worker delivers, retries with backoff, and suppresses invalidated reminders.
+model NotificationJob {
+  id             String             @id @default(cuid())
+  type           NotificationType
+  appointmentId  String             @map("appointment_id")
+  appointment    Appointment        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  /// Snapshot at enqueue time.
+  recipientEmail String             @map("recipient_email")
+  /// Merge-vars snapshot at enqueue time (doc 14 §5 contract).
+  vars           Json?
+  scheduledFor   DateTime           @map("scheduled_for") @db.Timestamptz(6)
+  status         NotificationStatus @default(pending)
+  attempts       Int                @default(0)
+  nextAttemptAt  DateTime?          @map("next_attempt_at") @db.Timestamptz(6)
+  lastError      String?            @map("last_error")
+  sentAt         DateTime?          @map("sent_at") @db.Timestamptz(6)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Idempotent enqueue: a webhook replay cannot duplicate a job. Slice F relaxes
+  /// this if prescription_ready needs to repeat per prescription (YAGNI now).
+  @@unique([appointmentId, type])
+  @@index([status, scheduledFor])
+  @@map("notification_jobs")
+}
+```
+
+`recipientEmail` and `vars` are snapshots taken at enqueue time (doc 14 §5 merge-var contract) — no PHI beyond what `appointments`/`users` already hold. The `@@unique([appointmentId, type])` makes enqueue idempotent (a replayed `payment.success` IPN re-runs enqueue as a no-op upsert). `onDelete: Cascade` matters: the `payment.failed` webhook path and the edge-#6a reconciliation path delete `slot_locked` appointments, and a leftover job row must not block that. The `@@index([status, scheduledFor])` feeds the dispatch worker's due-rows query.
+
+---
+
 ### Deferred — Medicine Ordering tables (NOT in v1 build)
 
 The Medicine Ordering module described in PRD §6 (orders / order_items) is **not yet modeled** in `prisma/schema.prisma`. It is deferred to a post-v1 milestone and will reuse the payment adapter, audit log, and snapshot discipline when added.
@@ -475,6 +536,7 @@ erDiagram
     users ||--o{ appointments : "1:n (patient_user_id)"
     appointments ||--o{ payments : "1:n"
     appointments ||--o{ prescriptions : "1:n"
+    appointments ||--o{ notification_jobs : "1:n (cascade)"
     prescriptions ||--o{ prescription_items : "1:n"
 ```
 
@@ -489,6 +551,7 @@ erDiagram
 | `payments`            | `appointment_id`  | `appointments`  | Many payments per appointment (retries)                |
 | `prescriptions`       | `appointment_id`  | `appointments`  | 1..n per appointment (immutable; correction = new row) |
 | `prescription_items`  | `prescription_id` | `prescriptions` | Many items per prescription                            |
+| `notification_jobs`   | `appointment_id`  | `appointments`  | Outbox rows; `onDelete: Cascade` (a deleted lock drops its jobs) |
 
 **Why doctor name is not on `appointments` (invariant #3):** The `appointments` table stores only `doctor_id` (a FK), never the doctor's name, specialization, or fee. If a doctor's display name were stored directly on the appointment and the doctor's profile were later updated, historical records would either change (incorrect) or diverge (inconsistent). Historical doctor identity is instead captured at the moment of prescription issuance in `Prescription.doctorSnapshot` (a jsonb snapshot of name, pmcNumber, specialization, signature). The appointment row itself is only the booking record; the prescription is the legal document that needs the durable identity.
 
@@ -509,6 +572,7 @@ erDiagram
 | `doctors`  | `@@unique`                      | `pmc_number`                    | PMC number uniqueness           |
 | `payments` | `@@unique` (name: `intent_key`) | `(patient_user_id, slot_start)` | Payment-intent idempotency (#7) |
 | `payments` | `@unique`                       | `refund_idempotency_key`        | Refund idempotency (#10)        |
+| `notification_jobs` | `@@unique`            | `(appointment_id, type)`        | Idempotent enqueue (replay-safe outbox, F07) |
 
 ### 4b. The no-double-booking partial unique index (invariant #1)
 
@@ -535,6 +599,7 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 | `payments`            | `@@index`                             | `appointment_id`          | Payment lookup per appointment                                        |
 | `prescriptions`       | `@@index`                             | `appointment_id`          | Prescription list per appointment                                     |
 | `prescription_items`  | `@@index`                             | `prescription_id`         | Item list per prescription                                            |
+| `notification_jobs`   | `@@index`                             | `(status, scheduled_for)` | Dispatch worker's due-rows query (F07)                                |
 | `audit_log`           | `@@index`                             | `event_type`              | Admin audit search filter (A5)                                        |
 | `audit_log`           | `@@index`                             | `actor_type`              | Admin audit search filter (A5)                                        |
 | `audit_log`           | `@@index`                             | `at`                      | Time-range queries on audit log (A5)                                  |
@@ -573,7 +638,7 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | F04 — Payment                                        | `payments`, `appointments`                         | Atomic confirm; `intent_key` unique (#7); `fee_at_booking` snapshot (#6); `gateway_fee`, `provider_ref`                                         |
 | F05 — Appointment lifecycle & video                  | `appointments`                                     | State machine hub; video room/token lifecycle managed by the Daily adapter against `appointment.id` (no dedicated table)                        |
 | F06 — Cancellation & refund                          | `appointments`, `payments`                         | Transitions to `cancelled_refunded` / `cancelled_no_refund` / `doctor_cancelled`; `refund_idempotency_key` (#10), `refund_ref`, `refund_status` |
-| F07 — Reminders & notifications                      | `appointments` (read)                              | No dedicated table; the notification worker re-checks appointment state before dispatch                                                         |
+| F07 — Reminders & notifications                      | `notification_jobs`, `appointments` (read)         | Transactional outbox (Slice E); event emails enqueue in the caller's `$transaction`; the dispatch worker re-checks appointment state before sending (F07.03), retries with backoff, and suppresses invalidated reminders |
 | F08 — Prescription                                   | `prescriptions`, `prescription_items`, `medicines` | Immutable rows (#4); price snapshot (#5); `doctor_snapshot` / `patient_id_snapshot` jsonb (#3, P8)                                              |
 | F09 — Doctor weekly availability                     | `availability_blocks`                              | Recurring weekly windows; 30-min slots generated at read time                                                                                   |
 | F10 — Admin: doctor onboarding, edit, (de)activation | `doctors`, `users`                                 | Admin CRUD; `pmc_number` + email immutability (#8); `is_active` / `status`                                                                      |
@@ -598,3 +663,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-03 | Added `reset_token_hash` + `reset_token_expires_at` to `users` (§2b, §6 F01) | Slice A password-reset storage (F01.03); schema change per change-impact matrix |
 | 2026-06-05 | Added `doctor_joined_at` + `patient_joined_at` nullable TIMESTAMPTZ columns to `appointments` (§2e); migration `20260604141222_add_video_join_columns` | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Dropped the deprecated `CONFIG.md §7` pointer from the §4b migration caveat (this section is the canonical home) | Deprecated-doc hygiene (design §8.1) |
+| 2026-06-11 | Added `NotificationType`/`NotificationStatus` enums (§2a), `NotificationJob` model (§2n), `Appointment.notificationJobs` relation (§2e), `Payment.refund_attempts`/`next_refund_retry_at` (§2f), relationship + index + F07 scope entries; migration `20260610231617_slice_e_notification_outbox` | Slice E (F07 outbox + F06.03 refund-retry); schema change per change-impact matrix |

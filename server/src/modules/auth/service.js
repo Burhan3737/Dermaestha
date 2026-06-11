@@ -66,7 +66,12 @@ export async function getById(id) {
 
 export async function requestPasswordReset(email) {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null; // uniform 200, no work (enumeration-safe)
+  if (!user) {
+    // G4: constant-shape work vs the known-email branch (token gen + hash) so the uniform
+    // {ok:true} response is not betrayed by a timing oracle. Mirrors login's DUMMY_HASH.
+    hashResetToken(generateResetToken());
+    return null;
+  }
   const rawToken = generateResetToken();
   const resetTokenHash = hashResetToken(rawToken);
   const resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60 * 1000);

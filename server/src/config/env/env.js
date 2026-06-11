@@ -10,12 +10,13 @@ const schema = z.object({
   PAYFAST_MERCHANT_ID: z.string().optional(),
   PAYFAST_PASSPHRASE: z.string().optional(),
   PAYMENT_PROVIDER: z.enum(['stub', 'mock']).default('stub'),
-  EMAIL_PROVIDER: z.enum(['stub', 'console']).default('stub'),
+  EMAIL_PROVIDER: z.enum(['stub', 'console', 'resend']).default('stub'),
   DAILY_API_KEY: z.string().optional(),
   DAILY_DOMAIN: z.string().optional(),
   VIDEO_PROVIDER: z.enum(['stub', 'mock', 'daily']).default('stub'),
   VIDEO_MOCK_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM: z.string().optional(),
   ERROR_TRACKING_DSN: z.string().optional(),
 });
 

@@ -18,6 +18,10 @@ export const PAYMENT_INTENT_MAX_PER_PATIENT_HOUR = Number(
 
 export const REFUND_MAX_ATTEMPTS = Number(process.env.REFUND_MAX_ATTEMPTS ?? 5);
 export const REFUND_BACKOFF_BASE_SEC = Number(process.env.REFUND_BACKOFF_BASE_SEC ?? 30);
+export const EMAIL_MAX_ATTEMPTS = Number(process.env.EMAIL_MAX_ATTEMPTS ?? 3);
+export const EMAIL_BACKOFF_BASE_SEC = Number(process.env.EMAIL_BACKOFF_BASE_SEC ?? 60);
+export const RECONCILIATION_LOOKBACK_H = Number(process.env.RECONCILIATION_LOOKBACK_H ?? 24);
+export const RECONCILIATION_MIN_AGE_MIN = Number(process.env.RECONCILIATION_MIN_AGE_MIN ?? 60);
 
 export const TIMEZONE = 'Asia/Karachi';
 

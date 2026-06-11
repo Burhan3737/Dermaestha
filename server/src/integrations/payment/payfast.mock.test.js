@@ -60,3 +60,11 @@ describe('payfast.mock gateway', () => {
     expect(out).toEqual({ refundRef: 'refund_rf_a1', status: 'settled' });
   });
 });
+
+describe('payfastMock.queryPaymentStatus', () => {
+  it('returns unknown — the dev mock gateway keeps no ledger; tests stub richer answers', async () => {
+    await expect(payfastMock.queryPaymentStatus({ providerRef: 'mock_x' })).resolves.toEqual({
+      status: 'unknown',
+    });
+  });
+});

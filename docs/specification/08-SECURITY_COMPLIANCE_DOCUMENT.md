@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.4                                                                                                     |
-| Last updated     | 2026-06-05                                                                                              |
+| Version          | 1.5                                                                                                     |
+| Last updated     | 2026-06-11                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
 
@@ -80,6 +80,7 @@ Scoping rules by role (PRD §3.6):
 - **PayFast sandbox/live mode:** the payment adapter toggles between sandbox and live mode via an env var, preventing accidental live-mode charges in non-production environments (ARCH §12).
 - **Dev provider switches must stay at production-safe defaults:** `PAYMENT_PROVIDER` and `EMAIL_PROVIDER` default to the non-simulating `stub` adapters; the dev mock payment gateway (`mock`) and its `/dev/checkout` routes activate only on explicit opt-in and **must never be set in production** (ADR-22; doc 10 deploy checklist). The mock-IPN HMAC uses `PAYFAST_PASSPHRASE` (or a dev-only fallback constant when unset) — this signing secret is for the dev simulator only; production uses the real PayFast passphrase for genuine IPN verification (doc 15).
 - **Dev video switch must stay at production-safe default:** `VIDEO_PROVIDER` defaults to `stub`; the dev mock video provider (`mock`), the `/dev/video/*` participant-join simulator routes, and the `/dev/worker/*` evaluation trigger route must never be active in production (ADR-24; doc 10 deploy checklist; doc 15). `VIDEO_MOCK_SECRET` is a dev-only signing key for mock meeting tokens and must not be set in production.
+- **Dev worker trigger routes mount only in development:** the on-demand worker trigger routes (`POST /dev/worker/*`) are conditionally mounted at startup only when `NODE_ENV === 'development'` and are never registered in production — same discipline as the existing dev payment and video simulators (ADR-24; doc 10 deploy checklist; doc 15).
 - **Error-tracking DSN:** the DSN for the error-tracking tool is an env secret; unhandled exceptions are surfaced to the admin alert feed (A3) via the integration rather than leaked in error responses (PRD §3.6 A3; ARCH §14.5).
 - **Single-instance worker assumption:** in-process `node-cron` workers and the memory-backed `express-rate-limit` store assume a single running instance. If the app ever scales horizontally, workers must be gated behind a Postgres advisory lock or moved to scheduled tasks, and the rate-limit store must move to a shared backend. This is a documented known limitation (CONFIG §3), not a silent assumption.
 
@@ -99,7 +100,7 @@ Scoping rules by role (PRD §3.6):
 
 Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_log` (`event_type=login_lockout`); sustained abuse is surfaced to the admin alert feed (A3).
 
-**Enumeration safety:** `POST /api/auth/forgot-password` and `POST /api/auth/login` return an identical response shape for known and unknown email addresses, preventing account enumeration (PRD §2.2 P2; ARCH §7).
+**Enumeration safety:** `POST /api/auth/forgot-password` and `POST /api/auth/login` return an identical response shape for known and unknown email addresses, preventing account enumeration (PRD §2.2 P2; ARCH §7). On an unknown email, the forgot-password path performs a dummy token-generate + hash operation (mirroring the login dummy-hash discipline) before returning the uniform response, so response timing does not betray whether an account exists. The reset-email send is fire-and-forget; the HTTP response never reflects whether a send occurred (G4 timing equalization).
 
 **Forced first-login password change (DA3):** when a doctor account is created by admin, `must_change_password = true` is set on the record. A middleware gate blocks all non-auth routes for that session until the password is changed. The same flag is set when admin resets a doctor's password (DA5), so the exposure window is limited to the doctor's first post-reset session (PRD DA3; ARCH §7; ARCH §5 module 1).
 
@@ -157,6 +158,7 @@ The audit log is **append-only** — no update or delete path is exposed at the 
 | Payment data | Card numbers, wallet credentials                                                                                                         | **Never touches the platform.** Handled exclusively by PayFast's hosted checkout. The platform stores only: gateway-assigned payment reference, gateway-reported fee, refund reference, and refund status |
 | Session data | Session cookie + server-side session record in the `session` table                                                                       | HTTP-only, Secure, SameSite=Lax; 7-day rolling TTL                                                                                                                                                        |
 | Audit log    | Timestamped event records with actor identity                                                                                            | Admin-only; append-only; no PII beyond actor/target references                                                                                                                                            |
+| Notification outbox | `recipient_email` snapshot and `vars` JSON snapshot stored in `notification_jobs` at enqueue time | No PHI beyond what `users`/`appointments` already hold; rows are accessible only by the in-process dispatch worker — no external read path |
 
 ### 2.2 Data minimization
 
@@ -272,3 +274,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | 2026-06-04 | Noted dev provider switches must stay at safe defaults in prod; mock-IPN passphrase is dev-only | Slice C dev payment simulation (ADR-22) |
 | 2026-06-05 | Added dev video switch (`VIDEO_PROVIDER=mock`) + `/dev/video/*`/`/dev/worker/*` + `VIDEO_MOCK_SECRET` must-not-be-prod note (§A05) | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Re-pointed the state-machine single-authority ref to the `transition()` writer in `modules/appointment/service.js` (merged) | Folder-structure restructure (ADR-26); behavior unchanged |
+| 2026-06-11 | Added G4 forgot-password timing equalization (§A07); notification outbox data-handling row (§2.1); dev worker trigger routes conditional-mount note (§A05) | Slice E hardening + outbox data-handling; schema/config cascade |

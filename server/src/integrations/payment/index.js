@@ -9,6 +9,7 @@ import { env } from '../../config/env/env.js';
  * @property {(req: import('express').Request) => any} verifyWebhook
  * @property {(args: any) => Promise<any>} refund
  * @property {(sinceIso: string) => Promise<any[]>} listUnconfirmed
+ * @property {(args: { providerRef: string }) => Promise<{ status: 'paid'|'failed'|'unknown', amount?: number, gatewayFee?: number|null }>} queryPaymentStatus
  */
 
 /** Selected provider. Swap to the concrete PayFast adapter in M2 via a config switch. */

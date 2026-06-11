@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.2                                    |
-| Last updated     | 2026-06-05                             |
+| Version          | 1.3                                    |
+| Last updated     | 2026-06-11                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -83,6 +83,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F01-003 | F01.01 Email Uniqueness Rule                  | Patient `P` already registered        | 1. Attempt sign-up with `P`'s email. 2. Submit.                                                                | Registration fails with a clear duplicate-email error; no second account is created.                                                                                | High     |
 | TC-F01-004 | F01.02 Session Rule                           | Patient `P` exists                    | 1. Log in at `/login` with `P`'s email + password. 2. Close and reopen the browser.                            | Login succeeds; session persists via a Secure, HTTP-only, SameSite=Lax cookie; `P` remains authenticated on return.                                                 | High     |
 | TC-F01-005 | F01.03 Enumeration-Safe Reset Rule            | Patient `P` exists; one unknown email | 1. Submit forgot-password for `P`'s email. 2. Submit forgot-password for an unknown email.                     | Both requests return an identical response; a reset link (1-hour expiry) is dispatched only for the known address; the response does not reveal which email exists. | High     |
+| TC-F01-006 | F01.03 Timing-Equalization Rule (G4)          | Patient `P` exists; one unknown email | 1. Submit forgot-password for `P`'s email. 2. Submit forgot-password for an unknown email.                     | Both branches perform constant-shape token work (generate + hash) before the uniform response, so request timing does not betray whether the account exists (mirrors the login dummy-hash discipline); the reset-email send is fire-and-forget and never reflected in the response. | High     |
 
 ### F02 — Doctor discovery (public listing & profile)
 
@@ -104,6 +105,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F03-006 | F03.03 Double-Booking Rule (#1)                         | Two patients target the same `(D, slot)`          | 1. `P` and `P2` both click "book" on the same slot near-simultaneously. 2. Both proceed.            | Storage-layer uniqueness allows only one booking; the second attempt fails fast at write time with a "slot just taken" error (Edge #1). | Critical |
 | TC-F03-007 | F03.03 Single-Lock Rule                                 | `P` holds one active slot lock                    | 1. With one lock held, `P` attempts to lock a second slot.                                          | `P` cannot hold multiple slot locks simultaneously; the second lock attempt is refused.                                                 | High     |
 | TC-F03-008 | F03.03 No-Overlap Rule                                  | `P` confirmed on a slot with `D`                  | 1. `P` attempts to book an overlapping slot with `D2`.                                              | `P` cannot book overlapping slots with the same or a different doctor; the overlapping attempt is rejected.                             | High     |
+| TC-F03-009 | F03.03 Active-Doctor Booking Rule (invariant #9, G2)   | `D` deactivated or unknown; `P` logged in         | 1. `P` attempts to lock a slot for a deactivated or non-existent doctor.                             | The lock is rejected with `404 NOT_FOUND` — the same answer as the public profile route, no existence leak; no `slot_locked` row is created; a deactivated/unknown doctor takes no new bookings (invariant #9). | High     |
 
 ### F04 — Payment
 
@@ -116,6 +118,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F04-005 | F04.02 Webhook-Auth Rule                    | Webhook endpoint reachable                               | 1. Send a `payment.success` webhook with a missing/invalid/expired signature.                        | The webhook is rejected (`401`); no state change occurs; the event is logged to the admin alert feed.                                                                                     | Critical |
 | TC-F04-006 | F04.01 feeAtBooking Snapshot (#6)           | `CA` confirmed at fee X; `D`'s fee later changed         | 1. Admin changes `D`'s consultation fee. 2. Inspect `CA`.                                            | `CA`'s billed amount, refund basis, and revenue accounting remain at the snapshotted fee X; the fee change does not affect the existing appointment.                                      | Critical |
 | TC-F04-007 | F04.03 Reconciliation safety net (Edge #6a) | `P` pays late; slot already confirmed to another patient | 1. A late webhook / reconciliation arrives for a slot already confirmed to someone else.             | No second appointment is created; the paying patient is auto-refunded in **full** (platform-caused, not net-of-fee); an admin alert is raised and the patient is emailed (Edge #6 / #6a). | Critical |
+| TC-F04-008 | F04.03 Reconciliation lost-IPN confirm      | `P` paid; the `payment.success` IPN was never delivered; slot still `slot_locked` | 1. Let the hourly reconciliation worker query the gateway and find the payment `paid`.               | The worker completes the SAME atomic confirm as the webhook (`slot_locked → confirmed` + `feeAtBooking` snapshot + payment success + outbox enqueue) in one `$transaction`; a `payment.reconciled_confirmed` audit row is written; a late duplicate IPN is an idempotent no-op. | Critical |
 
 ### F05 — Appointment lifecycle & video consultation
 
@@ -136,6 +139,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F05-013 | §3 No-show resolution — patient absent (doctor joined) | `CA` in `in_progress`; doctor joined, patient absent at slot+15m | 1. Doctor joins; patient never joins. 2. Let the no-show grace window elapse. | Appointment → `patient_no_show`; no refund; the doctor-joined record ensures doctor-absence precedence does not fire (ADR-12). | High     |
 | TC-F05-014 | §5 Evaluation worker: `in_progress→completed` at slot-end+5m | `CA` in `in_progress`; both parties have joined | 1. Let slot-end+5m arrive. 2. The evaluation worker ticks. | Appointment transitions to `completed`; no appointment remains in `in_progress` past slot-end+5m (hard guarantee per ADR-25). | Critical |
 | TC-F05-015 | §3 Zero-join-data at cutoff → non-penalizing terminal + admin alert | `CA` in `in_progress`; no join-event data recorded when slot-end+5m arrives | 1. Let slot-end+5m arrive with `doctorJoinedAt` and `patientJoinedAt` both null. | Appointment resolves to `doctor_no_show` (non-penalizing, doctor-absence-precedence for missing data per ADR-12); an `evaluation_data_gap` admin alert is raised; the appointment does NOT remain in `in_progress`. | Critical |
+| TC-F05-016 | F05.02 Doctor Today-Scope Rule (G3) | Doctor `D` has appointments today and on future days | 1. `D` opens the default appointments view. | The default doctor scope returns only `confirmed`/`in_progress` appointments within the current `Asia/Karachi` day; future-day and past appointments are excluded; history remains a separate scope. | High |
 
 ### F06 — Cancellation & refund
 
@@ -147,6 +151,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F06-004 | F05.01 / F06 Cancel link hidden once in_progress | `CA` transitioned to `in_progress`                                               | 1. `P` opens the appointment row.                                                                                  | No Cancel link is shown for an `in_progress` appointment (no cancellation path from `in_progress`).                                                                                       | High     |
 | TC-F06-005 | F06.02 Doctor cancel / No-Window Rule (Edge #13) | `CA`; doctor `D` logged in, <2h before start                                     | 1. `D` cancels with a required reason.                                                                             | No time-window restriction applies; appointment → `doctor_cancelled`; refund auto-initiated net of gateway fee; apology email with rebook offer sent.                                     | Critical |
 | TC-F06-006 | F06.03 Refund Idempotency Rule (#10)             | An appointment refunded; a retry/reconciliation/admin out-of-band action follows | 1. Trigger an automatic retry and an out-of-band gateway settlement for the same appointment.                      | The single `refund_idempotency_key` prevents a second settlement; the refund settles exactly once (Edge #30).                                                                             | Critical |
+| TC-F06-007 | F06.03 Refund-Retry & Exhaustion Rule (Edge #30, G1) | A refundable cancellation; the gateway refund call fails repeatedly | 1. Force the provider refund to fail. 2. Let the refund-retry worker run through the backoff schedule. | On each failure `refundStatus` becomes `retrying`, `refundAttempts` increments, and a backoff `nextRefundRetryAt` is set; the worker re-runs due retries idempotently; at `REFUND_MAX_ATTEMPTS` the row flips to `failed`, a `payment.refund_exhausted` admin alert is written, and a `refund_delayed` email is enqueued to the patient. | Critical |
 
 ### F07 — Reminders & notifications
 
@@ -156,6 +161,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F07-002 | F07.02 Short-Lead Skip Rule                           | Appointment confirmed <1h before start (lead time at 30 min) | 1. Confirm a booking <1h before slot start.                                   | The 24-hour and 1-hour reminders are skipped; only the confirmation email is sent.                                                                                        | High     |
 | TC-F07-003 | F07.03 Reminder-Invalidation Rule (Edge #15-adjacent) | `CA` with an undispatched reminder, then cancelled           | 1. Cancel `CA` before the reminder dispatch time. 2. Reach the dispatch time. | The notification worker re-checks state at dispatch and suppresses the reminder because the appointment is no longer `confirmed`/`in_progress`; no reminder is delivered. | High     |
 | TC-F07-004 | F07.03 Retry Rule (Edge #15)                          | Email provider made to fail                                  | 1. Force a send failure.                                                      | The system retries 3× with exponential backoff; on final failure the admin alert feed is notified.                                                                        | High     |
+| TC-F07-005 | F07 Outbox-Atomicity Rule                             | A `payment.success` confirmation whose `$transaction` is rolled back | 1. Trigger the webhook confirm. 2. Force the commit to fail. | The confirmation + reminder outbox rows enqueue inside the SAME `$transaction` as the `confirmed` transition, so a rollback leaves NO `notification_jobs` rows (an uncommitted state change can promise no email); a replayed identical IPN does not duplicate jobs (idempotent enqueue on `(appointmentId, type)`). | High     |
 
 ### F08 — Prescription
 
@@ -283,3 +289,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-01 | Initial creation | Derived from docs 02 (scope) + 08 (security) |
 | 2026-06-05 | Added TC-F05-010 through TC-F05-015 (video-token window, evaluation worker activation, no-show resolution branches, completion cutoff, zero-join-data alert) | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Re-pointed the TC-F05-011 transition-via ref to the `transition()` writer in `modules/appointment/service.js` | Folder-structure restructure (ADR-26); test expectation unchanged |
+| 2026-06-11 | Added TC-F01-006 (G4 timing equalization), TC-F03-009 (G2 active-doctor booking), TC-F04-008 (F04.03 lost-IPN confirm), TC-F05-016 (G3 doctor today-scope), TC-F06-007 (F06.03 refund-retry/exhaustion, G1), TC-F07-005 (F07 outbox atomicity) | Slice E (F04.03/F06.03/F07 + G2/G3/G4 fixes); feature → test cases |

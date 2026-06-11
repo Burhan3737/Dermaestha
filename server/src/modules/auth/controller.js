@@ -59,17 +59,17 @@ export async function forgotPassword(req, res, next) {
     const result = await authService.requestPasswordReset(req.body.email);
     if (result) {
       const resetUrl = `${env.APP_BASE_URL}/reset-password?token=${result.rawToken}`;
-      try {
-        await emailProvider.send({
+      // Fire-and-forget: the response must not reflect whether a send happened (G4/F01.03).
+      emailProvider
+        .send({
           template: 'password_reset',
           to: req.body.email,
           vars: { resetUrl, expiresInMinutes: RESET_TOKEN_TTL_MIN },
+        })
+        .catch(() => {
+          logger.warn('password reset email not sent', { email: req.body.email });
+          if (env.NODE_ENV !== 'production') logger.info('DEV password reset link', { resetUrl });
         });
-      } catch {
-        // Resend adapter is a stub until the email integration lands; never leak failure to the caller.
-        logger.warn('password reset email not sent (provider stub)', { email: req.body.email });
-        if (env.NODE_ENV !== 'production') logger.info('DEV password reset link', { resetUrl });
-      }
     }
     res.json({ ok: true }); // identical response whether or not the account exists
   } catch (e) {

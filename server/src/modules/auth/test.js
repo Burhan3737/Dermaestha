@@ -13,6 +13,7 @@ import { prisma } from '../../lib/prisma/prisma.js';
 import * as audit from '../../services/audit/audit.service.js';
 import * as auth from './service.js';
 import { hashResetToken } from '../../lib/resetToken/resetToken.js';
+import * as resetToken from '../../lib/resetToken/resetToken.js';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -81,10 +82,18 @@ describe('auth.service', () => {
     expect(unknown.message).toBe(wrong.message);
   });
 
-  it('requestPasswordReset returns null for unknown email (uniform 200, no work)', async () => {
+  it('requestPasswordReset returns null for unknown email (uniform 200, constant-shape work, no DB write)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     expect(await auth.requestPasswordReset('x@b.com')).toBeNull();
     expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('unknown email still performs token-shaped work (timing equalization, G4)', async () => {
+    const spy = vi.spyOn(resetToken, 'hashResetToken');
+    prisma.user.findUnique.mockResolvedValue(null);
+    const out = await auth.requestPasswordReset('ghost@t.test');
+    expect(out).toBeNull();
+    expect(spy).toHaveBeenCalled(); // same CPU shape as the known-email path
   });
 
   it('requestPasswordReset stores the token HASH (not raw) + expiry and returns the raw token', async () => {

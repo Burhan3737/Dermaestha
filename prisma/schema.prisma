@@ -77,6 +77,23 @@ enum AuditActorType {
   system
 }
 
+enum NotificationType {
+  booking_confirmation
+  reminder_24h
+  reminder_1h
+  prescription_ready
+  refund_confirmation
+  cancellation_apology
+  refund_delayed
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+  suppressed
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 /// All humans: patients, doctors, admin. One table, discriminated by `role` (DA2).
@@ -175,6 +192,7 @@ model Appointment {
 
   payments      Payment[]
   prescriptions Prescription[]
+  notificationJobs NotificationJob[]
 
   // The UNIQUE no-double-booking guarantee is the partial index added in the migration
   // (see file header). These are plain query indexes only.
@@ -201,6 +219,9 @@ model Payment {
   refundIdempotencyKey String?       @unique @map("refund_idempotency_key")
   refundRef            String?       @map("refund_ref")
   refundStatus         RefundStatus? @map("refund_status")
+  /// Refund-retry bookkeeping (F06.03 / edge #30). Worker polls retrying+due rows.
+  refundAttempts    Int       @default(0)  @map("refund_attempts")
+  nextRefundRetryAt DateTime? @map("next_refund_retry_at") @db.Timestamptz(6)
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -209,6 +230,34 @@ model Payment {
   @@unique([patientUserId, slotStart], name: "intent_key")
   @@index([appointmentId])
   @@map("payments")
+}
+
+/// Transactional email outbox (F07): the intent-to-send persists in the same DB (and, for
+/// event emails, the same $transaction) as the state change that promised it. The dispatch
+/// worker delivers, retries with backoff, and suppresses invalidated reminders.
+model NotificationJob {
+  id             String             @id @default(cuid())
+  type           NotificationType
+  appointmentId  String             @map("appointment_id")
+  appointment    Appointment        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  /// Snapshot at enqueue time.
+  recipientEmail String             @map("recipient_email")
+  /// Merge-vars snapshot at enqueue time (doc 14 §5 contract).
+  vars           Json?
+  scheduledFor   DateTime           @map("scheduled_for") @db.Timestamptz(6)
+  status         NotificationStatus @default(pending)
+  attempts       Int                @default(0)
+  nextAttemptAt  DateTime?          @map("next_attempt_at") @db.Timestamptz(6)
+  lastError      String?            @map("last_error")
+  sentAt         DateTime?          @map("sent_at") @db.Timestamptz(6)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  /// Idempotent enqueue: a webhook replay cannot duplicate a job. Slice F relaxes
+  /// this if prescription_ready needs to repeat per prescription (YAGNI now).
+  @@unique([appointmentId, type])
+  @@index([status, scheduledFor])
+  @@map("notification_jobs")
 }
 
 /// Immutable once written (#4). No update/delete service method or route exists; a correction

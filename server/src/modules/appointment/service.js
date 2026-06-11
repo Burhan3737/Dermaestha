@@ -3,17 +3,19 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import { logger } from '../../lib/logger/logger.js';
-import { KARACHI } from '../../lib/tz/tz.js';
+import { KARACHI, karachiWallTimeToUtc } from '../../lib/tz/tz.js';
 import {
   SLOT_GRANULARITY_MIN,
   SLOT_LOCK_TTL_MIN,
   ACTIVE_APPOINTMENT_STATES,
   NO_SHOW_GRACE_MIN,
   VIDEO_TOKEN_POST_MIN,
+  REFUND_MAX_ATTEMPTS,
+  REFUND_BACKOFF_BASE_SEC,
 } from '../../config/constants.js';
 import { generateSlots } from '../doctor/service.js';
-import { emailProvider } from '../../integrations/email/index.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
+import * as notification from '../notification/service.js';
 import * as audit from '../../services/audit/audit.service.js';
 // Self-import: intra-module calls that tests stub (quoteRefund/transition/initiateRefund/safeRefund)
 // route through the namespace so vi.spyOn can intercept them under ESM (a bare local call cannot be spied).
@@ -65,10 +67,18 @@ export async function listForRole({ role, userId, scope = 'active' }) {
     'cancelled_no_refund',
     'doctor_cancelled',
   ];
+  // F05.02: the default doctor view is TODAY's appointments (Karachi day); history is separate.
+  const todayYMD = formatInTimeZone(new Date(), KARACHI, 'yyyy-MM-dd');
+  const dayStart = karachiWallTimeToUtc(todayYMD, '00:00');
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const where =
     scope === 'history'
       ? { doctorId: doctor.id, state: { in: TERMINAL } }
-      : { doctorId: doctor.id, state: { in: UPCOMING } };
+      : {
+          doctorId: doctor.id,
+          state: { in: UPCOMING },
+          slotStart: { gte: dayStart, lt: dayEnd },
+        };
   const rows = await prisma.appointment.findMany({
     where,
     orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
@@ -140,6 +150,14 @@ export async function lockSlot({ patientUserId, doctorId, slotStart, forSelf, su
   const slotStartDate = new Date(slotStart);
   const slotEnd = new Date(slotStartDate.getTime() + SLOT_GRANULARITY_MIN * 60 * 1000);
   const now = new Date();
+
+  // Invariant #9 (F10.03): a deactivated/unknown doctor takes NO new bookings.
+  // 404-no-leak — same answer as the public profile route.
+  const activeDoctor = await prisma.doctor.findFirst({
+    where: { id: doctorId, isActive: true, status: 'active' },
+    select: { id: true },
+  });
+  if (!activeDoctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
 
   // 1. The slot must currently be a real, future, lead-time-valid, un-taken slot.
   const dateYMD = formatInTimeZone(slotStartDate, KARACHI, 'yyyy-MM-dd');
@@ -293,17 +311,43 @@ export async function initiateRefund({ appointmentId }) {
       idempotencyKey: key,
     });
   } catch (e) {
-    // Record the failure so the dashboard/refund-status view reflects it and a future
-    // retry is idempotency-keyed; re-throw so the best-effort caller still audits (#10).
+    // Edge #30: schedule an exponential-backoff retry; on exhaustion alert the admin and
+    // notify the patient of the delay. Idempotency key (#10) makes every retry safe.
+    const attempts = (payment.refundAttempts ?? 0) + 1;
+    const exhausted = attempts >= REFUND_MAX_ATTEMPTS;
     await prisma.payment.update({
       where: { id: payment.id },
-      data: { refundIdempotencyKey: key, refundStatus: 'failed' },
+      data: {
+        refundIdempotencyKey: key,
+        refundStatus: exhausted ? 'failed' : 'retrying',
+        refundAttempts: attempts,
+        nextRefundRetryAt: exhausted
+          ? null
+          : new Date(Date.now() + REFUND_BACKOFF_BASE_SEC * 1000 * 2 ** attempts),
+      },
     });
+    if (exhausted) {
+      await audit
+        .record({
+          eventType: 'payment.refund_exhausted',
+          actorType: 'system',
+          targetRef: appointmentId,
+          reason: String(e?.message ?? e),
+          meta: { providerRef: payment.providerRef ?? null, attempts },
+        })
+        .catch(() => {});
+      await enqueueRefundDelayed(appointmentId).catch(() => {});
+    }
     throw e;
   }
   await prisma.payment.update({
     where: { id: payment.id },
-    data: { refundIdempotencyKey: key, refundRef: result.refundRef, refundStatus: result.status },
+    data: {
+      refundIdempotencyKey: key,
+      refundRef: result.refundRef,
+      refundStatus: result.status,
+      nextRefundRetryAt: null,
+    },
   });
   return result;
 }
@@ -322,6 +366,34 @@ export async function safeRefund(appointmentId) {
         reason: String(e?.message ?? e),
       })
       .catch(() => {});
+  }
+}
+
+async function enqueueRefundDelayed(appointmentId) {
+  const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+  if (!appt) return;
+  const patient = await prisma.user.findUnique({
+    where: { id: appt.patientUserId },
+    select: { email: true, fullName: true },
+  });
+  if (!patient) return;
+  await notification.enqueue({
+    type: 'refund_delayed',
+    appointmentId,
+    recipientEmail: patient.email,
+    scheduledFor: new Date(),
+    vars: { patientName: patient.fullName, appointmentRef: appointmentId },
+  });
+}
+
+/** Minute-cron worker body (F06.03): re-run due refund retries. Clock-injected. */
+export async function retryDueRefunds(now = new Date()) {
+  const due = await prisma.payment.findMany({
+    where: { refundStatus: 'retrying', nextRefundRetryAt: { lte: now } },
+  });
+  for (const p of due) {
+    // Best-effort per row; initiateRefund itself reschedules/exhausts on failure.
+    await self.initiateRefund({ appointmentId: p.appointmentId }).catch(() => {});
   }
 }
 
@@ -359,7 +431,7 @@ export async function cancel({ appointmentId, actorType, actorId, reason }) {
       reason,
     });
     await safeRefund(appointmentId);
-    await sendApology(appt, 'cancellation_apology');
+    await enqueueCancellationEmail(appt, 'cancellation_apology');
     return { state: 'doctor_cancelled' };
   }
 
@@ -372,7 +444,7 @@ export async function cancel({ appointmentId, actorType, actorId, reason }) {
       actorId,
     });
     await safeRefund(appointmentId);
-    await sendApology(appt, 'refund_confirmation');
+    await enqueueCancellationEmail(appt, 'refund_confirmation');
     return { state: 'cancelled_refunded' };
   }
   await self.transition({
@@ -384,19 +456,41 @@ export async function cancel({ appointmentId, actorType, actorId, reason }) {
   return { state: 'cancelled_no_refund' };
 }
 
-async function sendApology(appt, template) {
+/** Enqueue a cancellation-flow email (outbox). Vars are snapshotted now (doc 14 §5). */
+async function enqueueCancellationEmail(appt, type) {
   try {
-    const patient = await prisma.user.findUnique({
-      where: { id: appt.patientUserId },
-      select: { email: true, fullName: true },
+    const [patient, doctor, payment] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: appt.patientUserId },
+        select: { email: true, fullName: true },
+      }),
+      prisma.doctor.findUnique({
+        where: { id: appt.doctorId },
+        select: { user: { select: { fullName: true } } },
+      }),
+      prisma.payment.findFirst({ where: { appointmentId: appt.id, status: 'success' } }),
+    ]);
+    if (!patient) return;
+    const refundAmount = payment
+      ? Math.max(0, payment.amount - (payment.gatewayFee ?? 0))
+      : null;
+    await notification.enqueue({
+      type,
+      appointmentId: appt.id,
+      recipientEmail: patient.email,
+      scheduledFor: new Date(),
+      vars: {
+        patientName: patient.fullName,
+        doctorName: doctor?.user?.fullName ?? null,
+        slotStartLocal: notification.slotStartLocal(appt.slotStart),
+        appointmentRef: appt.id,
+        amount: refundAmount,
+        refundAmount,
+        refundRef: payment?.refundRef ?? null,
+      },
     });
-    await emailProvider.send({
-      template,
-      to: patient.email,
-      vars: { patientName: patient.fullName, appointmentRef: appt.id },
-    });
-  } catch {
-    logger.warn('cancellation email not sent', { appointmentId: appt.id, template });
+  } catch (e) {
+    logger.warn('cancellation email not enqueued', { appointmentId: appt.id, type, err: String(e) });
   }
 }
 
@@ -456,7 +550,7 @@ async function resolveNoShow(a, atCutoff) {
   await self.transition({ appointmentId: a.id, to, actorType: 'system' });
   if (to === 'doctor_no_show') {
     await self.safeRefund(a.id);
-    await sendNoShowApology(a.patientUserId, a.id).catch(() => {});
+    await enqueueCancellationEmail(a, 'cancellation_apology');
     // Scoped to the zero-join-data case (neither party recorded a join at the hard cutoff) —
     // the strict "resolved blind" subset of ADR-12's "missing/ambiguous". Spec-owner to confirm
     // at the canon-docs step whether the alert should widen to late doctor-absent resolutions too.
@@ -473,19 +567,3 @@ async function resolveNoShow(a, atCutoff) {
   }
 }
 
-async function sendNoShowApology(patientUserId, appointmentId) {
-  const patient = await prisma.user.findUnique({
-    where: { id: patientUserId },
-    select: { email: true, fullName: true },
-  });
-  if (!patient) return;
-  try {
-    await emailProvider.send({
-      template: 'cancellation_apology',
-      to: patient.email,
-      vars: { patientName: patient.fullName, appointmentRef: appointmentId },
-    });
-  } catch {
-    logger.warn('no-show apology email not sent', { appointmentId });
-  }
-}

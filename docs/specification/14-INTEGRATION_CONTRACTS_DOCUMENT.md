@@ -4,8 +4,8 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.4                                |
-| Last updated     | 2026-06-05                         |
+| Version          | 1.5                                |
+| Last updated     | 2026-06-11                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
 
@@ -17,7 +17,7 @@
 2. [PayFast (payment) payload shapes](#2-payfast-payment-payload-shapes)
 3. [Daily.co (video) payload shapes](#3-dailyco-video-payload-shapes)
 4. [Resend (email) shapes](#4-resend-email-shapes)
-5. [Email merge-variable catalog (7 triggers)](#5-email-merge-variable-catalog-7-triggers)
+5. [Email merge-variable catalog (8 triggers)](#5-email-merge-variable-catalog-8-triggers)
 6. [Analytics event catalog](#6-analytics-event-catalog)
 7. [Error envelope](#7-error-envelope)
 8. [Revision footer](#revision-footer)
@@ -45,6 +45,9 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
  *   Idempotent refund keyed by refundIdempotencyKey.
  * @property {(sinceIso: string) => Promise<UnconfirmedPayment[]>} listUnconfirmed
  *   Reconciliation query: payments not yet confirmed in the window (hourly worker).
+ * @property {(args: QueryPaymentStatusArgs) => Promise<QueryPaymentStatusResult>} queryPaymentStatus
+ *   Reconciliation probe: fetch live status for a single payment by providerRef (F04.03).
+ *   Used by the hourly reconciliation worker to recover from lost payment.success IPNs.
  */
 ```
 
@@ -116,6 +119,17 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
  *  @property {'success'|'failed'|'pending'} status */
 ```
 
+### QueryPaymentStatusArgs and QueryPaymentStatusResult
+
+```js
+/** @typedef {Object} QueryPaymentStatusArgs
+ *  @property {string} providerRef */
+/** @typedef {Object} QueryPaymentStatusResult
+ *  @property {'paid'|'failed'|'unknown'} status
+ *  @property {number} [amount]          // paisa; present when status is 'paid'
+ *  @property {number|null} [gatewayFee] // paisa; null → use Settings fallback (policy #5) */
+```
+
 ### Webhook (IPN) specifics
 
 - PayFast posts `application/x-www-form-urlencoded`. **Signature verification:** recompute the MD5 (or vendor-current) signature over the posted params in PayFast's prescribed order using the merchant passphrase; reject on mismatch → `401` + admin alert (§3.4). Also (recommended) validate the source IP / server-confirmation callback per PayFast docs.
@@ -124,7 +138,7 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
 
 ### Dev simulation: `payfast.mock` (ADR-22)
 
-The concrete PayFast network adapter is not yet wired; the production default (`PAYMENT_PROVIDER=stub`) throws `NOT_IMPLEMENTED`. For dev/CI, a `payfast.mock` adapter implements the same `PaymentProvider` typedef: `createCheckout` returns a redirect to an app-served, env-guarded hosted-checkout page (`GET /dev/checkout`, mounted only when `PAYMENT_PROVIDER=mock`). Its Pay/Fail action builds a **real HMAC-signed IPN** (over the fields above, keyed on `PAYFAST_PASSPHRASE`) and POSTs it through the **same** `verifyWebhook` + atomic-commit path as production, so signature verification, the `$transaction` commit (#2), `feeAtBooking` snapshot (#6), and 401-on-bad-signature are exercised offline. The mock signs its own deterministic field set rather than PayFast's exact MD5 param order — the real adapter implements that when wired. The mock gateway and `/dev/*` routes must never be active in production (doc 10/15/08).
+The concrete PayFast network adapter is not yet wired; the production default (`PAYMENT_PROVIDER=stub`) throws `NOT_IMPLEMENTED`. For dev/CI, a `payfast.mock` adapter implements the same `PaymentProvider` typedef: `createCheckout` returns a redirect to an app-served, env-guarded hosted-checkout page (`GET /dev/checkout`, mounted only when `PAYMENT_PROVIDER=mock`). Its Pay/Fail action builds a **real HMAC-signed IPN** (over the fields above, keyed on `PAYFAST_PASSPHRASE`) and POSTs it through the **same** `verifyWebhook` + atomic-commit path as production, so signature verification, the `$transaction` commit (#2), `feeAtBooking` snapshot (#6), and 401-on-bad-signature are exercised offline. The mock signs its own deterministic field set rather than PayFast's exact MD5 param order — the real adapter implements that when wired. The mock also implements `queryPaymentStatus`, returning `{ status: 'unknown' }` (the mock keeps no payment ledger; reconciliation unit tests stub richer answers). The `payfast.stub` (`PAYMENT_PROVIDER=stub`, real-adapter placeholder for Slice H) marks `queryPaymentStatus` as not-yet-implemented and throws `NOT_IMPLEMENTED`. The mock gateway and `/dev/*` routes must never be active in production (doc 10/15/08).
 
 ---
 
@@ -176,11 +190,25 @@ The concrete Daily.co network adapter is not yet wired; the production default (
  *  @property {'bounce'|'complaint'|'delivered'} type @property {string} to @property {string} providerId */
 ```
 
+### Real Resend HTTP adapter
+
+The active email adapter posts to `POST https://api.resend.com/emails` with header `Authorization: Bearer ${RESEND_API_KEY}` and JSON body `{ from, to: [...], subject, text }`. A non-2xx response maps to an `EMAIL_SEND_FAILED` error (HTTP 502 to the caller), engaging the outbox retry machinery. A successful response returns `{ providerId }`.
+
+**Boot-time provider selection:**
+
+| Condition | Adapter selected |
+| --------- | ---------------- |
+| `EMAIL_PROVIDER=console` | Dev console logger — no real emails delivered |
+| `RESEND_API_KEY` set (and `EMAIL_PROVIDER` ≠ `console`) | Real Resend HTTP adapter |
+| Neither configured | Console adapter with a loud boot warning — no real emails delivered |
+
+**Production caveat:** a configured `RESEND_API_KEY` alone sends only to the Resend account owner's address from `onboarding@resend.dev` — sufficient to verify the integration end-to-end. Delivering to arbitrary patient inboxes requires a verified sender domain (DNS) and `RESEND_FROM` set to an address on that domain. Key only = testable; key + verified domain = production-ready.
+
 ---
 
-## 5. Email merge-variable catalog (7 triggers)
+## 5. Email merge-variable catalog (8 triggers)
 
-Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final copy is M4.
+Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final copy is M4. All email times render in Asia/Karachi (F07.02).
 
 | `EmailTemplate`        | Trigger                                   | Merge vars                                                   |
 | ---------------------- | ----------------------------------------- | ------------------------------------------------------------ |
@@ -190,6 +218,7 @@ Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v
 | `prescription_ready`   | `→prescription_issued`                    | `patientName, doctorName, prescriptionUrl`                   |
 | `refund_confirmation`  | refund `settled`                          | `patientName, amount, refundRef, appointmentRef`             |
 | `cancellation_apology` | `doctor_cancelled` / `doctor_no_show`     | `patientName, doctorName, slotStartLocal, refundAmount`      |
+| `refund_delayed`       | edge #30 patient delay notice             | `patientName, appointmentRef`                               |
 | `password_reset`       | patient forgot-password request (F01.03)  | `resetUrl, expiresInMinutes`                                |
 
 **Auth transactional email (F01.03):** `password_reset` is the one auth-flow template — dispatched directly by the auth service (not the notification worker's six appointment-cadence triggers). The send is best-effort and must never block or alter the enumeration-safe forgot-password response; on provider failure the link is logged in non-production and a warning is recorded.
@@ -235,3 +264,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-04 | Documented the dev `payfast.mock` adapter + `/dev/checkout` simulation (§2) | Slice C: offline payment simulation via real signed IPN (ADR-22) |
 | 2026-06-05 | Added dev `daily.mock` simulation note (§3) | Slice D (F05 video & lifecycle; ADR-24) |
 | 2026-06-11 | Repointed deprecated `CONFIG.md §3` -> doc 15 and `API.md §1.1` -> doc 05 | Deprecated-doc hygiene |
+| 2026-06-11 | Added `queryPaymentStatus` to PaymentProvider contract + `QueryPaymentStatusArgs`/`Result` typedefs + mock/stub notes (§1-2); real Resend HTTP adapter + boot-time selection + production caveat (§4); `refund_delayed` merge-var row + Asia/Karachi timezone note (§5) | Slice E (reconciliation adapter + real Resend); new external integration cascade |
