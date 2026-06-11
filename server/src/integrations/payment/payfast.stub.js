@@ -12,4 +12,5 @@ export const payfastStub = {
   },
   refund: ni('refund'),
   listUnconfirmed: ni('listUnconfirmed'),
+  queryPaymentStatus: ni('queryPaymentStatus'),
 };

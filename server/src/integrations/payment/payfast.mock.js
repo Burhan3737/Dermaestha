@@ -57,4 +57,8 @@ export const payfastMock = {
   async listUnconfirmed() {
     return [];
   },
+  /** The dev mock keeps no payment ledger; reconciliation tests stub this per-case. */
+  async queryPaymentStatus() {
+    return { status: 'unknown' };
+  },
 };
