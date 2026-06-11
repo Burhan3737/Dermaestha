@@ -6,7 +6,7 @@
 **Ticket / issue:** None
 **Branch:** main
 **Commits / PR:** pending (design doc commit)
-**Last updated:** 2026-06-12-0030
+**Last updated:** 2026-06-11-2359
 **Tags:** #design #feature #prescriptions #m3
 
 ## Summary
@@ -36,7 +36,6 @@ None this session. Design specifies (for the build session): one migration (`not
 3. **PDF:** pdf-lib behind a single lazy-loaded `renderPrescriptionPdf(json)` boundary, client-side only (user choice; server-side PDF is v1.2+).
 4. **Awaiting-prescription reminder:** minimal D-02 badge now (client-derived >12 h condition); F12/A3 admin alert stays Slice G (user choice).
 5. **Approach 1 of 3:** two new modules (prescription, medicine) + atomic submit `$transaction` + outbox `dedupeKey` migration so corrections (policy #9) email per-prescription — the relaxation Slice E's schema comment anticipated (user choice over folding into the appointment module or first-email-only).
-6. **Spec-review feedback (2026-06-12):** route-ownership consistency refactor added to scope as a behavior-preserving pre-task — `/:id/pay` and `/:id/video-token` move from the appointment router to payment/video module routers mounted at `/api/appointments` (webhook-convention mirror); prescription router then follows the same pattern. Agent initially began applying this refactor in-session; user correctly stopped it (brainstorm session — implementation belongs in the plan); the three touched files were `git restore`d to committed state and the change became design §1.6 instead.
 
 ## Notable findings
 
