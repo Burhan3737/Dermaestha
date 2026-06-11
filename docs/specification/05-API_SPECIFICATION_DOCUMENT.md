@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.7                           |
-| Last updated     | 2026-06-09                    |
+| Version          | 1.8                           |
+| Last updated     | 2026-06-11                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -182,6 +182,16 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 > **Dev-only, non-canonical:** when `PAYMENT_PROVIDER=mock`, the app mounts `GET /dev/checkout` + `POST /dev/payment/complete` to simulate PayFast's hosted page by emitting a real signed IPN to `/api/webhooks/payfast` (ADR-22, doc 14 §2). These `/dev/*` routes are not part of the canonical API surface and are never mounted in production.
 
+> **Dev-only worker triggers (non-canonical):** When `NODE_ENV === 'development'`, the app additionally mounts three on-demand routes to trigger worker passes directly (never mounted in production). See the worker/cron section in doc 14 for the production schedule.
+>
+> | Method · Path                    | Returns        | Runs                                 |
+> | -------------------------------- | -------------- | ------------------------------------ |
+> | `POST /dev/worker/notifications` | `{ ok: true }` | Notification dispatch pass           |
+> | `POST /dev/worker/refund-retry`  | `{ ok: true }` | Refund-retry pass                    |
+> | `POST /dev/worker/reconcile`     | `{ ok: true }` | Payment-reconciliation pass (F04.03) |
+
+> **Reconciliation worker (F04.03) — reuses the webhook confirm path:** The hourly payment-reconciliation worker, when the gateway reports a lost-IPN payment as paid, performs the **same** atomic `confirmPaidAppointment` transition as the `payment.success` webhook above: `slot_locked → confirmed`, snapshot `feeAtBooking`, write payment record, and enqueue confirmation email — all inside one Prisma `$transaction`. `appointmentState.transition` remains the only writer of `Appointment.state`; the worker never writes state directly. On edge #6a (gateway reports paid but the slot is no longer claimable), the worker issues a full gross refund instead of creating a second appointment.
+
 ---
 
 ### F08 — Prescriptions (D4, P7, #4/#5)
@@ -322,3 +332,4 @@ The **only** writer that performs transitions is the `transition()` function in 
 | 2026-06-09 | Completed the `POST /api/appointments/lock` Notes cell to list `ACTIVE_LOCK_EXISTS`/`OVERLAP`/`SLOT_NOT_BOOKABLE` (already in §3.2 status table) | Gap-analysis O2 — endpoint-note completeness |
 | 2026-06-11 | Re-pointed the state-machine writer + refund-orchestration prose to the merged `modules/appointment/service.js` | Folder-structure restructure (ADR-26); behavior unchanged |
 | 2026-06-11 | Repointed deprecated `CONFIG.md`/`INTEGRATIONS.md` refs to docs 15/14 | Deprecated-doc hygiene |
+| 2026-06-11 | Added dev-only worker trigger routes (`POST /dev/worker/*`); added F04.03 reconciliation-reuses-webhook-confirm note | Slice E (F04.03 reconciliation + F07 workers); schema/feature cascade |

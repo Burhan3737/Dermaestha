@@ -3,8 +3,8 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.4                                          |
-| Last updated     | 2026-06-05                                   |
+| Version          | 1.5                                          |
+| Last updated     | 2026-06-11                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
 
@@ -95,6 +95,7 @@ Workers use `node-cron`, running in-process. **Single-instance assumption (v1):*
 | ---------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Reconciliation         | **hourly** (`0 * * * *`)       | PayFast unconfirmed-payments query, last 24 h (edge #6/#6a)                                                                            |
 | Notification           | **every minute** (`* * * * *`) | Dispatch due emails; **re-check appointment state immediately before send**; suppress reminders if no longer `confirmed`/`in_progress` |
+| Refund-retry           | **every minute** (`* * * * *`) | Process due refund retries; exponential backoff (`REFUND_BACKOFF_BASE_SEC × 2^attempts`, max `REFUND_MAX_ATTEMPTS`; Slice E).          |
 | Appointment-evaluation | **every minute** (`* * * * *`) | `confirmed→in_progress` at slot-start; resolve `completed`/no-show in grace window; never strand `in_progress` past slot-end+5 min. **Implemented** (`server/src/workers/`; `evaluateDueAppointments` in `server/src/modules/appointment/service.js`; ADR-25). |
 
 ---
@@ -113,6 +114,8 @@ Source: CONFIG.md §4 (Refund retry #10, edge #30).
 | ------------------------- | ------- |
 | `REFUND_MAX_ATTEMPTS`     | `5`     |
 | `REFUND_BACKOFF_BASE_SEC` | `30`    |
+
+> `REFUND_MAX_ATTEMPTS` (5) and `REFUND_BACKOFF_BASE_SEC` (30) gained their first consumers in Slice E (the refund-retry worker).
 
 ---
 
@@ -201,7 +204,7 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 | Variable           | Purpose                                                                                          | Example / Default          |
 | ------------------ | ------------------------------------------------------------------------------------------------ | -------------------------- |
 | `PAYMENT_PROVIDER` | Selects the `PaymentProvider`: `stub` (prod, throws until the real adapter is wired) or `mock` (dev simulated gateway, mounts `/dev/checkout`) | `stub` (prod) \| `mock` (dev) |
-| `EMAIL_PROVIDER`   | Selects the `EmailProvider`: `stub` (throws) or `console` (dev logging adapter)                  | `stub` (prod) \| `console` (dev) |
+| `EMAIL_PROVIDER`   | Selects the `EmailProvider`: `stub` \| `console` \| `resend`. Boot-time selection: `EMAIL_PROVIDER=console` forces the console logger; else a present `RESEND_API_KEY` selects the real Resend adapter; else fallback to console with a loud warning. | `stub` |
 | `VIDEO_PROVIDER`   | Selects the `VideoProvider`: `stub` (prod, throws until concrete adapter wired), `mock` (dev — real webhook path + `/dev/video/*` + `/dev/worker/*` simulator), or `daily` (resolves to stub until the concrete `daily.js` adapter is wired). Mock and `/dev/*` routes **must never be active in production** (ADR-24; doc 08; doc 10). | `stub` |
 | `VIDEO_MOCK_SECRET` | Dev-only mock meeting-token signing key (HMAC). Optional; for use only when `VIDEO_PROVIDER=mock`. Never set in production. | _(optional, dev-only)_ |
 
@@ -217,7 +220,7 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 | Variable         | Purpose                 | Example / Default            |
 | ---------------- | ----------------------- | ---------------------------- |
 | `RESEND_API_KEY` | Resend API key          | _(set per environment)_      |
-| `RESEND_FROM`    | Verified sender address | `no-reply@dermestha.example` |
+| `RESEND_FROM`    | Optional. From address for the real Resend adapter. Without it the adapter sends from `onboarding@resend.dev` (Resend's shared default). Note: key-only sends reach only the Resend account owner's inbox — patient inboxes require a verified domain + this variable set. | `onboarding@resend.dev` |
 
 ### Error Tracking
 
@@ -256,6 +259,20 @@ Runtime A6 `settings` table entries override `minBookingLeadMinutes` and other b
 | `REFUND_MAX_ATTEMPTS`     | Maximum refund retry attempts       | `5`     |
 | `REFUND_BACKOFF_BASE_SEC` | Exponential backoff base in seconds | `30`    |
 
+### Email Dispatch
+
+| Variable                 | Purpose                                                                                                                    | Default |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `EMAIL_MAX_ATTEMPTS`     | Max email dispatch attempts before a job is marked failed and an `email.send_failed_final` audit alert is written (F07.03) | `3`     |
+| `EMAIL_BACKOFF_BASE_SEC` | Base seconds for email dispatch exponential backoff (`base × 2^attempts`)                                                  | `60`    |
+
+### Reconciliation Worker
+
+| Variable                     | Purpose                                                                                             | Default |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
+| `RECONCILIATION_LOOKBACK_H`  | Hours of history the reconciliation worker scans for pending payments (F04.03)                      | `24`    |
+| `RECONCILIATION_MIN_AGE_MIN` | Minimum payment age in minutes before reconciliation acts (avoids racing a webhook still in flight) | `60`    |
+
 ---
 
 ## Revision Footer
@@ -267,3 +284,4 @@ Runtime A6 `settings` table entries override `minBookingLeadMinutes` and other b
 | 2026-06-05 | Added `VIDEO_PROVIDER` + `VIDEO_MOCK_SECRET` provider-selection switches (§8); noted appointment-evaluation worker as Implemented (§3) | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Re-pointed the evaluation-worker logic ref to `modules/appointment/service.js` (merged) | Folder-structure restructure (ADR-26); `config/constants.js` ref unchanged (stayed flat) |
 | 2026-06-11 | Dropped deprecated `CONFIG.md`/`ARCHITECTURE.md §14.5` live pointers (this doc is the config canon; deployment topology -> doc 10) | Deprecated-doc hygiene |
+| 2026-06-11 | Added `EMAIL_MAX_ATTEMPTS`, `EMAIL_BACKOFF_BASE_SEC`, `RECONCILIATION_LOOKBACK_H`, `RECONCILIATION_MIN_AGE_MIN`; updated `EMAIL_PROVIDER` enum to `stub \| console \| resend`; updated `RESEND_FROM` semantics; added Refund-retry worker cadence (§3); noted Slice E first consumers of refund retry constants (§4) | Slice E (worker constants, Resend fallback, worker cadences); new tunable/config |

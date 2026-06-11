@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.7                                                                                                |
-| Last updated     | 2026-06-05                                                                                         |
+| Version          | 1.8                                                                                                |
+| Last updated     | 2026-06-11                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -40,6 +40,7 @@
 25. [ADR-24 — Dev video simulation: mock provider + real webhook + dev simulator](#adr-24--dev-video-simulation-mock-provider--real-webhook--dev-simulator)
 26. [ADR-25 — Appointment-evaluation worker: in-process node-cron (realizing ADR-08)](#adr-25--appointment-evaluation-worker-in-process-node-cron-realizing-adr-08)
 27. [ADR-26 — Feature-first client modules + domain-based server modules](#adr-26--feature-first-client-modules--domain-based-server-modules)
+28. [ADR-27 — Notification outbox + in-process dispatch/retry/reconciliation workers](#adr-27--notification-outbox--in-process-dispatchretryreconciliation-workers)
 
 ---
 
@@ -381,6 +382,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-27 — Notification outbox + in-process dispatch/retry/reconciliation workers
+
+**Date:** 2026-06-11
+
+**Status:** Accepted
+
+**Context:** Slice E realizes the two deferred workers ADR-08/ADR-25 anticipated (notification dispatch F07, reconciliation F04.03) and completes the refund-retry safety net (F06.03). Three coupling problems had to be solved together: (1) Slice C/D sent appointment emails as a post-commit, fire-and-forget `emailProvider.send()` — a crash between the committed state change and the send loses the email, and the PayFast IPN ack waited on a send it shouldn't; (2) reminders (F07.02) must fire at slot−24h / slot−1h but be suppressed if the appointment leaves `confirmed`/`in_progress` before then (F07.03), which a fire-once send cannot express; (3) a failed refund was previously near-silent. A simple "sent-flags on the appointment" approach was considered and rejected — boolean flags cannot carry retry/backoff state, a suppression outcome, or a per-trigger schedule, and they fail the F07.03 retry rule. (docs/superpowers/specs/2026-06-11-slice-e-m1-m2-closure-design.md)
+
+**Decision:** Introduce one persistent **transactional outbox** table, `notification_jobs` (doc 04 §2n), backing all appointment emails. Event emails are enqueued **inside the caller's `$transaction`** (the same transaction as the promising state change), with merge-vars snapshotted as JSON at enqueue time; idempotency is the `@@unique([appointmentId, type])` upsert (a replayed webhook is a no-op). Three thin `node-cron` drivers over **pure, clock-injected service functions** (the ADR-25 pattern) run in the existing `workers/` seam: `dispatchDueNotifications(now)` and `retryDueRefunds(now)` every minute, `reconcileUnconfirmed(now)` hourly. Dispatch re-checks appointment state immediately before sending (suppress→`suppressed` if invalidated), retries with exponential backoff (`EMAIL_BACKOFF_BASE_SEC × 2^attempts`) to `EMAIL_MAX_ATTEMPTS`, then marks `failed` + writes an `email.send_failed_final` audit alert. Refund-retry adds `Payment.refundAttempts`/`nextRefundRetryAt` (not job rows — refunds aren't notifications) and on exhaustion writes a `payment.refund_exhausted` alert + a `refund_delayed` outbox row. Reconciliation reuses the webhook's `confirmPaidAppointment` commit (never writing state itself — `appointmentState.transition` stays the only writer) and, on edge #6a, issues a full **gross** refund. Alert representation is audit rows (`targetRef`/`providerRef`) the Slice G admin feed will read; a dedicated alert store is deferred.
+
+**Consequences:** A committed state change and the email it promises now commit atomically — a crash can never lose an email, and the IPN ack no longer waits on a send. Reminders gain a real schedule + suppression + retry that flags could not express. The outbox + workers establish exactly the seam ADR-08/25 set up, with no new infrastructure (single-instance, no leader election per doc 15 §3 — the dispatch worker's atomic lease-claim flip is defense-in-depth, not distributed locking). Trade-offs: a minute of latency on event emails (the cron tick) versus an immediate post-commit send; one new table + two `Payment` columns (doc 04); and `prescription_ready` (Slice F) may need the per-appointment uniqueness relaxed to per-prescription (a YAGNI deferral noted in the model). The rejected sent-flags option is recorded above so the table is not "simplified" back into one later.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -393,3 +408,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-11 | Added ADR-26 (feature-first client + domain server modules); re-pointed ADR-21 (`lib/tz/tz.js`) + ADR-25 (merged `modules/appointment/service.js`) path refs | Folder-structure restructure for maintainability; behavior unchanged |
 | 2026-06-11 | Normalized ADR-11's `refund.service` decision ref to the merged `modules/appointment/service.js` (cross-ref ADR-26) | Docs↔code alignment follow-up |
 | 2026-06-11 | Repointed deprecated `CONFIG.md §7` refs (ADR-07 partial-index caveat -> doc 04 §4b; ADR-17 Prisma pin/upgrade -> doc 15 §7) | Deprecated-doc hygiene (design §8.1) |
+| 2026-06-11 | Added ADR-27 (notification outbox + in-process dispatch/retry/reconciliation workers; rejected sent-flags) | Slice E (F07 outbox + F04.03/F06.03 workers); new architectural decision |
