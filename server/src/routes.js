@@ -10,6 +10,7 @@ import { videoWebhookRouter } from './modules/video/index.js';
 import { healthRouter } from './health/index.js';
 import { devCheckoutRouter } from './dev/devCheckout.js';
 import { devVideoRouter } from './dev/devVideo.js';
+import { devWorkersRouter } from './dev/devWorkers.js';
 
 /** Mount all API + dev routes onto the app, in order (extracted from index.js, behavior unchanged). */
 export function registerRoutes(app) {
@@ -29,4 +30,5 @@ export function registerRoutes(app) {
   // Dev-only simulators. NEVER mounted in production.
   if (env.PAYMENT_PROVIDER === 'mock') app.use('/dev', devCheckoutRouter);
   if (env.VIDEO_PROVIDER === 'mock') app.use('/dev', devVideoRouter);
+  if (env.NODE_ENV === 'development') app.use('/dev', devWorkersRouter);
 }
