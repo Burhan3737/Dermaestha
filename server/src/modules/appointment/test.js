@@ -56,6 +56,7 @@ describe('appointment.listForRole', () => {
         forSelf: true,
         subjectName: null,
         doctor: { id: 'd1', specialization: 'Acne', photoUrl: null, user: { fullName: 'Dr A' } },
+        _count: { prescriptions: 0 },
       },
     ]);
     const out = await listForRole({ role: 'patient', userId: 'u1' });
@@ -70,6 +71,7 @@ describe('appointment.listForRole', () => {
       doctorName: 'Dr A',
       specialization: 'Acne',
       doctorPhotoUrl: null,
+      hasPrescription: false,
     });
     expect(prisma.appointment.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -144,6 +146,7 @@ describe('appointment.listForRole (doctor)', () => {
         forSelf: false,
         subjectName: 'Child',
         patient: { fullName: 'Parent P' },
+        _count: { prescriptions: 0 },
       },
     ]);
     const rows = await listForRole({ role: 'doctor', userId: 'docUser' });
@@ -718,4 +721,56 @@ describe('transition: prescription issuance (F08.02)', () => {
       );
     },
   );
+});
+
+describe('listForRole patient history (F08.01 / P-09)', () => {
+  it("scope=history returns terminal states newest-first with hasPrescription", async () => {
+    prisma.appointment.findMany.mockResolvedValue([
+      {
+        id: 'a2',
+        slotStart: new Date('2099-01-02T13:00:00Z'),
+        slotEnd: new Date('2099-01-02T13:30:00Z'),
+        state: 'prescription_issued',
+        feeAtBooking: 250000,
+        forSelf: true,
+        subjectName: null,
+        doctor: { id: 'd1', specialization: 'Acne', photoUrl: null, user: { fullName: 'Dr A' } },
+        _count: { prescriptions: 2 },
+      },
+    ]);
+    const out = await listForRole({ role: 'patient', userId: 'u1', scope: 'history' });
+    expect(out[0].hasPrescription).toBe(true);
+    expect(out[0].state).toBe('prescription_issued');
+    const arg = prisma.appointment.findMany.mock.calls[0][0];
+    expect(arg.where.state.in).toContain('cancelled_refunded');
+    expect(arg.where.state.in).not.toContain('confirmed');
+    expect(arg.orderBy).toEqual({ slotStart: 'desc' });
+  });
+});
+
+describe('getForRole subject fields (D-05 header)', () => {
+  it('returns subjectAge/subjectRelation/patientName for the builder header', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({
+      id: 'a1',
+      patientUserId: 'u1',
+      doctorId: 'd1',
+      slotStart: new Date('2099-01-04T13:00:00Z'),
+      slotEnd: new Date('2099-01-04T13:30:00Z'),
+      state: 'completed',
+      feeAtBooking: 250000,
+      forSelf: false,
+      subjectName: 'Ali',
+      subjectAge: 9,
+      subjectRelation: 'son',
+      doctorJoinedAt: null,
+      patientJoinedAt: null,
+      doctor: { id: 'd1', specialization: 'Acne', photoUrl: null, user: { fullName: 'Dr A' } },
+      patient: { fullName: 'Parent P' },
+    });
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    const out = await getForRole({ id: 'a1', role: 'doctor', userId: 'u-doc' });
+    expect(out.subjectAge).toBe(9);
+    expect(out.subjectRelation).toBe('son');
+    expect(out.patientName).toBe('Parent P');
+  });
 });

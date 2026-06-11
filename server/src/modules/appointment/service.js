@@ -22,6 +22,15 @@ import * as audit from '../../services/audit/audit.service.js';
 import * as self from './service.js';
 
 const UPCOMING = ['confirmed', 'in_progress'];
+const TERMINAL = [
+  'completed',
+  'prescription_issued',
+  'patient_no_show',
+  'doctor_no_show',
+  'cancelled_refunded',
+  'cancelled_no_refund',
+  'doctor_cancelled',
+];
 
 function toPatientRow(a) {
   return {
@@ -35,14 +44,18 @@ function toPatientRow(a) {
     doctorName: a.doctor.user.fullName,
     specialization: a.doctor.specialization,
     doctorPhotoUrl: a.doctor.photoUrl,
+    hasPrescription: a._count.prescriptions > 0,
   };
 }
 
 export async function listForRole({ role, userId, scope = 'active' }) {
   if (role === 'patient') {
     const rows = await prisma.appointment.findMany({
-      where: { patientUserId: userId, state: { in: UPCOMING } },
-      orderBy: { slotStart: 'asc' },
+      where:
+        scope === 'history'
+          ? { patientUserId: userId, state: { in: TERMINAL } }
+          : { patientUserId: userId, state: { in: UPCOMING } },
+      orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
       include: {
         doctor: {
           select: {
@@ -52,21 +65,13 @@ export async function listForRole({ role, userId, scope = 'active' }) {
             user: { select: { fullName: true } },
           },
         },
+        _count: { select: { prescriptions: true } },
       },
     });
     return rows.map(toPatientRow);
   }
   const doctor = await prisma.doctor.findUnique({ where: { userId }, select: { id: true } });
   if (!doctor) return [];
-  const TERMINAL = [
-    'completed',
-    'prescription_issued',
-    'patient_no_show',
-    'doctor_no_show',
-    'cancelled_refunded',
-    'cancelled_no_refund',
-    'doctor_cancelled',
-  ];
   // F05.02: the default doctor view is TODAY's appointments (Karachi day); history is separate.
   const todayYMD = formatInTimeZone(new Date(), KARACHI, 'yyyy-MM-dd');
   const dayStart = karachiWallTimeToUtc(todayYMD, '00:00');
@@ -82,7 +87,7 @@ export async function listForRole({ role, userId, scope = 'active' }) {
   const rows = await prisma.appointment.findMany({
     where,
     orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
-    include: { patient: { select: { fullName: true } } },
+    include: { patient: { select: { fullName: true } }, _count: { select: { prescriptions: true } } },
   });
   return rows.map((a) => ({
     id: a.id,
@@ -92,6 +97,7 @@ export async function listForRole({ role, userId, scope = 'active' }) {
     forSelf: a.forSelf,
     subjectName: a.subjectName,
     patientName: a.patient?.fullName ?? null,
+    hasPrescription: a._count.prescriptions > 0,
   }));
 }
 
@@ -107,6 +113,7 @@ export async function getForRole({ id, role, userId }) {
           user: { select: { fullName: true } },
         },
       },
+      patient: { select: { fullName: true } },
     },
   });
   const visible =
@@ -127,6 +134,9 @@ export async function getForRole({ id, role, userId }) {
     feeAtBooking: a.feeAtBooking,
     forSelf: a.forSelf,
     subjectName: a.subjectName,
+    subjectAge: a.subjectAge,
+    subjectRelation: a.subjectRelation,
+    patientName: a.patient?.fullName ?? null,
     doctorName: a.doctor.user.fullName,
     specialization: a.doctor.specialization,
     doctorPhotoUrl: a.doctor.photoUrl,
