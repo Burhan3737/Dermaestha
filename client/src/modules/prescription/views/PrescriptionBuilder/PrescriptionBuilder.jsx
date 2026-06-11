@@ -1,75 +1,14 @@
 // @ts-check
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.jsx';
 import { formatPkr, formatKarachi } from '../../../../lib/format/format.js';
 import { useAppointment } from '../../../appointment/useAppointment.js';
 import { usePrescription } from '../../usePrescription.js';
+import { MedicineSearch } from '../../components/MedicineSearch/MedicineSearch.jsx';
 
-/** Keyboard-navigable medicine listbox (doc 06: custom listbox for D-05 medicine search). */
-function MedicineSearch({ medicines, search, onSearch, onPick, onFreeText }) {
-  const options = medicines.data?.data ?? [];
-  const open = search.length >= 2;
-  const [active, setActive] = useState(0);
-  const count = options.length + 1; // +1 = free-text fallback row
-
-  const pick = (i) => {
-    if (i < options.length) onPick(options[i]);
-    else onFreeText(search);
-    onSearch('');
-  };
-
-  return (
-    <div className="field">
-      <label htmlFor="med-search">Add medicine</label>
-      <input
-        id="med-search"
-        placeholder="Search medicine…"
-        value={search}
-        role="combobox"
-        aria-expanded={open}
-        aria-controls="med-listbox"
-        onChange={(e) => {
-          onSearch(e.target.value);
-          setActive(0);
-        }}
-        onKeyDown={(e) => {
-          if (!open) return;
-          if (e.key === 'ArrowDown') setActive((a) => (a + 1) % count);
-          else if (e.key === 'ArrowUp') setActive((a) => (a - 1 + count) % count);
-          else if (e.key === 'Enter') {
-            e.preventDefault();
-            pick(active);
-          }
-        }}
-      />
-      {open && (
-        <ul id="med-listbox" role="listbox" className="listbox">
-          {options.map((m, i) => (
-            <li
-              key={m.id}
-              role="option"
-              aria-selected={i === active}
-              className={i === active ? 'option option--active' : 'option'}
-              onClick={() => pick(i)}
-            >
-              {m.name}
-              {m.genericName ? ` (${m.genericName})` : ''} — {formatPkr(m.unitPrice)}
-            </li>
-          ))}
-          <li
-            role="option"
-            aria-selected={active === options.length}
-            className={active === options.length ? 'option option--active' : 'option'}
-            onClick={() => pick(options.length)}
-          >
-            Add "{search}" as free text (not priced)
-          </li>
-        </ul>
-      )}
-    </div>
-  );
-}
+// Stable React keys for dynamic rows; not persisted — resets on page reload, which is fine.
+let nextRowId = 0;
 
 export function PrescriptionBuilder() {
   const { id } = useParams();
@@ -79,6 +18,8 @@ export function PrescriptionBuilder() {
   const [notes, setNotes] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
   const [confirming, setConfirming] = useState(false);
+
+  const inFlight = useRef(false);
 
   const { detail } = useAppointment({ detailId: id });
   const { prescriptions, medicines, submit } = usePrescription({
@@ -97,7 +38,9 @@ export function PrescriptionBuilder() {
   const setRow = (i, field, value) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [field]: value } : r)));
 
-  const doSubmit = () =>
+  const doSubmit = () => {
+    if (inFlight.current) return; // immutable artifact: a double-click must not double-issue
+    inFlight.current = true;
     submit.mutate(
       {
         appointmentId: id,
@@ -121,8 +64,14 @@ export function PrescriptionBuilder() {
           ...(followUpDate ? { followUpDate } : {}),
         },
       },
-      { onSuccess: () => navigate('/doctor') },
+      {
+        onSuccess: () => navigate('/doctor'),
+        onSettled: () => {
+          inFlight.current = false;
+        },
+      },
     );
+  };
 
   return (
     <SidebarLayout>
@@ -148,19 +97,19 @@ export function PrescriptionBuilder() {
           onPick={(m) =>
             setRows((rs) => [
               ...rs,
-              { medicineId: m.id, medicineName: m.name, price: m.unitPrice, dosage: '', duration: '', instructions: '' },
+              { rowId: nextRowId++, medicineId: m.id, medicineName: m.name, price: m.unitPrice, dosage: '', duration: '', instructions: '' },
             ])
           }
           onFreeText={(name) =>
             setRows((rs) => [
               ...rs,
-              { medicineName: name, price: null, dosage: '', duration: '', instructions: '' },
+              { rowId: nextRowId++, medicineName: name, price: null, dosage: '', duration: '', instructions: '' },
             ])
           }
         />
 
         {rows.map((r, i) => (
-          <div key={`${r.medicineName}-${i}`} className="appt-row">
+          <div key={r.rowId} className="appt-row">
             <strong>{r.medicineName}</strong>{' '}
             {r.price === null ? (
               <span className="badge badge--neutral">not priced</span>
