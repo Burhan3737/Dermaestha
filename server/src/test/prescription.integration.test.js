@@ -84,6 +84,7 @@ describe('prescription flow — immutable submit, corrections, snapshot durabili
     firstRxId = res.body.id;
     expect(res.body.items).toHaveLength(2);
     expect(res.body.items.find((i) => i.medicineName === 'Custom Balm').price).toBeNull();
+    expect(res.body.items.find((i) => i.medicineName !== 'Custom Balm').price).toBe(50000);
     expect(res.body.patientIdSnapshot).toEqual({
       forSelf: false,
       name: 'Ali',
@@ -161,14 +162,18 @@ describe('prescription flow — immutable submit, corrections, snapshot durabili
   });
 
   afterAll(async () => {
-    await prisma.notificationJob.deleteMany({ where: { appointmentId } });
+    // A partially-failed beforeAll leaves these undefined; an undefined key in a Prisma
+    // where is silently dropped → unfiltered deleteMany. Sentinel-bind so deletes stay scoped.
+    const apptId = appointmentId ?? '__cleanup_none__';
+    const medId = medicineId ?? '__cleanup_none__';
+    await prisma.notificationJob.deleteMany({ where: { appointmentId: apptId } });
     await prisma.prescriptionItem.deleteMany({
-      where: { prescription: { appointmentId } },
+      where: { prescription: { appointmentId: apptId } },
     });
-    await prisma.prescription.deleteMany({ where: { appointmentId } });
-    await prisma.appointment.deleteMany({ where: { id: appointmentId } });
-    await prisma.auditLog.deleteMany({ where: { targetRef: appointmentId } });
-    await prisma.medicine.deleteMany({ where: { id: medicineId } });
+    await prisma.prescription.deleteMany({ where: { appointmentId: apptId } });
+    await prisma.appointment.deleteMany({ where: { id: apptId } });
+    await prisma.auditLog.deleteMany({ where: { targetRef: apptId } });
+    await prisma.medicine.deleteMany({ where: { id: medId } });
     await prisma.user.deleteMany({ where: { email: patientEmail } });
     await prisma.$disconnect();
   });
@@ -285,16 +290,20 @@ describe('prescription flow — concurrency race guard + forSelf snapshot', () =
   });
 
   afterAll(async () => {
-    await prisma.notificationJob.deleteMany({ where: { appointmentId: forSelfApptId } });
+    // A partially-failed beforeAll leaves these undefined; an undefined key in a Prisma
+    // where is silently dropped → unfiltered deleteMany. Sentinel-bind so deletes stay scoped.
+    const fsId = forSelfApptId ?? '__cleanup_none__';
+    const rcId = raceApptId ?? '__cleanup_none__';
+    await prisma.notificationJob.deleteMany({ where: { appointmentId: fsId } });
     await prisma.prescriptionItem.deleteMany({
-      where: { prescription: { appointmentId: forSelfApptId } },
+      where: { prescription: { appointmentId: fsId } },
     });
-    await prisma.prescription.deleteMany({ where: { appointmentId: forSelfApptId } });
-    await prisma.appointment.deleteMany({ where: { id: forSelfApptId } });
-    await prisma.auditLog.deleteMany({ where: { targetRef: forSelfApptId } });
+    await prisma.prescription.deleteMany({ where: { appointmentId: fsId } });
+    await prisma.appointment.deleteMany({ where: { id: fsId } });
+    await prisma.auditLog.deleteMany({ where: { targetRef: fsId } });
     // raceApptId: no prescriptions/jobs; just appointment + audit rows.
-    await prisma.appointment.deleteMany({ where: { id: raceApptId } });
-    await prisma.auditLog.deleteMany({ where: { targetRef: raceApptId } });
+    await prisma.appointment.deleteMany({ where: { id: rcId } });
+    await prisma.auditLog.deleteMany({ where: { targetRef: rcId } });
     await prisma.user.deleteMany({ where: { email: patientEmail } });
     await prisma.$disconnect();
   });
