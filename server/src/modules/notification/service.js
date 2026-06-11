@@ -15,10 +15,11 @@ export const slotStartLocal = (slotStart) =>
   formatInTimeZone(slotStart, KARACHI, 'EEE, dd MMM yyyy HH:mm');
 
 /**
- * Persist one outbox row. Idempotent on (appointmentId, type): a replay is a no-op.
- * Pass `client` to join the caller's $transaction (the outbox guarantee).
+ * Persist one outbox row. Idempotent on (appointmentId, type, dedupeKey): a replay is a no-op.
+ * dedupeKey defaults to '' (singleton per type); pass a unique key (e.g. prescription id) for
+ * repeatable types. Pass `client` to join the caller's $transaction (the outbox guarantee).
  * @param {{ type: string, appointmentId: string, recipientEmail: string,
- *   scheduledFor: Date, vars?: object, client?: any }} args
+ *   scheduledFor: Date, vars?: object, dedupeKey?: string, client?: any }} args
  */
 export async function enqueue({
   type,
@@ -26,12 +27,13 @@ export async function enqueue({
   recipientEmail,
   scheduledFor,
   vars,
+  dedupeKey = '',
   client = prisma,
 }) {
   return client.notificationJob.upsert({
-    where: { appointmentId_type: { appointmentId, type } },
+    where: { appointmentId_type_dedupeKey: { appointmentId, type, dedupeKey } },
     update: {},
-    create: { type, appointmentId, recipientEmail, scheduledFor, vars },
+    create: { type, appointmentId, recipientEmail, scheduledFor, vars, dedupeKey },
   });
 }
 

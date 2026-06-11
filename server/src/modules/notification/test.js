@@ -36,7 +36,13 @@ describe('notification.enqueue', () => {
       vars: { patientName: 'P' },
     });
     expect(prisma.notificationJob.upsert).toHaveBeenCalledWith({
-      where: { appointmentId_type: { appointmentId: 'a1', type: 'booking_confirmation' } },
+      where: {
+        appointmentId_type_dedupeKey: {
+          appointmentId: 'a1',
+          type: 'booking_confirmation',
+          dedupeKey: '',
+        },
+      },
       update: {},
       create: {
         type: 'booking_confirmation',
@@ -44,6 +50,7 @@ describe('notification.enqueue', () => {
         recipientEmail: 'p@t.test',
         scheduledFor: NOW,
         vars: { patientName: 'P' },
+        dedupeKey: '',
       },
     });
   });
@@ -59,6 +66,28 @@ describe('notification.enqueue', () => {
     });
     expect(tx.notificationJob.upsert).toHaveBeenCalled();
     expect(prisma.notificationJob.upsert).not.toHaveBeenCalled();
+  });
+
+  it('a dedupeKey makes the same (appointment, type) enqueue-able again — per-prescription emails', async () => {
+    prisma.notificationJob.upsert.mockResolvedValue({ id: 'n2' });
+    await enqueue({
+      type: 'prescription_ready',
+      appointmentId: 'a1',
+      recipientEmail: 'p@t.test',
+      scheduledFor: NOW,
+      dedupeKey: 'rx_1',
+    });
+    expect(prisma.notificationJob.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          appointmentId_type_dedupeKey: {
+            appointmentId: 'a1',
+            type: 'prescription_ready',
+            dedupeKey: 'rx_1',
+          },
+        },
+      }),
+    );
   });
 });
 
