@@ -21,6 +21,7 @@
 3. **Outbox dedupe-key migration:** `notification_jobs.dedupe_key` + widened unique `(appointment_id, type, dedupe_key)` so every prescription — including policy-#9 corrections — sends its own `prescription_ready` email (the relaxation Slice E's schema comment anticipated).
 4. **Client views:** P-09 patient past appointments (state-label mapping per F08.01), P-13 prescription view + PDF download, D-05 prescription builder; D-02 gains the "Write prescription" action and the `awaiting_prescription` (>12 h) badge.
 5. **Client PDF boundary:** `renderPrescriptionPdf(json)` over lazily-imported **pdf-lib** — client-side only; the server never produces PDF bytes (server-side PDF is v1.2+).
+6. **Route-ownership consistency refactor (pre-task, behavior-preserving):** `POST /:id/pay` and `GET /:id/video-token` are currently declared in the appointment module's router/controller despite belonging to the payment and video domains. Before the prescription router lands, move each to its owning module — payment and video each export an appointment-nested router (`Router()` with `/:id/pay` / `/:id/video-token`) mounted at `/api/appointments` in `routes.js`, mirroring the existing `/api/webhooks` shared-prefix convention. HTTP paths, middleware (payLimiter moves with `pay`), and behavior unchanged; suite must stay green with no test edits (all tests reference paths, not files). The prescription module then follows the identical pattern (spec-review feedback, 2026-06-12).
 
 **Out of scope (later slices)**
 
@@ -63,7 +64,7 @@ catalogue
   PATCH /api/admin/medicines/:id   (admin; edit + isActive)
 ```
 
-New server modules: `server/src/modules/prescription/`, `server/src/modules/medicine/` (feature-first, ADR-26). New client modules: `client/src/modules/prescription/` (P-13 view, D-05 builder), `client/src/lib/pdf/`. `appointmentState.transition` remains the only `Appointment.state` writer; its `LEGAL` map gains exactly one entry: `completed: {prescription_issued}`.
+New server modules: `server/src/modules/prescription/`, `server/src/modules/medicine/` (feature-first, ADR-26). Routing convention (after the §1.6 pre-task): every domain module owns its router(s); appointment-nested routes (`/:id/pay` → payment, `/:id/video-token` → video, `/:id/prescriptions` → prescription) are exported by their owning module and mounted at the shared `/api/appointments` prefix in `routes.js`, exactly like the `/api/webhooks` convention. New client modules: `client/src/modules/prescription/` (P-13 view, D-05 builder), `client/src/lib/pdf/`. `appointmentState.transition` remains the only `Appointment.state` writer; its `LEGAL` map gains exactly one entry: `completed: {prescription_issued}`.
 
 ---
 
@@ -150,7 +151,7 @@ Two-tier pattern as established.
 | 04  | `notification_jobs`: `dedupe_key` column + widened unique |
 | 05  | 5 new endpoints; patient `scope=history`; `hasPrescription` field; `completed→prescription_issued` in the transition table (if not present) |
 | 12  | New F08/F11 test cases |
-| 13  | M3 status sweep (modules 10/11, F08/F11, views P-09/P-13/D-05, M3 checklist — incl. correcting its stale screen IDs to doc 06 canon: P-09/P-13/D-05, not "P-10/P-11/D-04") |
+| 13  | M3 status sweep (modules 10/11, F08/F11, views P-09/P-13/D-05, M3 checklist — incl. correcting its stale screen IDs to doc 06 canon: P-09/P-13/D-05, not "P-10/P-11/D-04"); module-9 evidence cell re-pointed (`GET /:id/video-token` moves from `appointment/index.js` to `video/index.js` per the §1.6 refactor) |
 | 14  | §5 `prescription_ready` trigger column: "every prescription submit" (not just the transition); note the dedupe-key semantics |
 | 08  | Admin medicine routes in the access-control matrix (if it enumerates routes) |
 | 11  | ADR if deemed decision-worthy: outbox dedupe-key relaxation (small; may fold into ADR-27's record instead) |
