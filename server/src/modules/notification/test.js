@@ -86,6 +86,7 @@ describe('notification.enqueue', () => {
             dedupeKey: 'rx_1',
           },
         },
+        create: expect.objectContaining({ dedupeKey: 'rx_1' }),
       }),
     );
   });
