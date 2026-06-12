@@ -224,9 +224,11 @@ const settingsShape = (s) => ({
   fallbackFeeFixed: s.fallbackFeeFixed,
 });
 
-/** F14: single seeded row (id=1). Booking + refund code reads it live — no cache to bust. */
+/** F14: single seeded row (id=1). Booking + refund code reads it live — no cache to bust.
+ *  Returns null if the singleton row is missing (unseeded DB). */
 export async function getSettings() {
-  return prisma.settings.findUnique({ where: { id: 1 } });
+  const s = await prisma.settings.findUnique({ where: { id: 1 } });
+  return s ? settingsShape(s) : null;
 }
 
 /** F14.03: every change is an admin-actor audit entry with the before→after diff. */

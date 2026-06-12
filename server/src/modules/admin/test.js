@@ -219,10 +219,15 @@ describe('admin.resendEmail (F12.02 Email-Only Re-Trigger)', () => {
 
 describe('admin settings (F14)', () => {
   it('getSettings reads the singleton row', async () => {
-    prisma.settings.findUnique.mockResolvedValue({ id: 1, minBookingLeadMinutes: 60 });
+    prisma.settings.findUnique.mockResolvedValue({ id: 1, minBookingLeadMinutes: 60, fallbackFeePctBps: 0, fallbackFeeFixed: 0 });
     const out = await getSettings();
     expect(prisma.settings.findUnique).toHaveBeenCalledWith({ where: { id: 1 } });
-    expect(out.minBookingLeadMinutes).toBe(60);
+    expect(out).toEqual({ minBookingLeadMinutes: 60, fallbackFeePctBps: 0, fallbackFeeFixed: 0 });
+  });
+
+  it('getSettings returns null when the singleton row is missing (unseeded DB)', async () => {
+    prisma.settings.findUnique.mockResolvedValue(null);
+    expect(await getSettings()).toBeNull();
   });
 
   it('updateSettings writes the three tunables and audits before→after (F14.03)', async () => {
