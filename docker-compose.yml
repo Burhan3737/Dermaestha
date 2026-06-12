@@ -24,6 +24,8 @@ services:
       DATABASE_URL: postgresql://user:pass@db:5432/dermestha
       SESSION_SECRET: local-dev-secret-please-change-0123456789
     ports: ['3000:3000']
+    volumes: ['dermestha_uploads:/app/uploads']
 
 volumes:
   dermestha_pg:
+  dermestha_uploads:
