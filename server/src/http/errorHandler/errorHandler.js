@@ -21,14 +21,18 @@ export function errorHandler(err, req, res, _next) {
   captureException(err);
   // F12.01 alert source #5: best-effort audit row (route + message only — no stack, no PII).
   // Fire-and-forget: an audit failure must never mask the original error response.
-  audit
-    .record({
-      eventType: 'system.unhandled_exception',
-      actorType: 'system',
-      targetRef: req?.path,
-      reason: String(err?.message ?? err).slice(0, 500),
-      meta: { method: req?.method },
-    })
-    .catch(() => {});
+  try {
+    audit
+      .record({
+        eventType: 'system.unhandled_exception',
+        actorType: 'system',
+        targetRef: req?.path,
+        reason: String(err?.message ?? err).slice(0, 500),
+        meta: { method: req?.method },
+      })
+      .catch(() => {});
+  } catch {
+    // a sync throw from the audit layer must never block the 500 response
+  }
   return res.status(500).json({ error: { code: 'INTERNAL', message: 'Something went wrong.' } });
 }

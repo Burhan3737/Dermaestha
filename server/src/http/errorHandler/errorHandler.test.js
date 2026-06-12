@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { z } from 'zod';
 import { AppError } from '../AppError.js';
 import { errorHandler } from './errorHandler.js';
@@ -24,6 +24,8 @@ function mockRes() {
 }
 
 describe('errorHandler', () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it('maps an AppError to its status + envelope', () => {
     const res = mockRes();
     errorHandler(new AppError('SLOT_TAKEN', 'Slot just taken.', 409), {}, res, () => {});
@@ -31,6 +33,7 @@ describe('errorHandler', () => {
     expect(res.body).toEqual({
       error: { code: 'SLOT_TAKEN', message: 'Slot just taken.', details: undefined },
     });
+    expect(audit.record).not.toHaveBeenCalled();
   });
   it('maps a ZodError to 400 VALIDATION_FAILED with field details', () => {
     const res = mockRes();
@@ -38,6 +41,7 @@ describe('errorHandler', () => {
     errorHandler(err, {}, res, () => {});
     expect(res.statusCode).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_FAILED');
+    expect(audit.record).not.toHaveBeenCalled();
   });
   it('maps an unknown error to 500 INTERNAL without leaking the message', () => {
     const res = mockRes();

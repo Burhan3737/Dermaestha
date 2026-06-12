@@ -162,7 +162,8 @@ const ALERT_EVENT_TYPES = [
 const AWAITING_PRESCRIPTION_HOURS = 12;
 
 /** F12.01: live projection — Slice E's alert audit rows + derived awaiting-prescription rows
- *  (same predicate as the D-02 badge) + the Task-17 exception bridge. No dedicated table. */
+ *  (same predicate as the D-02 badge) + the Task-17 exception bridge. No dedicated table.
+ *  Both the audit query and the awaiting-prescription query are capped at 100 rows. */
 export async function listAlerts(now = new Date()) {
   const [auditRows, awaiting] = await Promise.all([
     prisma.auditLog.findMany({
@@ -177,6 +178,7 @@ export async function listAlerts(now = new Date()) {
         slotEnd: { lte: new Date(now.getTime() - AWAITING_PRESCRIPTION_HOURS * 3600 * 1000) },
       },
       orderBy: { slotEnd: 'desc' },
+      take: 100,
       include: { doctor: { select: { user: { select: { fullName: true } } } } },
     }),
   ]);
