@@ -71,4 +71,42 @@ describe('AdminDoctors (A-01)', () => {
       expect(api.post).toHaveBeenCalledWith('/doctors/d1/reset-password', { newPassword: 'NewPass123' }),
     );
   });
+
+  it('activate posts reactivate for an inactive doctor', async () => {
+    api.post.mockResolvedValue({ id: 'd2', isActive: true });
+    renderView();
+    await screen.findByText('Dr Pending');
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/doctors/d2/reactivate'));
+  });
+
+  it('cancelling the reset modal clears the typed password and stale error', async () => {
+    api.post.mockRejectedValue(Object.assign(new Error('Too weak'), { code: 'VALIDATION', status: 400 }));
+    renderView();
+    await screen.findByText('Dr Ayesha Khan');
+    // open reset modal on d1, type a password, submit to trigger error
+    fireEvent.click(screen.getAllByRole('button', { name: 'Reset password' })[0]);
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'weak' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+    await waitFor(() => expect(screen.getByText('Too weak')).toBeTruthy());
+    // cancel — should clear password state and mutation error
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    // re-open reset modal (d1's button)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Reset password' })[0]);
+    await waitFor(() => {
+      expect(screen.getByLabelText('New password').value).toBe('');
+      expect(screen.queryByText('Too weak')).toBeNull();
+    });
+  });
+
+  it('deactivation modal surfaces the API error', async () => {
+    api.post.mockRejectedValue(Object.assign(new Error('Server down'), { code: 'INTERNAL', status: 500 }));
+    renderView();
+    await screen.findByText('Dr Ayesha Khan');
+    fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Deactivate doctor' }));
+    await waitFor(() => expect(screen.getByText('Server down')).toBeTruthy());
+    // modal is still open (onSuccess never fired)
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
 });

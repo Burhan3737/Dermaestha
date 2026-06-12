@@ -62,7 +62,7 @@ export function AdminDoctors() {
                     {d.isActive ? (
                       <Button variant="danger" onClick={() => setDeactivating(d)}>Deactivate</Button>
                     ) : (
-                      <Button variant="secondary" onClick={() => setDoctorActive.mutate({ id: d.id, isActive: true })}>
+                      <Button variant="secondary" isLoading={setDoctorActive.isPending} onClick={() => setDoctorActive.mutate({ id: d.id, isActive: true })}>
                         Activate
                       </Button>
                     )}{' '}
@@ -85,6 +85,9 @@ export function AdminDoctors() {
                 their calendar and will be honoured — deactivation only removes the doctor from the
                 public listing and blocks new bookings. Login is not revoked.
               </p>
+              {setDoctorActive.error && (
+                <Alert variant="danger">{setDoctorActive.error.message}</Alert>
+              )}
             </div>
             <div className="modal__actions">
               <Button variant="ghost" onClick={() => setDeactivating(null)}>Cancel</Button>
@@ -114,7 +117,7 @@ export function AdminDoctors() {
               />
             </div>
             <div className="modal__actions">
-              <Button variant="ghost" onClick={() => setResetting(null)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => { setResetting(null); setNewPassword(''); resetDoctorPassword.reset(); }}>Cancel</Button>
               <Button isLoading={resetDoctorPassword.isPending} onClick={confirmReset}>Set password</Button>
             </div>
           </div>
