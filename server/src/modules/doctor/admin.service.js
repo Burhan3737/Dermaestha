@@ -165,3 +165,39 @@ export async function adminReplaceBlocks({ doctorId, blocks, actorId }) {
   });
   return result;
 }
+
+/** JPEG/PNG/WebP by magic bytes (F10.01). SVG and everything else → null (XSS vector). */
+export function sniffImageExt(buf) {
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
+  if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return 'png';
+  }
+  if (
+    buf.length >= 12 &&
+    buf.toString('ascii', 0, 4) === 'RIFF' &&
+    buf.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return 'webp';
+  }
+  return null;
+}
+
+/** Writes the validated photo to UPLOADS_DIR (server-generated filename — no traversal). */
+export async function saveDoctorPhoto({ id, buffer, actorId }) {
+  const doctor = await prisma.doctor.findUnique({ where: { id }, select: { id: true } });
+  if (!doctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
+  const ext = sniffImageExt(buffer);
+  if (!ext) throw new AppError('INVALID_FILE', 'Photo must be a JPEG, PNG, or WebP image.', 400);
+  const dir = path.resolve(env.UPLOADS_DIR, 'doctors');
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, `${id}.${ext}`), buffer);
+  const photoUrl = `/uploads/doctors/${id}.${ext}`;
+  await prisma.doctor.update({ where: { id }, data: { photoUrl } });
+  await audit.record({
+    eventType: 'doctor.photo_updated',
+    actorType: 'admin',
+    actorId,
+    targetRef: id,
+  });
+  return { photoUrl };
+}

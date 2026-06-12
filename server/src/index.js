@@ -24,6 +24,9 @@ export function createApp() {
   // All /api + /dev routes (see routes.js).
   registerRoutes(app);
 
+  // Uploaded doctor photos (Slice G). In Docker this path is the dermestha_uploads volume.
+  app.use('/uploads', express.static(path.resolve(env.UPLOADS_DIR)));
+
   // Static SPA + catch-all LAST (ARCHITECTURE §14.3).
   app.use(express.static(CLIENT_DIST));
   app.get('*', (_req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')));

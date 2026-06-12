@@ -18,6 +18,7 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().optional(),
   ERROR_TRACKING_DSN: z.string().optional(),
+  UPLOADS_DIR: z.string().default('./uploads'),
 });
 
 /** @param {NodeJS.ProcessEnv | Record<string,string|undefined>} raw */

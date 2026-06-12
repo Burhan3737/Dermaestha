@@ -18,9 +18,10 @@ vi.mock('./service.js', () => ({ replaceBlocksForDoctor: vi.fn().mockResolvedVal
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as audit from '../../services/audit/audit.service.js';
-import { createDoctor, listAllDoctors, updateDoctor, setDoctorActive, resetDoctorPassword, adminReplaceBlocks } from './admin.service.js';
+import { createDoctor, listAllDoctors, updateDoctor, setDoctorActive, resetDoctorPassword, adminReplaceBlocks, saveDoctorPhoto, sniffImageExt } from './admin.service.js';
 import { hashPassword } from '../../lib/password/password.js';
 import { replaceBlocksForDoctor } from './service.js';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -229,5 +230,42 @@ describe('adminReplaceBlocks (F10.01/.02 weekly template)', () => {
     await expect(
       adminReplaceBlocks({ doctorId: 'nope', blocks: [], actorId: 'a' }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+});
+
+describe('sniffImageExt (magic bytes — extension and client MIME are never trusted)', () => {
+  it('detects jpeg / png / webp and rejects everything else (incl. SVG)', () => {
+    expect(sniffImageExt(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))).toBe('jpg');
+    expect(sniffImageExt(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe('png');
+    expect(sniffImageExt(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP')]))).toBe('webp');
+    expect(sniffImageExt(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg">'))).toBeNull();
+    expect(sniffImageExt(Buffer.from([0x00, 0x01]))).toBeNull();
+  });
+});
+
+describe('saveDoctorPhoto (F10.01 photo upload)', () => {
+  it('writes uploads/doctors/<id>.<ext>, updates photoUrl, audits', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1' });
+    prisma.doctor.update.mockResolvedValue({ id: 'd1' });
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]);
+    const out = await saveDoctorPhoto({ id: 'd1', buffer: jpeg, actorId: 'admin1' });
+    expect(mkdir).toHaveBeenCalledWith(expect.stringContaining('doctors'), { recursive: true });
+    expect(writeFile).toHaveBeenCalledWith(expect.stringContaining('d1.jpg'), jpeg);
+    expect(prisma.doctor.update).toHaveBeenCalledWith({
+      where: { id: 'd1' },
+      data: { photoUrl: '/uploads/doctors/d1.jpg' },
+    });
+    expect(out).toEqual({ photoUrl: '/uploads/doctors/d1.jpg' });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'doctor.photo_updated', targetRef: 'd1' }),
+    );
+  });
+
+  it('rejects a non-image buffer with 400 INVALID_FILE and writes nothing', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1' });
+    await expect(
+      saveDoctorPhoto({ id: 'd1', buffer: Buffer.from('<svg/>'), actorId: 'a' }),
+    ).rejects.toMatchObject({ code: 'INVALID_FILE', status: 400 });
+    expect(writeFile).not.toHaveBeenCalled();
   });
 });
