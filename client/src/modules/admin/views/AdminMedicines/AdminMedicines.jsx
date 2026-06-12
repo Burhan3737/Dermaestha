@@ -6,8 +6,7 @@ import { Field } from '../../../../shared/Field/Field.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
-
-const pkr = (paisa) => `Rs ${(paisa / 100).toLocaleString()}`;
+import { formatPkr } from '../../../../lib/format/format.js';
 
 export function AdminMedicines() {
   const [search, setSearch] = useState('');
@@ -39,7 +38,7 @@ export function AdminMedicines() {
 
       <div className="section-card">
         <div className="filters">
-          <Field label="Search" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Field id="med-search" label="Search" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         {medicines.isLoading && <p>Loading…</p>}
         {medicines.error && <Alert variant="danger">{medicines.error.message}</Alert>}
@@ -57,7 +56,7 @@ export function AdminMedicines() {
                   <td>{m.name}</td>
                   <td>{m.genericName ?? '—'}</td>
                   <td>{m.dosageForms.join(', ')}</td>
-                  <td>{pkr(m.unitPrice)}</td>
+                  <td>{formatPkr(m.unitPrice)}</td>
                   <td>
                     {m.isActive ? (
                       <span className="badge badge--success">Active</span>
