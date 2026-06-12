@@ -23,7 +23,7 @@ export const doctorCreateSchema = z.object({
   pmcNumber: z.string().trim().min(1).max(40),
   specialization: z.string().trim().min(1).max(120),
   /** PKR paisa. */
-  fee: z.number().int().positive(),
+  fee: z.number().int().positive().max(2_147_483_647),
   bio: z.string().trim().min(1).max(2000),
   /** DA1: admin-set initial password, shared out-of-band. */
   initialPassword: z.string().min(8).max(200),
@@ -38,7 +38,7 @@ export const doctorUpdateSchema = z
     fullName: z.string().trim().min(1).max(120).optional(),
     phone: z.string().trim().min(7).max(20).optional(),
     specialization: z.string().trim().min(1).max(120).optional(),
-    fee: z.number().int().positive().optional(),
+    fee: z.number().int().positive().max(2_147_483_647).optional(),
     bio: z.string().trim().min(1).max(2000).optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'At least one field is required' });
