@@ -17,7 +17,7 @@ vi.mock('../../services/audit/audit.service.js', () => ({
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as audit from '../../services/audit/audit.service.js';
-import { listRecords, getRecordDetail } from './service.js';
+import { listRecords, getRecordDetail, listAuditEntries, resendEmail } from './service.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -119,5 +119,74 @@ describe('admin.getRecordDetail (F13.02)', () => {
   it('unknown id → 404', async () => {
     prisma.appointment.findUnique.mockResolvedValue(null);
     await expect(getRecordDetail('nope')).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+});
+
+describe('admin.listAuditEntries (F13.01 audit filters)', () => {
+  it('filters by appointmentId/eventType/actorType/date and pages newest-first', async () => {
+    prisma.auditLog.findMany.mockResolvedValue([]);
+    prisma.auditLog.count.mockResolvedValue(0);
+    await listAuditEntries({
+      page: 1,
+      pageSize: 50,
+      appointmentId: 'a1',
+      eventType: 'login',
+      actorType: 'doctor',
+      from: '2099-01-01',
+    });
+    const arg = prisma.auditLog.findMany.mock.calls[0][0];
+    expect(arg.where).toEqual({
+      targetRef: 'a1',
+      eventType: 'login',
+      actorType: 'doctor',
+      at: { gte: karachiWallTimeToUtc('2099-01-01', '00:00') },
+    });
+    expect(arg.orderBy).toEqual({ at: 'desc' });
+  });
+
+  it('email filter resolves the user and filters on actorId; unknown email matches nothing', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.auditLog.findMany.mockResolvedValue([]);
+    prisma.auditLog.count.mockResolvedValue(0);
+    await listAuditEntries({ email: 'ghost@t.test' });
+    expect(prisma.auditLog.findMany.mock.calls[0][0].where.actorId).toBe('__no_match__');
+  });
+});
+
+describe('admin.resendEmail (F12.02 Email-Only Re-Trigger)', () => {
+  it('resets ONLY a failed job back to pending for the worker to pick up, and audits', async () => {
+    prisma.notificationJob.findUnique.mockResolvedValue({
+      id: 'n1',
+      appointmentId: 'a1',
+      type: 'booking_confirmation',
+      status: 'failed',
+    });
+    prisma.notificationJob.update.mockResolvedValue({ id: 'n1', status: 'pending' });
+    await resendEmail({ jobId: 'n1', actorId: 'admin1' });
+    expect(prisma.notificationJob.update).toHaveBeenCalledWith({
+      where: { id: 'n1' },
+      data: { status: 'pending', attempts: 0, nextAttemptAt: null, lastError: null },
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'admin.email_resend',
+        actorId: 'admin1',
+        targetRef: 'a1',
+        meta: { jobId: 'n1', type: 'booking_confirmation' },
+      }),
+    );
+  });
+
+  it('a non-failed job → 409 INVALID_STATE; unknown job → 404', async () => {
+    prisma.notificationJob.findUnique.mockResolvedValue({ id: 'n1', status: 'sent' });
+    await expect(resendEmail({ jobId: 'n1', actorId: 'a' })).rejects.toMatchObject({
+      code: 'INVALID_STATE',
+      status: 409,
+    });
+    prisma.notificationJob.findUnique.mockResolvedValue(null);
+    await expect(resendEmail({ jobId: 'nope', actorId: 'a' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    });
   });
 });

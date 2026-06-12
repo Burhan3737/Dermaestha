@@ -8,6 +8,7 @@ import { appointmentsRouter } from './modules/appointment/index.js';
 import { paymentWebhookRouter } from './modules/payment/index.js';
 import { videoWebhookRouter } from './modules/video/index.js';
 import { medicinesRouter, adminMedicinesRouter } from './modules/medicine/index.js';
+import { adminRouter } from './modules/admin/index.js';
 import { prescriptionsRouter } from './modules/prescription/index.js';
 import { healthRouter } from './health/index.js';
 import { devCheckoutRouter } from './dev/devCheckout.js';
@@ -23,6 +24,7 @@ export function registerRoutes(app) {
   app.use('/api/availability', availabilityRouter);
   app.use('/api/medicines', medicinesRouter);
   app.use('/api/admin/medicines', adminMedicinesRouter);
+  app.use('/api/admin', adminRouter);
   // Nested prescription routes; mounted before the appointments router so the
   // two-segment path is owned explicitly (mergeParams carries :id through).
   app.use('/api/appointments/:id/prescriptions', prescriptionsRouter);

@@ -85,6 +85,71 @@ export async function listRecords({
   return { data: rows.map(toRecordRow), page: { number: page, size: pageSize, total } };
 }
 
+/** F13.01 audit tab: filtered append-only log, newest-first. Karachi day boundaries. */
+export async function listAuditEntries({
+  page = 1,
+  pageSize = 50,
+  appointmentId,
+  userId,
+  email,
+  eventType,
+  actorType,
+  from,
+  to,
+} = {}) {
+  let actorId = userId;
+  if (!actorId && email) {
+    const u = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    actorId = u?.id ?? '__no_match__'; // unknown email must match nothing, not everything
+  }
+  const where = {
+    ...(appointmentId ? { targetRef: appointmentId } : {}),
+    ...(actorId ? { actorId } : {}),
+    ...(eventType ? { eventType } : {}),
+    ...(actorType ? { actorType } : {}),
+    ...(from || to
+      ? {
+          at: {
+            ...(from ? { gte: karachiWallTimeToUtc(from, '00:00') } : {}),
+            ...(to ? { lt: new Date(karachiWallTimeToUtc(to, '00:00').getTime() + 24 * 60 * 60 * 1000) } : {}),
+          },
+        }
+      : {}),
+  };
+  const [rows, total] = await prisma.$transaction([
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { at: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
+  return { data: rows, page: { number: page, size: pageSize, total } };
+}
+
+/** F12.02: failed → pending (attempts reset); the existing dispatch worker re-sends.
+ *  No parallel send path; emails only — refunds are NEVER re-triggered in-app (#10). */
+export async function resendEmail({ jobId, actorId }) {
+  const job = await prisma.notificationJob.findUnique({ where: { id: jobId } });
+  if (!job) throw new AppError('NOT_FOUND', 'Notification job not found.', 404);
+  if (job.status !== 'failed') {
+    throw new AppError('INVALID_STATE', 'Only failed emails can be re-triggered.', 409);
+  }
+  const updated = await prisma.notificationJob.update({
+    where: { id: jobId },
+    data: { status: 'pending', attempts: 0, nextAttemptAt: null, lastError: null },
+  });
+  await audit.record({
+    eventType: 'admin.email_resend',
+    actorType: 'admin',
+    actorId,
+    targetRef: job.appointmentId,
+    meta: { jobId, type: job.type },
+  });
+  return updated;
+}
+
 /** F13.02: one appointment with its full transition history (audit), prescriptions, email jobs. */
 export async function getRecordDetail(appointmentId) {
   const a = await prisma.appointment.findUnique({
