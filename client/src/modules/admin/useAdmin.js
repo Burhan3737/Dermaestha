@@ -12,7 +12,7 @@ const qs = (obj) => {
 
 /**
  * Admin module data/mutations (house pattern: one hook per module, enabled-gated queries).
- * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null }} [opts]
+ * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null, recordDetailId?: string|null }} [opts]
  */
 export function useAdmin(opts = {}) {
   const {
@@ -21,6 +21,7 @@ export function useAdmin(opts = {}) {
     doctors: doctorsEnabled = false,
     recordsFilters = null,
     auditFilters = null,
+    recordDetailId = null,
   } = opts;
   const qc = useQueryClient();
 
@@ -98,10 +99,35 @@ export function useAdmin(opts = {}) {
     enabled: Boolean(auditFilters),
   });
 
+  /** @param {string} recordDetailId */
+  const recordDetail = useQuery({
+    queryKey: ['admin-record', recordDetailId],
+    queryFn: () => api.get(`/admin/records/${recordDetailId}`),
+    enabled: Boolean(recordDetailId),
+  });
+
+  const invalidateRecord = () => {
+    qc.invalidateQueries({ queryKey: ['admin-record'] });
+    qc.invalidateQueries({ queryKey: ['admin-records'] });
+  };
+
+  /** Resend a failed notification job. @param {{ jobId: string }} args */
+  const resendEmail = useMutation({
+    mutationFn: ({ jobId }) => api.post(`/admin/emails/${jobId}/resend`),
+    onSuccess: invalidateRecord,
+  });
+
+  /** Toggle disputed flag on an appointment. @param {{ id: string, disputed: boolean }} args */
+  const setDisputed = useMutation({
+    mutationFn: ({ id, disputed }) => api.post(`/appointments/${id}/dispute`, { disputed }),
+    onSuccess: invalidateRecord,
+  });
+
   return {
     medicines, createMedicine, updateMedicine,
     doctors, createDoctor, updateDoctor, setDoctorActive,
     resetDoctorPassword, uploadDoctorPhoto, saveDoctorBlocks,
     records, auditEntries,
+    recordDetail, resendEmail, setDisputed,
   };
 }

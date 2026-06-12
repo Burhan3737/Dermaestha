@@ -4,6 +4,7 @@ import { RoleRoute } from '../../lib/RoleRoute/RoleRoute.jsx';
 import { AdminDoctors } from './views/AdminDoctors/AdminDoctors.jsx';
 import { AdminMedicines } from './views/AdminMedicines/AdminMedicines.jsx';
 import { AdminRecords } from './views/AdminRecords/AdminRecords.jsx';
+import { AdminRecordDetail } from './views/AdminRecordDetail/AdminRecordDetail.jsx';
 
 /** Admin sidebar links (A-01…A-05). Entries are added as the views land. */
 export const ADMIN_LINKS = [
@@ -23,4 +24,5 @@ export const adminRoutes = (session) => [
   { path: '/admin/doctors', element: guard(session, <AdminDoctors />) },
   { path: '/admin/medicines', element: guard(session, <AdminMedicines />) },
   { path: '/admin/records', element: guard(session, <AdminRecords />) },
+  { path: '/admin/records/:id', element: guard(session, <AdminRecordDetail />) },
 ];
