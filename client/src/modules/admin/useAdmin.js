@@ -2,12 +2,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/apiClient/apiClient.js';
 
+/** Object → querystring, skipping empty values. */
+const qs = (obj) => {
+  const parts = Object.entries(obj)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`);
+  return parts.length ? `?${parts.join('&')}` : '';
+};
+
 /**
  * Admin module data/mutations (house pattern: one hook per module, enabled-gated queries).
- * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean }} [opts]
+ * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null }} [opts]
  */
 export function useAdmin(opts = {}) {
-  const { medicines: medicinesEnabled = false, medicinesSearch = '', doctors: doctorsEnabled = false } = opts;
+  const {
+    medicines: medicinesEnabled = false,
+    medicinesSearch = '',
+    doctors: doctorsEnabled = false,
+    recordsFilters = null,
+    auditFilters = null,
+  } = opts;
   const qc = useQueryClient();
 
   const medicines = useQuery({
@@ -72,9 +86,22 @@ export function useAdmin(opts = {}) {
     onSuccess: invalidateDoctors,
   });
 
+  const records = useQuery({
+    queryKey: ['admin-records', recordsFilters],
+    queryFn: () => api.get(`/admin/records${qs(recordsFilters)}`),
+    enabled: Boolean(recordsFilters),
+  });
+
+  const auditEntries = useQuery({
+    queryKey: ['admin-audit', auditFilters],
+    queryFn: () => api.get(`/admin/audit${qs(auditFilters)}`),
+    enabled: Boolean(auditFilters),
+  });
+
   return {
     medicines, createMedicine, updateMedicine,
     doctors, createDoctor, updateDoctor, setDoctorActive,
     resetDoctorPassword, uploadDoctorPhoto, saveDoctorBlocks,
+    records, auditEntries,
   };
 }
