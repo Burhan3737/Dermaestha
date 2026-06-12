@@ -32,3 +32,11 @@ export async function resendEmail(req, res, next) {
     next(e);
   }
 }
+
+export async function alerts(_req, res, next) {
+  try {
+    res.json({ data: await adminService.listAlerts() });
+  } catch (e) {
+    next(e);
+  }
+}

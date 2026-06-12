@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 import { AppError } from '../AppError.js';
 import { errorHandler } from './errorHandler.js';
+
+vi.mock('../../services/audit/audit.service.js', () => ({
+  record: vi.fn().mockResolvedValue({}),
+}));
+import * as audit from '../../services/audit/audit.service.js';
 
 function mockRes() {
   return {
@@ -40,5 +45,19 @@ describe('errorHandler', () => {
     expect(res.statusCode).toBe(500);
     expect(res.body.error.code).toBe('INTERNAL');
     expect(res.body.error.message).not.toMatch(/db exploded/);
+  });
+  it('writes a system.unhandled_exception audit row for non-AppError 500s (F12.01 bridge)', () => {
+    const res = mockRes();
+    errorHandler(new Error('kaboom'), { path: '/api/payments/x', method: 'POST' }, res, () => {});
+    expect(res.statusCode).toBe(500);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'system.unhandled_exception',
+        actorType: 'system',
+        targetRef: '/api/payments/x',
+        reason: 'kaboom',
+        meta: { method: 'POST' },
+      }),
+    );
   });
 });

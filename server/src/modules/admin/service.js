@@ -153,6 +153,69 @@ export async function resendEmail({ jobId, actorId }) {
   return { id: jobId, status: 'pending' };
 }
 
+const ALERT_EVENT_TYPES = [
+  'payment.reconciliation_mismatch',
+  'payment.refund_exhausted',
+  'email.send_failed_final',
+  'system.unhandled_exception',
+];
+const AWAITING_PRESCRIPTION_HOURS = 12;
+
+/** F12.01: live projection — Slice E's alert audit rows + derived awaiting-prescription rows
+ *  (same predicate as the D-02 badge) + the Task-17 exception bridge. No dedicated table. */
+export async function listAlerts(now = new Date()) {
+  const [auditRows, awaiting] = await Promise.all([
+    prisma.auditLog.findMany({
+      where: { eventType: { in: ALERT_EVENT_TYPES } },
+      orderBy: { at: 'desc' },
+      take: 100,
+    }),
+    prisma.appointment.findMany({
+      where: {
+        state: 'completed',
+        prescriptions: { none: {} },
+        slotEnd: { lte: new Date(now.getTime() - AWAITING_PRESCRIPTION_HOURS * 3600 * 1000) },
+      },
+      orderBy: { slotEnd: 'desc' },
+      include: { doctor: { select: { user: { select: { fullName: true } } } } },
+    }),
+  ]);
+
+  // Enrich email alerts with their resendable failed jobs (the audit row has no jobId).
+  const emailTargets = auditRows
+    .filter((r) => r.eventType === 'email.send_failed_final' && r.targetRef)
+    .map((r) => r.targetRef);
+  const failedJobs = emailTargets.length
+    ? await prisma.notificationJob.findMany({
+        where: { appointmentId: { in: emailTargets }, status: 'failed' },
+        select: { id: true, appointmentId: true, type: true, status: true },
+      })
+    : [];
+
+  const alerts = [
+    ...auditRows.map((r) => ({
+      id: r.id,
+      kind: r.eventType,
+      at: r.at,
+      targetRef: r.targetRef,
+      reason: r.reason,
+      meta: r.meta,
+      ...(r.eventType === 'email.send_failed_final'
+        ? { failedJobs: failedJobs.filter((j) => j.appointmentId === r.targetRef) }
+        : {}),
+    })),
+    ...awaiting.map((a) => ({
+      id: `awaiting_${a.id}`,
+      kind: 'awaiting_prescription',
+      at: a.slotEnd,
+      targetRef: a.id,
+      reason: `No prescription ${AWAITING_PRESCRIPTION_HOURS}h after the consultation with ${a.doctor.user.fullName}.`,
+      meta: null,
+    })),
+  ];
+  return alerts.sort((x, y) => y.at.getTime() - x.at.getTime());
+}
+
 /** F13.02: one appointment with its full transition history (audit), prescriptions, email jobs. */
 export async function getRecordDetail(appointmentId) {
   const a = await prisma.appointment.findUnique({

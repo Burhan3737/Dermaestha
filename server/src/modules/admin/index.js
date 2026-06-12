@@ -23,6 +23,8 @@ const adminWriteLimiter = makeRateLimiter({
 });
 
 export const adminRouter = Router();
+// GET /api/admin/alerts  (A-03 feed, F12.01)
+adminRouter.get('/alerts', requireRole('admin'), c.alerts);
 // GET /api/admin/records  (A-04 unified records, F13.01)
 adminRouter.get('/records', requireRole('admin'), validateQuery(recordsQuerySchema), c.records);
 // GET /api/admin/records/:id  (A-04 detail: history + prescriptions + email jobs, F13.02)

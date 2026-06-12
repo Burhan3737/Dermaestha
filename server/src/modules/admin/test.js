@@ -17,7 +17,7 @@ vi.mock('../../services/audit/audit.service.js', () => ({
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as audit from '../../services/audit/audit.service.js';
-import { listRecords, getRecordDetail, listAuditEntries, resendEmail } from './service.js';
+import { listRecords, getRecordDetail, listAuditEntries, resendEmail, listAlerts } from './service.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -214,5 +214,51 @@ describe('admin.resendEmail (F12.02 Email-Only Re-Trigger)', () => {
       status: 409,
     });
     expect(audit.record).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.listAlerts (F12.01 — five sources, no dedicated table)', () => {
+  it('merges audit-row alerts with derived awaiting-prescription rows, newest first', async () => {
+    const NOW = new Date('2099-01-10T12:00:00Z');
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'e1', at: new Date('2099-01-10T11:00:00Z'), eventType: 'email.send_failed_final',
+        actorType: 'system', targetRef: 'a1', reason: 'prescription_ready: boom', meta: null,
+      },
+      {
+        id: 'e2', at: new Date('2099-01-09T10:00:00Z'), eventType: 'payment.refund_exhausted',
+        actorType: 'system', targetRef: 'a2', reason: 'gateway 500', meta: null,
+      },
+    ]);
+    prisma.appointment.findMany.mockResolvedValue([
+      {
+        id: 'a3', slotEnd: new Date('2099-01-09T18:00:00Z'),
+        doctor: { user: { fullName: 'Dr A' } },
+      },
+    ]);
+    prisma.notificationJob.findMany.mockResolvedValue([
+      { id: 'n9', appointmentId: 'a1', type: 'prescription_ready', status: 'failed' },
+    ]);
+    const out = await listAlerts(NOW);
+    expect(out.map((a) => a.kind)).toEqual([
+      'email.send_failed_final',
+      'awaiting_prescription',
+      'payment.refund_exhausted',
+    ]);
+    // the email alert is enriched with its resendable failed jobs
+    expect(out[0].failedJobs).toEqual([{ id: 'n9', appointmentId: 'a1', type: 'prescription_ready', status: 'failed' }]);
+    // the derived predicate: completed, no prescription, slot ended >12h before now
+    const apptArg = prisma.appointment.findMany.mock.calls[0][0];
+    expect(apptArg.where.state).toBe('completed');
+    expect(apptArg.where.prescriptions).toEqual({ none: {} });
+    expect(apptArg.where.slotEnd.lte).toEqual(new Date('2099-01-10T00:00:00Z')); // NOW − 12h
+    // the audit-source list covers all four eventTypes
+    const auditArg = prisma.auditLog.findMany.mock.calls[0][0];
+    expect(auditArg.where.eventType.in).toEqual([
+      'payment.reconciliation_mismatch',
+      'payment.refund_exhausted',
+      'email.send_failed_final',
+      'system.unhandled_exception',
+    ]);
   });
 });
