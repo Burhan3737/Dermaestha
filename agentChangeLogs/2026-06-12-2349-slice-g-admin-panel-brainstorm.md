@@ -1,13 +1,13 @@
 # 2026-06-12-2349 — slice-g-admin-panel-brainstorm
 
 **Status:** Completed
-**Goal:** Brainstorm and write the approved design spec for Slice G — the full admin panel (F10, F12, F13, F14 + screens A-01…A-05).
-**Skill(s) used:** superpowers:brainstorming (user-invoked)
+**Goal:** Brainstorm and write the approved design spec for Slice G — the full admin panel (F10, F12, F13, F14 + screens A-01…A-05) — then the 22-task implementation plan.
+**Skill(s) used:** superpowers:brainstorming (user-invoked), superpowers:writing-plans (announced, user approved spec first)
 **Ticket / issue:** None
 **Branch:** main
-**Commits / PR:** docs(spec) commit for the Slice G design doc + this changelog
-**Last updated:** 2026-06-12-2349
-**Tags:** #design #spec #admin-panel
+**Commits / PR:** docs(spec) 44c749b + docs(plan) commit for the implementation plan
+**Last updated:** 2026-06-13-0030
+**Tags:** #design #spec #plan #admin-panel
 
 ## Summary
 Slice F (Prescriptions) is merged; the user chose the admin panel as the next step. Brainstormed Slice G scope with the user via the brainstorming skill: explored canon (docs 00/02/05/06/13) and code seams (two Explore agents over server + client), resolved the open decisions one question at a time, presented the design in five sections (each approved), and wrote the design spec to `docs/superpowers/specs/2026-06-12-slice-g-admin-panel-design.md`.
@@ -21,6 +21,7 @@ M3 sits at ~85–90% (A-02 admin medicine UI outstanding) and M4 at 0%. The spec
 | `docs/superpowers/specs/2026-06-12-slice-g-admin-panel-design.md` | Created | Approved Slice G design: F10 doctor management + photo upload (local disk + Docker volume), F12 alert feed (audit-row sources + exception bridge), F13 records & audit, F14 settings, five admin views, testing + spec-impact plan |
 | `agentChangeLogs/2026-06-12-2349-slice-g-admin-panel-brainstorm.md` | Created | This session log |
 | `agentChangeLogs/index.md` | Modified | Appended this session's line |
+| `docs/superpowers/plans/2026-06-13-slice-g-admin-panel.md` | Created | 22-task TDD implementation plan (user approved the spec first): prep → A-02 → F10+A-01 → F13+A-04 → F12+A-03 → F14+A-05 → integration → infra |
 
 ## Dependencies / config / schema
 None this session (design only). The design itself plans: multer dependency, `UPLOADS_DIR` env var, `dermestha_uploads` Docker volume — all in the build session, none applied now. No schema changes planned at all.
@@ -39,6 +40,10 @@ None this session (design only). The design itself plans: multer dependency, `UP
 - Slice E deliberately wrote the alert audit rows (`payment.reconciliation_mismatch`, `payment.refund_exhausted`, `email.send_failed_final`) with `targetRef` for this feed.
 - Client has no admin module; `SidebarLayout` links are doctor-hardcoded (becomes a prop); `.table`/`.filters`/`.modal-*`/`.badge` CSS already ported from mockups.
 - Doc 05 names the resend param `:eventId`; it is the notification-job id — naming fix queued for the spec sweep.
+- `PaymentStatus` enum is `pending|success|failed` (NOT "paid") — encoded into the plan's records mapping.
+- `prisma/seed.js` still imports the pre-restructure `lib/password.js` path — `npm run db:seed` is broken on fresh checkouts; plan Task 1 fixes it (one line) and adds a dev admin to the seed.
+- `SidebarLayout` already accepts a `links` prop; `apiClient` lacked `patch` + multipart (plan Task 2 adds them).
+- Spec self-review (during brainstorm) surfaced two F10 canon gaps fixed in the spec: admin availability write route + admin all-doctors listing with `upcomingConfirmedCount`.
 
 ## Verification
 Design-only session: no code changed, no tests run. The design's success criteria define the build-time verification (integration proof of DA1→DA3 loop, #9 non-cascade, settings live effect, volume persistence).
@@ -47,7 +52,7 @@ Design-only session: no code changed, no tests run. The design's success criteri
 None — documentation only. Revert = delete the spec + this log entry.
 
 ## Open items / next session
-1. User reviews `docs/superpowers/specs/2026-06-12-slice-g-admin-panel-design.md`.
-2. On approval: invoke superpowers:writing-plans to produce the Slice G implementation plan.
+1. ~~User reviews the design spec~~ — approved 2026-06-13; plan written to `docs/superpowers/plans/2026-06-13-slice-g-admin-panel.md`.
+2. Execute the plan (subagent-driven or inline — user's choice pending).
 3. At build start: ask the user about branch creation (`feature/slice-g`) — requires explicit approval per CLAUDE.md.
-4. Spec-suite edits (design §8) need explicit user approval before any doc 00–15 file is touched.
+4. Spec-suite edits (design §8 / plan Task 22) need explicit user approval before any doc 00–15 file is touched.
