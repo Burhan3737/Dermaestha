@@ -5,7 +5,7 @@ vi.mock('../../lib/prisma/prisma.js', () => ({
   prisma: {
     appointment: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn() },
     auditLog: { findMany: vi.fn(), count: vi.fn() },
-    notificationJob: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+    notificationJob: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     user: { findUnique: vi.fn() },
     settings: { findUnique: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
@@ -151,6 +151,16 @@ describe('admin.listAuditEntries (F13.01 audit filters)', () => {
     await listAuditEntries({ email: 'ghost@t.test' });
     expect(prisma.auditLog.findMany.mock.calls[0][0].where.actorId).toBe('__no_match__');
   });
+
+  it('to-date boundary is exclusive at the next Karachi midnight', async () => {
+    prisma.auditLog.findMany.mockResolvedValue([]);
+    prisma.auditLog.count.mockResolvedValue(0);
+    await listAuditEntries({ to: '2099-01-01' });
+    const arg = prisma.auditLog.findMany.mock.calls[0][0];
+    expect(arg.where.at.lt).toEqual(
+      new Date(karachiWallTimeToUtc('2099-01-01', '00:00').getTime() + 24 * 60 * 60 * 1000),
+    );
+  });
 });
 
 describe('admin.resendEmail (F12.02 Email-Only Re-Trigger)', () => {
@@ -161,12 +171,13 @@ describe('admin.resendEmail (F12.02 Email-Only Re-Trigger)', () => {
       type: 'booking_confirmation',
       status: 'failed',
     });
-    prisma.notificationJob.update.mockResolvedValue({ id: 'n1', status: 'pending' });
-    await resendEmail({ jobId: 'n1', actorId: 'admin1' });
-    expect(prisma.notificationJob.update).toHaveBeenCalledWith({
-      where: { id: 'n1' },
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 1 });
+    const out = await resendEmail({ jobId: 'n1', actorId: 'admin1' });
+    expect(prisma.notificationJob.updateMany).toHaveBeenCalledWith({
+      where: { id: 'n1', status: 'failed' },
       data: { status: 'pending', attempts: 0, nextAttemptAt: null, lastError: null },
     });
+    expect(out).toEqual({ id: 'n1', status: 'pending' });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'admin.email_resend',
@@ -188,5 +199,20 @@ describe('admin.resendEmail (F12.02 Email-Only Re-Trigger)', () => {
       code: 'NOT_FOUND',
       status: 404,
     });
+  });
+
+  it('concurrent flip after the read loses cleanly with 409', async () => {
+    prisma.notificationJob.findUnique.mockResolvedValue({
+      id: 'n1',
+      appointmentId: 'a1',
+      type: 'booking_confirmation',
+      status: 'failed',
+    });
+    prisma.notificationJob.updateMany.mockResolvedValue({ count: 0 });
+    await expect(resendEmail({ jobId: 'n1', actorId: 'admin1' })).rejects.toMatchObject({
+      code: 'INVALID_STATE',
+      status: 409,
+    });
+    expect(audit.record).not.toHaveBeenCalled();
   });
 });

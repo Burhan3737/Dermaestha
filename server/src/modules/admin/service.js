@@ -136,10 +136,13 @@ export async function resendEmail({ jobId, actorId }) {
   if (job.status !== 'failed') {
     throw new AppError('INVALID_STATE', 'Only failed emails can be re-triggered.', 409);
   }
-  const updated = await prisma.notificationJob.update({
-    where: { id: jobId },
+  const result = await prisma.notificationJob.updateMany({
+    where: { id: jobId, status: 'failed' }, // atomic guard — loses cleanly if anything raced us
     data: { status: 'pending', attempts: 0, nextAttemptAt: null, lastError: null },
   });
+  if (result.count === 0) {
+    throw new AppError('INVALID_STATE', 'Email job is no longer in failed state.', 409);
+  }
   await audit.record({
     eventType: 'admin.email_resend',
     actorType: 'admin',
@@ -147,7 +150,7 @@ export async function resendEmail({ jobId, actorId }) {
     targetRef: job.appointmentId,
     meta: { jobId, type: job.type },
   });
-  return updated;
+  return { id: jobId, status: 'pending' };
 }
 
 /** F13.02: one appointment with its full transition history (audit), prescriptions, email jobs. */
