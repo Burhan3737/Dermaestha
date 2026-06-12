@@ -15,3 +15,12 @@ const KHI = new Intl.DateTimeFormat('en-PK', {
 
 /** UTC ISO → human string rendered in Asia/Karachi. */
 export const formatKarachi = (iso) => (iso ? KHI.format(new Date(iso)) : '');
+
+const KHI_TABLE = new Intl.DateTimeFormat('en-PK', {
+  timeZone: 'Asia/Karachi',
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
+/** Dense table-cell variant of formatKarachi (admin tables). */
+export const formatKarachiTable = (iso) => (iso ? KHI_TABLE.format(new Date(iso)) : '');

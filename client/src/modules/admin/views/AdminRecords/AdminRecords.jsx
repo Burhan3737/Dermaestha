@@ -6,13 +6,11 @@ import { Button } from '../../../../shared/Button/Button.jsx';
 import { Field } from '../../../../shared/Field/Field.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
 import { Pagination } from '../../../../shared/Pagination/Pagination.jsx';
-import { formatPkr } from '../../../../lib/format/format.js';
+import { formatPkr, formatKarachiTable } from '../../../../lib/format/format.js';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
 
 const pkr = (paisa) => (paisa == null ? '—' : formatPkr(paisa));
-const karachi = (iso) =>
-  new Date(iso).toLocaleString('en-PK', { timeZone: 'Asia/Karachi', dateStyle: 'medium', timeStyle: 'short' });
 
 const EMPTY_FILTERS = { patient: '', doctorName: '', appointmentId: '', paymentRef: '', from: '', to: '' };
 
@@ -73,7 +71,7 @@ export function AdminRecords() {
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id}>
-                      <td>{karachi(r.slotStart)}</td>
+                      <td>{formatKarachiTable(r.slotStart)}</td>
                       <td>
                         {r.patientName}
                         {r.subjectName && <span className="help"> (for: {r.subjectName})</span>}
@@ -117,7 +115,7 @@ export function AdminRecords() {
                 <tbody>
                   {auditRows.map((eRow) => (
                     <tr key={eRow.id}>
-                      <td>{karachi(eRow.at)}</td>
+                      <td>{formatKarachiTable(eRow.at)}</td>
                       <td>{eRow.eventType}</td>
                       <td>{eRow.actorType}{eRow.actorId ? ` (${eRow.actorId})` : ''}</td>
                       <td>{eRow.targetRef ?? '—'}</td>
