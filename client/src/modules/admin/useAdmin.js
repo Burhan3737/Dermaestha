@@ -12,7 +12,7 @@ const qs = (obj) => {
 
 /**
  * Admin module data/mutations (house pattern: one hook per module, enabled-gated queries).
- * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null, recordDetailId?: string|null, alerts?: boolean }} [opts]
+ * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null, recordDetailId?: string|null, alerts?: boolean, settings?: boolean }} [opts]
  */
 export function useAdmin(opts = {}) {
   const {
@@ -23,6 +23,7 @@ export function useAdmin(opts = {}) {
     auditFilters = null,
     recordDetailId = null,
     alerts: alertsEnabled = false,
+    settings: settingsEnabled = false,
   } = opts;
   const qc = useQueryClient();
 
@@ -131,6 +132,19 @@ export function useAdmin(opts = {}) {
     onSuccess: invalidateRecord,
   });
 
+  /** Platform-wide tunable settings (F14). */
+  const settings = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: () => api.get('/admin/settings'),
+    enabled: settingsEnabled,
+  });
+
+  /** Persist platform settings. @param {{ minBookingLeadMinutes: number, fallbackFeePctBps: number, fallbackFeeFixed: number }} body */
+  const saveSettings = useMutation({
+    mutationFn: (body) => api.put('/admin/settings', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-settings'] }),
+  });
+
   return {
     medicines, createMedicine, updateMedicine,
     doctors, createDoctor, updateDoctor, setDoctorActive,
@@ -138,5 +152,6 @@ export function useAdmin(opts = {}) {
     alerts,
     records, auditEntries,
     recordDetail, resendEmail, setDisputed,
+    settings, saveSettings,
   };
 }
