@@ -3,7 +3,8 @@ import { Router } from 'express';
 import * as c from './controller.js';
 import { requireRole } from '../../middleware/requireRole/requireRole.js';
 import { makeRateLimiter } from '../../middleware/rateLimit/rateLimit.js';
-import { recordsQuerySchema, auditQuerySchema } from '../../../../shared/schemas/index.js';
+import { recordsQuerySchema, auditQuerySchema, settingsUpdateSchema } from '../../../../shared/schemas/index.js';
+import { validate } from '../../middleware/validate/validate.js';
 
 // Validate req.query into req.query (Zod) without a body. Small inline middleware.
 // Follows house pattern (same as doctor/index.js and medicine/index.js).
@@ -33,3 +34,6 @@ adminRouter.get('/records/:id', requireRole('admin'), c.recordDetail);
 adminRouter.get('/audit', requireRole('admin'), validateQuery(auditQuerySchema), c.auditEntries);
 // POST /api/admin/emails/:jobId/resend  (F12.02; :jobId = notification_jobs.id)
 adminRouter.post('/emails/:jobId/resend', requireRole('admin'), adminWriteLimiter, c.resendEmail);
+// GET/PUT /api/admin/settings  (A-05, F14; lead-time floor 30 enforced by the DTO)
+adminRouter.get('/settings', requireRole('admin'), c.getSettings);
+adminRouter.put('/settings', requireRole('admin'), adminWriteLimiter, validate(settingsUpdateSchema), c.putSettings);

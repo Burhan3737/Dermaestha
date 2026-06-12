@@ -17,7 +17,7 @@ vi.mock('../../services/audit/audit.service.js', () => ({
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as audit from '../../services/audit/audit.service.js';
-import { listRecords, getRecordDetail, listAuditEntries, resendEmail, listAlerts } from './service.js';
+import { listRecords, getRecordDetail, listAuditEntries, resendEmail, listAlerts, getSettings, updateSettings } from './service.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -214,6 +214,38 @@ describe('admin.resendEmail (F12.02 Email-Only Re-Trigger)', () => {
       status: 409,
     });
     expect(audit.record).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin settings (F14)', () => {
+  it('getSettings reads the singleton row', async () => {
+    prisma.settings.findUnique.mockResolvedValue({ id: 1, minBookingLeadMinutes: 60 });
+    const out = await getSettings();
+    expect(prisma.settings.findUnique).toHaveBeenCalledWith({ where: { id: 1 } });
+    expect(out.minBookingLeadMinutes).toBe(60);
+  });
+
+  it('updateSettings writes the three tunables and audits before→after (F14.03)', async () => {
+    prisma.settings.findUnique.mockResolvedValue({
+      id: 1, minBookingLeadMinutes: 60, fallbackFeePctBps: 0, fallbackFeeFixed: 0,
+    });
+    prisma.settings.update.mockResolvedValue({
+      id: 1, minBookingLeadMinutes: 30, fallbackFeePctBps: 250, fallbackFeeFixed: 0,
+    });
+    const data = { minBookingLeadMinutes: 30, fallbackFeePctBps: 250, fallbackFeeFixed: 0 };
+    await updateSettings({ data, actorId: 'admin1' });
+    expect(prisma.settings.update).toHaveBeenCalledWith({ where: { id: 1 }, data });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'settings.updated',
+        actorType: 'admin',
+        actorId: 'admin1',
+        meta: {
+          before: { minBookingLeadMinutes: 60, fallbackFeePctBps: 0, fallbackFeeFixed: 0 },
+          after: { minBookingLeadMinutes: 30, fallbackFeePctBps: 250, fallbackFeeFixed: 0 },
+        },
+      }),
+    );
   });
 });
 

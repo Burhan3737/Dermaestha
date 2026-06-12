@@ -40,3 +40,19 @@ export async function alerts(_req, res, next) {
     next(e);
   }
 }
+
+export async function getSettings(_req, res, next) {
+  try {
+    res.json(await adminService.getSettings());
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function putSettings(req, res, next) {
+  try {
+    res.json(await adminService.updateSettings({ data: req.body, actorId: req.session.userId }));
+  } catch (e) {
+    next(e);
+  }
+}

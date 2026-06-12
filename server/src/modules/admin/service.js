@@ -218,6 +218,30 @@ export async function listAlerts(now = new Date()) {
   return alerts.sort((x, y) => y.at.getTime() - x.at.getTime());
 }
 
+const settingsShape = (s) => ({
+  minBookingLeadMinutes: s.minBookingLeadMinutes,
+  fallbackFeePctBps: s.fallbackFeePctBps,
+  fallbackFeeFixed: s.fallbackFeeFixed,
+});
+
+/** F14: single seeded row (id=1). Booking + refund code reads it live — no cache to bust. */
+export async function getSettings() {
+  return prisma.settings.findUnique({ where: { id: 1 } });
+}
+
+/** F14.03: every change is an admin-actor audit entry with the before→after diff. */
+export async function updateSettings({ data, actorId }) {
+  const before = await prisma.settings.findUnique({ where: { id: 1 } });
+  const updated = await prisma.settings.update({ where: { id: 1 }, data });
+  await audit.record({
+    eventType: 'settings.updated',
+    actorType: 'admin',
+    actorId,
+    meta: { before: settingsShape(before), after: settingsShape(updated) },
+  });
+  return updated;
+}
+
 /** F13.02: one appointment with its full transition history (audit), prescriptions, email jobs. */
 export async function getRecordDetail(appointmentId) {
   const a = await prisma.appointment.findUnique({
