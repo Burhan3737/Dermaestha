@@ -76,7 +76,7 @@ export async function listRecords({
         patient: { select: { fullName: true, email: true } },
         doctor: { select: { user: { select: { fullName: true } } } },
         payments: {
-          select: { status: true, amount: true, providerRef: true, refundRef: true, refundStatus: true },
+          select: { status: true, amount: true, providerRef: true, refundRef: true },
         },
       },
     }),
@@ -241,7 +241,7 @@ export async function updateSettings({ data, actorId }) {
     actorId,
     meta: { before: settingsShape(before), after: settingsShape(updated) },
   });
-  return updated;
+  return settingsShape(updated);
 }
 
 /** F13.02: one appointment with its full transition history (audit), prescriptions, email jobs. */

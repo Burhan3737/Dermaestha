@@ -13,7 +13,6 @@ export function WeeklyBlocksEditor({ blocks, onChange }) {
   return (
     <div>
       {blocks.map((b, i) => (
-        // eslint-disable-next-line react/no-array-index-key
         <div key={i} className="filters" style={{ marginBottom: 'var(--sp-2)' }}>
           <select
             className="input"

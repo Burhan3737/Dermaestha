@@ -43,7 +43,9 @@ export function AdminAlerts() {
               )}
               {/* No confirm modal here by design (A-03 quick action); the detail view (A-04) is the confirmed path. */}
               <p>
-                {a.targetRef && <Link to={`/admin/records/${a.targetRef}`}>View record</Link>}
+                {a.targetRef && a.kind !== 'system.unhandled_exception' && (
+                  <Link to={`/admin/records/${a.targetRef}`}>View record</Link>
+                )}
                 {(a.failedJobs ?? []).map((j) => (
                   <Button
                     key={j.id}

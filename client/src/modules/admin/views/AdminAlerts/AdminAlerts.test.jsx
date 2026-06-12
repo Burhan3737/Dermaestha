@@ -19,6 +19,7 @@ const ALERTS = {
     },
     { id: 'awaiting_a3', kind: 'awaiting_prescription', at: '2099-01-09T18:00:00Z', targetRef: 'a3', reason: 'No prescription 12h after the consultation with Dr A.' },
     { id: 'e2', kind: 'payment.refund_exhausted', at: '2099-01-09T10:00:00Z', targetRef: 'a2', reason: 'gateway 500' },
+    { id: 'e3', kind: 'system.unhandled_exception', at: '2099-01-08T09:00:00Z', targetRef: '/api/payments/x', reason: 'kaboom' },
   ],
 };
 
@@ -60,6 +61,18 @@ describe('AdminAlerts (A-03)', () => {
     expect(screen.getByText('Awaiting prescription')).toBeTruthy();
     const links = screen.getAllByRole('link', { name: 'View record' });
     expect(links[0].getAttribute('href')).toBe('/admin/records/a1');
+  });
+
+  it('exception alerts show no record link (targetRef is a route path)', async () => {
+    renderView();
+    // Wait for cards to render
+    expect(await screen.findByText('kaboom')).toBeTruthy();
+    // The exception card must have no "View record" link
+    const exceptionCard = screen.getByTestId('e3');
+    expect(within(exceptionCard).queryByRole('link', { name: 'View record' })).toBeNull();
+    // The other three cards (e1, awaiting_a3, e2) each have a targetRef and are not exceptions
+    const links = screen.getAllByRole('link', { name: 'View record' });
+    expect(links).toHaveLength(3);
   });
 
   it('resend appears only on email-failure alerts and POSTs the failed job (F12.02)', async () => {
