@@ -5,13 +5,14 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('api.patch / api.upload (Slice G)', () => {
   it('patch sends a JSON PATCH and returns the parsed body', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => ({ id: 'm1', isActive: false }),
     });
+    vi.stubGlobal('fetch', fetchMock);
     const out = await api.patch('/admin/medicines/m1', { isActive: false });
-    expect(global.fetch).toHaveBeenCalledWith('/api/admin/medicines/m1', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/medicines/m1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: false }),
@@ -20,21 +21,34 @@ describe('api.patch / api.upload (Slice G)', () => {
   });
 
   it('upload POSTs FormData without a JSON content-type and surfaces the error envelope', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 400,
       json: async () => ({ error: { code: 'INVALID_FILE', message: 'Photo must be a JPEG, PNG, or WebP image.' } }),
     });
+    vi.stubGlobal('fetch', fetchMock);
     const fd = new FormData();
     await expect(api.upload('/doctors/d1/photo', fd)).rejects.toMatchObject({
       code: 'INVALID_FILE',
       status: 400,
     });
-    const [url, opts] = global.fetch.mock.calls[0];
+    const [url, opts] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/doctors/d1/photo');
     expect(opts.method).toBe('POST');
     expect(opts.body).toBe(fd);
     expect(opts.headers).toBeUndefined(); // browser sets the multipart boundary itself
+  });
+
+  it('upload returns the parsed body on success', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ photoUrl: '/uploads/doctors/d1.jpg' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const fd = new FormData();
+    const out = await api.upload('/doctors/d1/photo', fd);
+    expect(out).toEqual({ photoUrl: '/uploads/doctors/d1.jpg' });
   });
 });
 
