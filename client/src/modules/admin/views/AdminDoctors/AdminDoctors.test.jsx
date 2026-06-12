@@ -109,4 +109,41 @@ describe('AdminDoctors (A-01)', () => {
     // modal is still open (onSuccess never fired)
     expect(screen.getByRole('dialog')).toBeTruthy();
   });
+
+  it('photo upload failure after create keeps the form open and surfaces the error', async () => {
+    api.post.mockResolvedValue({ id: 'd-new' });
+    api.upload.mockRejectedValue(Object.assign(new Error('Photo too large'), { code: 'INVALID_FILE', status: 400 }));
+    renderView();
+    await screen.findByText('Dr Ayesha Khan');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add doctor' }));
+
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Dr Test' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@x.dev' } });
+    fireEvent.change(screen.getByLabelText('Phone'), { target: { value: '0300' } });
+    fireEvent.change(screen.getByLabelText('PMC number'), { target: { value: 'PMC-9999' } });
+    fireEvent.change(screen.getByLabelText('Specialization'), { target: { value: 'Acne' } });
+    fireEvent.change(screen.getByLabelText('Consultation fee (PKR)'), { target: { value: '2500' } });
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Some bio' } });
+    fireEvent.change(screen.getByLabelText('Initial password'), { target: { value: 'Pass123' } });
+
+    const photoInput = screen.getByLabelText('Profile photo (JPEG/PNG/WebP, max 2MB)');
+    fireEvent.change(photoInput, { target: { files: [new File(['x'], 'p.jpg', { type: 'image/jpeg' })] } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save doctor' }));
+
+    await screen.findByText('Photo too large');
+    expect(screen.getByRole('button', { name: 'Save doctor' })).toBeTruthy();
+  });
+
+  it('switching edit targets shows the new doctor\'s data', async () => {
+    renderView();
+    await screen.findByText('Dr Ayesha Khan');
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    expect(screen.getByLabelText('Full name').value).toBe('Dr Ayesha Khan');
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
+    expect(screen.getByLabelText('Full name').value).toBe('Dr Pending');
+  });
 });

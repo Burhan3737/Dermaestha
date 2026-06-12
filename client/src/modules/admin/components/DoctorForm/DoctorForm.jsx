@@ -90,6 +90,12 @@ export function DoctorForm({ mode, initial = {}, isSaving = false, error = null,
       {photoFile && <p className="help">Selected: {photoFile.name}</p>}
 
       <h3>Weekly availability template</h3>
+      {mode === 'edit' && (
+        <p className="help">
+          Blocks entered here replace the doctor's entire existing weekly template on save.
+          Leave empty to keep the current schedule unchanged.
+        </p>
+      )}
       <WeeklyBlocksEditor blocks={blocks} onChange={setBlocks} />
 
       <div className="modal__actions" style={{ marginTop: 'var(--sp-4)' }}>

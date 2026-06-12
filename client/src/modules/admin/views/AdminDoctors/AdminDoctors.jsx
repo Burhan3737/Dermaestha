@@ -21,11 +21,21 @@ export function AdminDoctors() {
   const [resetting, setResetting] = useState(null); // doctor row or null
   const [newPassword, setNewPassword] = useState('');
   const [editing, setEditing] = useState(null); // null | 'add' | doctor row
+  const [followUpError, setFollowUpError] = useState(null);
+  const [savingFollowUp, setSavingFollowUp] = useState(false);
 
   const afterSave = async (doctorId, blocks, photoFile, isEdit) => {
-    if (isEdit && blocks.length > 0) await saveDoctorBlocks.mutateAsync({ id: doctorId, blocks });
-    if (photoFile) await uploadDoctorPhoto.mutateAsync({ id: doctorId, file: photoFile });
-    setEditing(null);
+    setSavingFollowUp(true);
+    try {
+      if (isEdit && blocks.length > 0) await saveDoctorBlocks.mutateAsync({ id: doctorId, blocks });
+      if (photoFile) await uploadDoctorPhoto.mutateAsync({ id: doctorId, file: photoFile });
+      setFollowUpError(null);
+      setEditing(null);
+    } catch (err) {
+      setFollowUpError(err); // doctor already created/updated — keep the form open and show why
+    } finally {
+      setSavingFollowUp(false);
+    }
   };
 
   const submitForm = (payload, photoFile) => {
@@ -105,12 +115,13 @@ export function AdminDoctors() {
         <div className="section-card">
           <h2>{editing === 'add' ? 'Add doctor' : `Edit ${editing.fullName}`}</h2>
           <DoctorForm
+            key={editing === 'add' ? 'add' : editing.id}
             mode={editing === 'add' ? 'add' : 'edit'}
             initial={editing === 'add' ? {} : editing}
-            isSaving={createDoctor.isPending || updateDoctor.isPending}
-            error={createDoctor.error || updateDoctor.error}
+            isSaving={createDoctor.isPending || updateDoctor.isPending || savingFollowUp}
+            error={createDoctor.error || updateDoctor.error || followUpError}
             onSubmit={submitForm}
-            onCancel={() => setEditing(null)}
+            onCancel={() => { setEditing(null); setFollowUpError(null); }}
           />
         </div>
       )}
