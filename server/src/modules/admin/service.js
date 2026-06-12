@@ -2,6 +2,7 @@
 import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import * as audit from '../../services/audit/audit.service.js';
+import { karachiWallTimeToUtc } from '../../lib/tz/tz.js';
 
 /** Doc-02 F13.01 record row. The settled money figures come from the SUCCESS payment row
  *  (PaymentStatus enum: pending|success|failed — there is no "paid"). */
@@ -23,7 +24,9 @@ const toRecordRow = (a) => {
   };
 };
 
-/** F13.01: unified, filtered, paginated, newest-first. Read-only projection. */
+/** F13.01: unified, filtered, paginated, newest-first. Read-only projection.
+ *  `from`/`to` are "YYYY-MM-DD" Karachi calendar dates (inclusive both ends):
+ *  from maps to start-of-day Karachi (gte), to maps to start-of-next-day Karachi (lt). */
 export async function listRecords({
   page = 1,
   pageSize = 20,
@@ -57,8 +60,8 @@ export async function listRecords({
     ...(from || to
       ? {
           slotStart: {
-            ...(from ? { gte: new Date(from) } : {}),
-            ...(to ? { lte: new Date(to) } : {}),
+            ...(from ? { gte: karachiWallTimeToUtc(from, '00:00') } : {}),
+            ...(to ? { lt: new Date(karachiWallTimeToUtc(to, '00:00').getTime() + 24 * 60 * 60 * 1000) } : {}),
           },
         }
       : {}),

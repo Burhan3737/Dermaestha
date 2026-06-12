@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { karachiWallTimeToUtc } from '../../lib/tz/tz.js';
 
 vi.mock('../../lib/prisma/prisma.js', () => ({
   prisma: {
@@ -86,7 +87,10 @@ describe('admin.listRecords (F13.01)', () => {
       { providerRef: 'pf_ok' },
       { refundRef: 'pf_ok' },
     ]);
-    expect(arg.where.slotStart.gte).toEqual(new Date('2099-01-01'));
+    expect(arg.where.slotStart.gte).toEqual(karachiWallTimeToUtc('2099-01-01', '00:00'));
+    expect(arg.where.slotStart.lt).toEqual(
+      new Date(karachiWallTimeToUtc('2099-02-01', '00:00').getTime() + 24 * 60 * 60 * 1000),
+    );
   });
 });
 
