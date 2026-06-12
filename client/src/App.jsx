@@ -25,7 +25,6 @@ export function AppRoutes() {
       {buildRoutes(session).map((r) => (
         <Route key={r.path} path={r.path} element={r.element} />
       ))}
-      <Route path="/admin" element={<Placeholder label="Admin panel" />} />
       <Route path="*" element={<Placeholder label="Dermestha" />} />
     </Routes>
   );
