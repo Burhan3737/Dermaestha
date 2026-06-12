@@ -1,5 +1,5 @@
 // @ts-check
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
@@ -184,13 +184,20 @@ export function sniffImageExt(buf) {
 
 /** Writes the validated photo to UPLOADS_DIR (server-generated filename — no traversal). */
 export async function saveDoctorPhoto({ id, buffer, actorId }) {
-  const doctor = await prisma.doctor.findUnique({ where: { id }, select: { id: true } });
+  const doctor = await prisma.doctor.findUnique({ where: { id }, select: { id: true, photoUrl: true } });
   if (!doctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
   const ext = sniffImageExt(buffer);
   if (!ext) throw new AppError('INVALID_FILE', 'Photo must be a JPEG, PNG, or WebP image.', 400);
   const dir = path.resolve(env.UPLOADS_DIR, 'doctors');
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, `${id}.${ext}`), buffer);
+  const newFilename = `${id}.${ext}`;
+  if (doctor.photoUrl) {
+    const oldBasename = path.basename(doctor.photoUrl);
+    if (oldBasename !== newFilename) {
+      await unlink(path.join(dir, oldBasename)).catch(() => {});
+    }
+  }
+  await writeFile(path.join(dir, newFilename), buffer);
   const photoUrl = `/uploads/doctors/${id}.${ext}`;
   await prisma.doctor.update({ where: { id }, data: { photoUrl } });
   await audit.record({

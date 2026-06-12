@@ -13,7 +13,7 @@ vi.mock('../../services/audit/audit.service.js', () => ({
 vi.mock('../../lib/password/password.js', () => ({
   hashPassword: vi.fn().mockResolvedValue('hashed-pw'),
 }));
-vi.mock('node:fs/promises', () => ({ mkdir: vi.fn(), writeFile: vi.fn() }));
+vi.mock('node:fs/promises', () => ({ mkdir: vi.fn(), writeFile: vi.fn(), unlink: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('./service.js', () => ({ replaceBlocksForDoctor: vi.fn().mockResolvedValue([]) }));
 
 import { prisma } from '../../lib/prisma/prisma.js';
@@ -21,7 +21,7 @@ import * as audit from '../../services/audit/audit.service.js';
 import { createDoctor, listAllDoctors, updateDoctor, setDoctorActive, resetDoctorPassword, adminReplaceBlocks, saveDoctorPhoto, sniffImageExt } from './admin.service.js';
 import { hashPassword } from '../../lib/password/password.js';
 import { replaceBlocksForDoctor } from './service.js';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, unlink } from 'node:fs/promises';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -245,12 +245,13 @@ describe('sniffImageExt (magic bytes — extension and client MIME are never tru
 
 describe('saveDoctorPhoto (F10.01 photo upload)', () => {
   it('writes uploads/doctors/<id>.<ext>, updates photoUrl, audits', async () => {
-    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1' });
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1', photoUrl: null });
     prisma.doctor.update.mockResolvedValue({ id: 'd1' });
     const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]);
     const out = await saveDoctorPhoto({ id: 'd1', buffer: jpeg, actorId: 'admin1' });
     expect(mkdir).toHaveBeenCalledWith(expect.stringContaining('doctors'), { recursive: true });
     expect(writeFile).toHaveBeenCalledWith(expect.stringContaining('d1.jpg'), jpeg);
+    expect(unlink).not.toHaveBeenCalled();
     expect(prisma.doctor.update).toHaveBeenCalledWith({
       where: { id: 'd1' },
       data: { photoUrl: '/uploads/doctors/d1.jpg' },
@@ -267,5 +268,21 @@ describe('saveDoctorPhoto (F10.01 photo upload)', () => {
       saveDoctorPhoto({ id: 'd1', buffer: Buffer.from('<svg/>'), actorId: 'a' }),
     ).rejects.toMatchObject({ code: 'INVALID_FILE', status: 400 });
     expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  it('unlinks the old photo when extension changes (e.g. png → jpg)', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1', photoUrl: '/uploads/doctors/d1.png' });
+    prisma.doctor.update.mockResolvedValue({ id: 'd1' });
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]);
+    await saveDoctorPhoto({ id: 'd1', buffer: jpeg, actorId: 'admin1' });
+    expect(unlink).toHaveBeenCalledWith(expect.stringContaining('d1.png'));
+    expect(writeFile).toHaveBeenCalledWith(expect.stringContaining('d1.jpg'), jpeg);
+  });
+
+  it('unknown id → 404 NOT_FOUND', async () => {
+    prisma.doctor.findUnique.mockResolvedValue(null);
+    await expect(
+      saveDoctorPhoto({ id: 'missing', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), actorId: 'a' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 });
