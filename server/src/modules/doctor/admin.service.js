@@ -6,7 +6,6 @@ import { AppError } from '../../http/AppError.js';
 import { hashPassword } from '../../lib/password/password.js';
 import { env } from '../../config/env/env.js';
 import * as audit from '../../services/audit/audit.service.js';
-import { replaceBlocksForDoctor } from './service.js';
 
 /** Admin row shape for A-01 (incl. immutable fields, shown read-only in the UI). */
 const toAdminRow = (d) => ({

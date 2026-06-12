@@ -93,6 +93,7 @@ describe('createDoctor (F10.01 / DA1)', () => {
       code: 'PMC_TAKEN',
       status: 409,
     });
+    expect(audit.record).not.toHaveBeenCalled();
   });
 });
 
