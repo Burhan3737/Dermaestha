@@ -13,7 +13,7 @@ export const recordsQuerySchema = z.object({
   appointmentId: z.string().trim().max(64).optional(),
   /** Matches payment providerRef OR refundRef. */
   paymentRef: z.string().trim().max(128).optional(),
-  state: z.string().trim().max(40).optional(),
+  state: z.enum(['slot_locked', 'confirmed', 'in_progress', 'completed', 'prescription_issued', 'cancelled_refunded', 'cancelled_no_refund', 'doctor_cancelled', 'patient_no_show', 'doctor_no_show']).optional(),
   from: isoDate.optional(),
   to: isoDate.optional(),
 });
