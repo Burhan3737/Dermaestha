@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -19,6 +19,21 @@ const ALERTS = {
     },
     { id: 'awaiting_a3', kind: 'awaiting_prescription', at: '2099-01-09T18:00:00Z', targetRef: 'a3', reason: 'No prescription 12h after the consultation with Dr A.' },
     { id: 'e2', kind: 'payment.refund_exhausted', at: '2099-01-09T10:00:00Z', targetRef: 'a2', reason: 'gateway 500' },
+  ],
+};
+
+const TWO_EMAIL_ALERTS = {
+  data: [
+    {
+      id: 'e10', kind: 'email.send_failed_final', at: '2099-01-10T11:00:00Z',
+      reason: 'first failure',
+      failedJobs: [{ id: 'n1', appointmentId: 'a1', type: 'prescription_ready', status: 'failed' }],
+    },
+    {
+      id: 'e20', kind: 'email.send_failed_final', at: '2099-01-10T10:00:00Z',
+      reason: 'second failure',
+      failedJobs: [{ id: 'n2', appointmentId: 'a2', type: 'appointment_confirmed', status: 'failed' }],
+    },
   ],
 };
 
@@ -55,5 +70,31 @@ describe('AdminAlerts (A-03)', () => {
     expect(resend).toHaveLength(1);
     fireEvent.click(resend[0]);
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/emails/n9/resend'));
+  });
+
+  it('only the clicked resend button spins', async () => {
+    api.get.mockResolvedValue(TWO_EMAIL_ALERTS);
+    api.post.mockImplementation(() => new Promise(() => {}));
+    renderView();
+    await screen.findByText('first failure');
+    const buttons = screen.getAllByRole('button', { name: /Resend/ });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[0]);
+    await waitFor(() => expect(buttons[0].disabled).toBe(true));
+    expect(buttons[1].disabled).toBe(false);
+  });
+
+  it('resend failure shows the error inside the affected card', async () => {
+    api.get.mockResolvedValue(TWO_EMAIL_ALERTS);
+    api.post.mockRejectedValue(Object.assign(new Error('No longer failed'), { code: 'INVALID_STATE', status: 409 }));
+    renderView();
+    await screen.findByText('first failure');
+    const buttons = screen.getAllByRole('button', { name: /Resend/ });
+    fireEvent.click(buttons[0]);
+    const errorMsg = await screen.findByText('No longer failed');
+    const firstCard = screen.getByTestId('e10');
+    const secondCard = screen.getByTestId('e20');
+    expect(firstCard.contains(errorMsg)).toBe(true);
+    expect(within(secondCard).queryByText('No longer failed')).toBeNull();
   });
 });
