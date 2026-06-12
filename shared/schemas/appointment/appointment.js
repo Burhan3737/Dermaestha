@@ -24,3 +24,8 @@ export const lockSchema = z
 export const cancelSchema = z.object({
   reason: z.string().min(1).max(500).optional(),
 });
+
+/** POST /api/appointments/:id/dispute (F13.02, admin). One route sets AND clears. */
+export const disputeSchema = z.object({
+  disputed: z.boolean(),
+});

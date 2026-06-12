@@ -36,7 +36,7 @@ import * as notification from '../notification/service.js';
 import * as svc from './service.js';
 
 // Direct (real) handles for functions tested head-on; intra-cluster seams are spied per-suite on `svc`.
-const { listForRole, getForRole, lockSlot, transition, quoteRefund, initiateRefund, cancel, evaluateDueAppointments, retryDueRefunds } =
+const { listForRole, getForRole, lockSlot, transition, quoteRefund, initiateRefund, cancel, evaluateDueAppointments, retryDueRefunds, setDisputed } =
   svc;
 
 // clearAllMocks resets call history but preserves mock IMPLEMENTATIONS, so the cross-module factory
@@ -790,5 +790,38 @@ describe('getForRole subject fields (D-05 header)', () => {
     expect(out.subjectAge).toBe(9);
     expect(out.subjectRelation).toBe('son');
     expect(out.patientName).toBe('Parent P');
+  });
+});
+
+describe('setDisputed (F13.02 / A-04)', () => {
+  it('sets the flag, audits appointment.disputed — NOT a state transition', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'confirmed' });
+    prisma.appointment.update.mockResolvedValue({ id: 'a1', disputed: true });
+    await setDisputed({ appointmentId: 'a1', disputed: true, actorId: 'admin1' });
+    expect(prisma.appointment.update).toHaveBeenCalledWith({
+      where: { id: 'a1' },
+      data: { disputed: true },
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'appointment.disputed',
+        actorType: 'admin',
+        actorId: 'admin1',
+        targetRef: 'a1',
+      }),
+    );
+  });
+
+  it('clearing audits appointment.dispute_cleared; unknown id → 404', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1' });
+    prisma.appointment.update.mockResolvedValue({ id: 'a1', disputed: false });
+    await setDisputed({ appointmentId: 'a1', disputed: false, actorId: 'admin1' });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'appointment.dispute_cleared' }),
+    );
+    prisma.appointment.findUnique.mockResolvedValue(null);
+    await expect(
+      setDisputed({ appointmentId: 'nope', disputed: true, actorId: 'a' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 });
