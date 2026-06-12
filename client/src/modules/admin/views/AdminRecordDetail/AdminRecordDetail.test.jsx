@@ -76,4 +76,26 @@ describe('AdminRecordDetail (A-04 detail)', () => {
       expect(api.post).toHaveBeenCalledWith('/appointments/a1/dispute', { disputed: true }),
     );
   });
+
+  it('resend failure keeps the modal open with the error and the Resend button intact', async () => {
+    api.post.mockRejectedValue(Object.assign(new Error('Email job is no longer in failed state.'), { code: 'INVALID_STATE', status: 409 }));
+    renderView();
+    await screen.findByText('appointment.confirmed');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Resend' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Resend email' }));
+    expect(await screen.findByText('Email job is no longer in failed state.')).toBeTruthy();
+    // modal still open (confirm button still there) and table Resend still present
+    expect(screen.getByRole('button', { name: 'Resend email' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Resend' })).toHaveLength(1);
+  });
+
+  it('clear disputed POSTs disputed:false', async () => {
+    api.get.mockResolvedValue({ ...DETAIL, appointment: { ...DETAIL.appointment, disputed: true } });
+    api.post.mockResolvedValue({ id: 'a1', disputed: false });
+    renderView();
+    await screen.findByText('appointment.confirmed');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear disputed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/appointments/a1/dispute', { disputed: false }));
+  });
 });
