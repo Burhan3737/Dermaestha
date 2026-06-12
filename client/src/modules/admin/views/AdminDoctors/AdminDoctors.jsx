@@ -7,6 +7,7 @@ import { Alert } from '../../../../shared/Alert/Alert.jsx';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
 import { formatPkr } from '../../../../lib/format/format.js';
+import { DoctorForm } from '../../components/DoctorForm/DoctorForm.jsx';
 
 function statusBadge(d) {
   if (d.status === 'pending') return <span className="badge badge--info">Pending</span>;
@@ -15,10 +16,31 @@ function statusBadge(d) {
 }
 
 export function AdminDoctors() {
-  const { doctors, setDoctorActive, resetDoctorPassword } = useAdmin({ doctors: true });
+  const { doctors, setDoctorActive, resetDoctorPassword, createDoctor, updateDoctor, uploadDoctorPhoto, saveDoctorBlocks } = useAdmin({ doctors: true });
   const [deactivating, setDeactivating] = useState(null); // doctor row or null
   const [resetting, setResetting] = useState(null); // doctor row or null
   const [newPassword, setNewPassword] = useState('');
+  const [editing, setEditing] = useState(null); // null | 'add' | doctor row
+
+  const afterSave = async (doctorId, blocks, photoFile, isEdit) => {
+    if (isEdit && blocks.length > 0) await saveDoctorBlocks.mutateAsync({ id: doctorId, blocks });
+    if (photoFile) await uploadDoctorPhoto.mutateAsync({ id: doctorId, file: photoFile });
+    setEditing(null);
+  };
+
+  const submitForm = (payload, photoFile) => {
+    if (editing === 'add') {
+      // blocks travel inside the create body; only the photo needs the follow-up request
+      createDoctor.mutate(payload, {
+        onSuccess: (created) => afterSave(created.id, [], photoFile, false),
+      });
+    } else {
+      const { blocks, ...body } = payload;
+      updateDoctor.mutate({ id: editing.id, ...body }, {
+        onSuccess: () => afterSave(editing.id, blocks, photoFile, true),
+      });
+    }
+  };
 
   const rows = doctors.data?.data ?? [];
 
@@ -39,6 +61,9 @@ export function AdminDoctors() {
       <h1>Doctors</h1>
 
       <div className="section-card">
+        <div className="modal__actions" style={{ justifyContent: 'flex-end' }}>
+          <Button onClick={() => setEditing('add')}>Add doctor</Button>
+        </div>
         {doctors.isLoading && <p>Loading…</p>}
         {doctors.error && <Alert variant="danger">{doctors.error.message}</Alert>}
         {!doctors.isLoading && rows.length === 0 && <p className="empty">No doctors yet.</p>}
@@ -59,6 +84,7 @@ export function AdminDoctors() {
                   <td>{statusBadge(d)}</td>
                   <td>{d.upcomingConfirmedCount}</td>
                   <td>
+                    <Button variant="ghost" onClick={() => setEditing(d)}>Edit</Button>{' '}
                     {d.isActive ? (
                       <Button variant="danger" onClick={() => setDeactivating(d)}>Deactivate</Button>
                     ) : (
@@ -74,6 +100,20 @@ export function AdminDoctors() {
           </table>
         )}
       </div>
+
+      {editing && (
+        <div className="section-card">
+          <h2>{editing === 'add' ? 'Add doctor' : `Edit ${editing.fullName}`}</h2>
+          <DoctorForm
+            mode={editing === 'add' ? 'add' : 'edit'}
+            initial={editing === 'add' ? {} : editing}
+            isSaving={createDoctor.isPending || updateDoctor.isPending}
+            error={createDoctor.error || updateDoctor.error}
+            onSubmit={submitForm}
+            onCancel={() => setEditing(null)}
+          />
+        </div>
+      )}
 
       {deactivating && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
