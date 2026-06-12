@@ -50,6 +50,18 @@ describe('errorHandler', () => {
     expect(res.body.error.code).toBe('INTERNAL');
     expect(res.body.error.message).not.toMatch(/db exploded/);
   });
+  it('maps a ZodError from a different zod instance (shared/ resolves root zod@4) to 400', () => {
+    const res = mockRes();
+    const foreign = Object.assign(new Error('validation'), {
+      name: 'ZodError',
+      issues: [{ path: ['minBookingLeadMinutes'], message: 'Too small' }],
+    });
+    errorHandler(foreign, { path: '/api/admin/settings', method: 'PUT' }, res, () => {});
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_FAILED');
+    expect(res.body.error.details).toEqual({ minBookingLeadMinutes: 'Too small' });
+    expect(audit.record).not.toHaveBeenCalled();
+  });
   it('writes a system.unhandled_exception audit row for non-AppError 500s (F12.01 bridge)', () => {
     const res = mockRes();
     errorHandler(new Error('kaboom'), { path: '/api/payments/x', method: 'POST' }, res, () => {});

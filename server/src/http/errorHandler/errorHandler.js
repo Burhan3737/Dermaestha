@@ -12,7 +12,8 @@ export function errorHandler(err, req, res, _next) {
       .status(err.status)
       .json({ error: { code: err.code, message: err.message, details: err.details } });
   }
-  if (err instanceof ZodError) {
+  // instanceof alone misses ZodErrors from shared/ (root zod@4) — the server pins zod@3; duck-type as fallback.
+  if (err instanceof ZodError || (err?.name === 'ZodError' && Array.isArray(err?.issues))) {
     const details = err.issues.reduce((acc, i) => ({ ...acc, [i.path.join('.')]: i.message }), {});
     return res
       .status(400)
