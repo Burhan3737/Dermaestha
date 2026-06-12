@@ -6,6 +6,7 @@ import { AppError } from '../../http/AppError.js';
 import { hashPassword } from '../../lib/password/password.js';
 import { env } from '../../config/env/env.js';
 import * as audit from '../../services/audit/audit.service.js';
+import { replaceBlocksForDoctor } from './service.js';
 
 /** Admin row shape for A-01 (incl. immutable fields, shown read-only in the UI). */
 const toAdminRow = (d) => ({
@@ -87,4 +88,80 @@ export async function createDoctor({ data, actorId }) {
     targetRef: doctor.id,
   });
   return doctor;
+}
+
+/** F10.02: PATCH editable fields. fullName/phone live on User; the rest on Doctor.
+ *  pmcNumber/email never reach this function (rejected at the route, #8). */
+export async function updateDoctor({ id, data, actorId }) {
+  const doctor = await prisma.doctor.findUnique({ where: { id }, select: { id: true, userId: true } });
+  if (!doctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
+  const { fullName, phone, ...docFields } = data;
+  const userFields = {
+    ...(fullName !== undefined ? { fullName } : {}),
+    ...(phone !== undefined ? { phone } : {}),
+  };
+  await prisma.$transaction(async (tx) => {
+    if (Object.keys(userFields).length) {
+      await tx.user.update({ where: { id: doctor.userId }, data: userFields });
+    }
+    if (Object.keys(docFields).length) {
+      await tx.doctor.update({ where: { id }, data: docFields });
+    }
+  });
+  await audit.record({
+    eventType: 'doctor.updated',
+    actorType: 'admin',
+    actorId,
+    targetRef: id,
+    meta: { fields: Object.keys(data) },
+  });
+}
+
+/** F10.03 / #9: flips listing visibility ONLY — appointments, login, panel access untouched.
+ *  First activation of a `pending` doctor also promotes status to `active` (Pending-State Rule). */
+export async function setDoctorActive({ id, isActive, actorId }) {
+  const doctor = await prisma.doctor.findUnique({ where: { id } });
+  if (!doctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
+  const updated = await prisma.doctor.update({
+    where: { id },
+    data: isActive ? { isActive: true, status: 'active' } : { isActive: false },
+  });
+  await audit.record({
+    eventType: isActive ? 'doctor.reactivated' : 'doctor.deactivated',
+    actorType: 'admin',
+    actorId,
+    targetRef: id,
+  });
+  return updated;
+}
+
+/** DA5: admin-mediated recovery; the doctor must change it on next login (DA3). */
+export async function resetDoctorPassword({ id, newPassword, actorId }) {
+  const doctor = await prisma.doctor.findUnique({ where: { id }, select: { id: true, userId: true } });
+  if (!doctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
+  const passwordHash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: doctor.userId },
+    data: { passwordHash, mustChangePassword: true },
+  });
+  await audit.record({
+    eventType: 'doctor.password_reset',
+    actorType: 'admin',
+    actorId,
+    targetRef: id,
+  });
+}
+
+/** Admin write of the weekly template (F10.01/.02). Same core + guard as the doctor-own path. */
+export async function adminReplaceBlocks({ doctorId, blocks, actorId }) {
+  const doctor = await prisma.doctor.findUnique({ where: { id: doctorId }, select: { id: true } });
+  if (!doctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
+  const result = await replaceBlocksForDoctor(doctorId, blocks);
+  await audit.record({
+    eventType: 'doctor.availability_updated',
+    actorType: 'admin',
+    actorId,
+    targetRef: doctorId,
+  });
+  return result;
 }

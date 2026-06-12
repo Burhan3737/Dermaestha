@@ -18,7 +18,9 @@ vi.mock('./service.js', () => ({ replaceBlocksForDoctor: vi.fn().mockResolvedVal
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as audit from '../../services/audit/audit.service.js';
-import { createDoctor, listAllDoctors } from './admin.service.js';
+import { createDoctor, listAllDoctors, updateDoctor, setDoctorActive, resetDoctorPassword, adminReplaceBlocks } from './admin.service.js';
+import { hashPassword } from '../../lib/password/password.js';
+import { replaceBlocksForDoctor } from './service.js';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -131,5 +133,101 @@ describe('listAllDoctors (A-01)', () => {
     const arg = prisma.doctor.findMany.mock.calls[0][0];
     expect(arg.where).toBeUndefined(); // ALL doctors, not just active
     expect(arg.include._count.select.appointments.where.state).toBe('confirmed');
+  });
+});
+
+describe('updateDoctor (F10.02)', () => {
+  beforeEach(() => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1' });
+  });
+
+  it('splits user fields (fullName/phone) from doctor fields and audits the changed keys', async () => {
+    const tx = {
+      user: { update: vi.fn().mockResolvedValue({}) },
+      doctor: { update: vi.fn().mockResolvedValue({ id: 'd1' }) },
+    };
+    prisma.$transaction.mockImplementation(async (fn) => fn(tx));
+    await updateDoctor({ id: 'd1', data: { fullName: 'Dr Renamed', fee: 300000 }, actorId: 'admin1' });
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { fullName: 'Dr Renamed' },
+    });
+    expect(tx.doctor.update).toHaveBeenCalledWith({ where: { id: 'd1' }, data: { fee: 300000 } });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'doctor.updated',
+        targetRef: 'd1',
+        meta: { fields: ['fullName', 'fee'] },
+      }),
+    );
+  });
+
+  it('unknown id → 404 NOT_FOUND', async () => {
+    prisma.doctor.findUnique.mockResolvedValue(null);
+    await expect(updateDoctor({ id: 'nope', data: { fee: 1 }, actorId: 'a' })).rejects.toMatchObject(
+      { code: 'NOT_FOUND', status: 404 },
+    );
+  });
+});
+
+describe('setDoctorActive (F10.03 / #9)', () => {
+  it('deactivate sets isActive=false ONLY — no cascade fields touched', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1' });
+    prisma.doctor.update.mockResolvedValue({ id: 'd1', isActive: false });
+    await setDoctorActive({ id: 'd1', isActive: false, actorId: 'admin1' });
+    expect(prisma.doctor.update).toHaveBeenCalledWith({
+      where: { id: 'd1' },
+      data: { isActive: false },
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'doctor.deactivated', targetRef: 'd1' }),
+    );
+  });
+
+  it('reactivate restores listing AND promotes a pending doctor to active status', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1', status: 'pending' });
+    prisma.doctor.update.mockResolvedValue({ id: 'd1', isActive: true });
+    await setDoctorActive({ id: 'd1', isActive: true, actorId: 'admin1' });
+    expect(prisma.doctor.update).toHaveBeenCalledWith({
+      where: { id: 'd1' },
+      data: { isActive: true, status: 'active' },
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'doctor.reactivated' }),
+    );
+  });
+});
+
+describe('resetDoctorPassword (DA5)', () => {
+  it('hashes the admin-set password and re-arms mustChangePassword', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1' });
+    prisma.user.update.mockResolvedValue({});
+    await resetDoctorPassword({ id: 'd1', newPassword: 'NewPass123', actorId: 'admin1' });
+    expect(hashPassword).toHaveBeenCalledWith('NewPass123');
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { passwordHash: 'hashed-pw', mustChangePassword: true },
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'doctor.password_reset', targetRef: 'd1' }),
+    );
+  });
+});
+
+describe('adminReplaceBlocks (F10.01/.02 weekly template)', () => {
+  it('delegates to the doctorId-keyed core and audits', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1', userId: 'u1' });
+    await adminReplaceBlocks({ doctorId: 'd1', blocks: [], actorId: 'admin1' });
+    expect(replaceBlocksForDoctor).toHaveBeenCalledWith('d1', []);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'doctor.availability_updated', targetRef: 'd1' }),
+    );
+  });
+
+  it('unknown doctor → 404', async () => {
+    prisma.doctor.findUnique.mockResolvedValue(null);
+    await expect(
+      adminReplaceBlocks({ doctorId: 'nope', blocks: [], actorId: 'a' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 });

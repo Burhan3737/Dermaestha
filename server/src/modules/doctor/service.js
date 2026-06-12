@@ -148,13 +148,12 @@ export async function nextAvailableSlot(doctorId, days = 14) {
   return null;
 }
 
-export async function replaceWeeklyBlocks(userId, blocks) {
-  const doctor = await prisma.doctor.findUnique({ where: { userId } });
-  if (!doctor) throw new AppError('NOT_FOUND', 'Doctor profile not found.', 404);
-
+/** Core block replacement, keyed by doctorId (shared by the doctor-own and admin paths).
+ *  Enforces the BLOCK_HAS_BOOKINGS guard (edge #14) before replacing. */
+export async function replaceBlocksForDoctor(doctorId, blocks) {
   const futureActive = await prisma.appointment.findMany({
     where: {
-      doctorId: doctor.id,
+      doctorId,
       state: { in: ACTIVE_APPOINTMENT_STATES },
       slotStart: { gt: new Date() },
       // Lazy expiry (ADR-23): an expired slot_locked no longer occupies the slot, so it must
@@ -179,10 +178,16 @@ export async function replaceWeeklyBlocks(userId, blocks) {
   }
 
   await prisma.$transaction([
-    prisma.availabilityBlock.deleteMany({ where: { doctorId: doctor.id } }),
+    prisma.availabilityBlock.deleteMany({ where: { doctorId } }),
     prisma.availabilityBlock.createMany({
-      data: blocks.map((b) => ({ doctorId: doctor.id, ...b })),
+      data: blocks.map((b) => ({ doctorId, ...b })),
     }),
   ]);
-  return getWeeklyBlocks(doctor.id);
+  return getWeeklyBlocks(doctorId);
+}
+
+export async function replaceWeeklyBlocks(userId, blocks) {
+  const doctor = await prisma.doctor.findUnique({ where: { userId } });
+  if (!doctor) throw new AppError('NOT_FOUND', 'Doctor profile not found.', 404);
+  return replaceBlocksForDoctor(doctor.id, blocks);
 }
