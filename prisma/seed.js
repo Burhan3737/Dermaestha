@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { hashPassword } from '../server/src/lib/password.js';
+import { hashPassword } from '../server/src/lib/password/password.js';
 
 const prisma = new PrismaClient();
 
@@ -84,6 +84,18 @@ async function main() {
     }
   }
 
-  console.log('Seed complete: settings + medicines + demo doctors.');
+  await prisma.user.upsert({
+    where: { email: 'admin@dermestha.dev' },
+    update: {},
+    create: {
+      role: 'admin',
+      email: 'admin@dermestha.dev',
+      fullName: 'Dermestha Admin',
+      passwordHash,
+      mustChangePassword: false,
+    },
+  });
+
+  console.log('Seed complete: settings + medicines + demo doctors + dev admin.');
 }
 main().finally(() => prisma.$disconnect());
