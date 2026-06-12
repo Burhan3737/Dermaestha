@@ -12,6 +12,7 @@ vi.mock('../../services/audit/audit.service.js', () => ({
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as audit from '../../services/audit/audit.service.js';
 import { list, create, update } from './service.js';
+import { list as listController } from './controller.js';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -107,5 +108,46 @@ describe('medicine.create / update (F11.02/.03)', () => {
   it('a non-P2025 failure propagates instead of masquerading as 404', async () => {
     prisma.medicine.update.mockRejectedValue(Object.assign(new Error('db down'), { code: 'P1001' }));
     await expect(update({ id: 'm1', data: { unitPrice: 1 }, actorId: 'a' })).rejects.toThrow('db down');
+  });
+});
+
+describe('medicine controller — includeInactive admin gate', () => {
+  it('rejects includeInactive=true from non-admin with FORBIDDEN 403', async () => {
+    const req = {
+      query: { includeInactive: 'true' },
+      session: { userId: 'user1', role: 'doctor' },
+    };
+    const res = { json: vi.fn() };
+    const next = vi.fn();
+
+    await listController(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'FORBIDDEN',
+        status: 403,
+      }),
+    );
+    expect(res.json).not.toHaveBeenCalled();
+    expect(prisma.medicine.findMany).not.toHaveBeenCalled();
+  });
+
+  it('admin with includeInactive=true calls service and responds with data', async () => {
+    prisma.medicine.findMany.mockResolvedValue([]);
+    const req = {
+      query: { includeInactive: 'true' },
+      session: { userId: 'admin1', role: 'admin' },
+    };
+    const res = { json: vi.fn() };
+    const next = vi.fn();
+
+    await listController(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ data: [] });
+    expect(prisma.medicine.findMany).toHaveBeenCalledWith({
+      where: {},
+      orderBy: { name: 'asc' },
+    });
   });
 });
