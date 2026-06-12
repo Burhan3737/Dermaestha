@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 process.env.PAYMENT_PROVIDER = 'mock';
 process.env.EMAIL_PROVIDER = 'console';
 process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
@@ -13,12 +13,16 @@ const uniq = (tag) => `sliceg_${tag}_${Date.now()}_${Math.floor(Math.random() * 
 
 describe('admin journey — onboard → DA3 → immutability → deactivate (#9) → settings → records/alerts/resend', () => {
   let adminAgent;
-  let adminEmail, doctorEmail, doctorId, doctorUserId;
+  let adminEmail, adminUserId, doctorEmail, doctorId, doctorUserId;
+  let patientEmail, patientId, apptId;
+  let jobId;
+  let nosyEmail;
+  let originalSettings;
 
   beforeAll(async () => {
     // Dedicated admin (bootstrap-admin pattern; never mutate seeded rows).
     adminEmail = `${uniq('admin')}@test.local`;
-    await prisma.user.create({
+    const adminUser = await prisma.user.create({
       data: {
         role: 'admin',
         email: adminEmail,
@@ -26,11 +30,14 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
         passwordHash: await hashPassword('AdminPass123'),
       },
     });
+    adminUserId = adminUser.id;
     adminAgent = request.agent(app);
     await adminAgent
       .post('/api/auth/login')
       .send({ email: adminEmail, password: 'AdminPass123' })
       .expect(200);
+    const settingsRes = await adminAgent.get('/api/admin/settings');
+    originalSettings = settingsRes.body;
   });
 
   it('onboards a doctor: pending+inactive, hidden from public listing, audit row written', async () => {
@@ -100,7 +107,7 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
     expect(pub.body.data.find((d) => d.id === doctorId)).toBeTruthy();
 
     // A real confirmed future appointment under this doctor.
-    const patientEmail = `${uniq('pat')}@test.local`;
+    patientEmail = `${uniq('pat')}@test.local`;
     const patient = await prisma.user.create({
       data: {
         role: 'patient',
@@ -111,6 +118,7 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
         tosAcceptedAt: new Date(),
       },
     });
+    patientId = patient.id;
     const appt = await prisma.appointment.create({
       data: {
         doctorId,
@@ -121,6 +129,7 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
         feeAtBooking: 250000,
       },
     });
+    apptId = appt.id;
 
     const deact = await adminAgent.post(`/api/doctors/${doctorId}/deactivate`).expect(200);
     expect(deact.body.isActive).toBe(false);
@@ -145,7 +154,6 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
   });
 
   it('settings PUT takes effect and floor-validates (F14)', async () => {
-    const before = await adminAgent.get('/api/admin/settings').expect(200);
     const tooLow = await adminAgent.put('/api/admin/settings').send({
       minBookingLeadMinutes: 15,
       fallbackFeePctBps: 0,
@@ -159,20 +167,15 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
       .expect(200);
     const after = await adminAgent.get('/api/admin/settings').expect(200);
     expect(after.body.minBookingLeadMinutes).toBe(45);
-
-    // restore to keep other suites' lead-time assumptions intact
-    await adminAgent.put('/api/admin/settings').send({
-      minBookingLeadMinutes: before.body.minBookingLeadMinutes,
-      fallbackFeePctBps: before.body.fallbackFeePctBps,
-      fallbackFeeFixed: before.body.fallbackFeeFixed,
-    });
+    // restore is deferred to afterAll so it survives test failures
   });
 
   it('records + audit + alerts + email resend round-trip (F13/F12)', async () => {
     const records = await adminAgent.get('/api/admin/records?doctorName=Slice%20G');
     expect(records.status).toBe(200);
     expect(records.body.data.length).toBeGreaterThanOrEqual(1);
-    const apptId = records.body.data[0].id;
+    // apptId is captured from the 'reactivate' test; confirm it surfaces in records.
+    expect(records.body.data.some((r) => r.id === apptId)).toBe(true);
 
     // dispute toggle is audit-logged and surfaces in the detail
     await adminAgent.post(`/api/appointments/${apptId}/dispute`).send({ disputed: true }).expect(200);
@@ -199,6 +202,7 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
         dedupeKey: uniq('dk'),
       },
     });
+    jobId = job.id;
     await prisma.auditLog.create({
       data: {
         eventType: 'email.send_failed_final',
@@ -224,10 +228,11 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
   });
 
   it('every admin route 403s for a non-admin (DA6)', async () => {
+    nosyEmail = `${uniq('nosy')}@test.local`;
     const stranger = request.agent(app);
     await stranger.post('/api/auth/signup').send({
       fullName: 'Nosy P',
-      email: `${uniq('nosy')}@test.local`,
+      email: nosyEmail,
       phone: '03001234567',
       password: 'password1',
       tosAccepted: true,
@@ -237,5 +242,27 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
     await stranger.get('/api/admin/settings').expect(403);
     await stranger.post('/api/doctors').send({}).expect(403);
     await stranger.get('/api/doctors?includeInactive=true').expect(403);
+  });
+
+  afterAll(async () => {
+    // Restore settings first so it survives any test failure above.
+    if (originalSettings) await adminAgent.put('/api/admin/settings').send(originalSettings);
+    // Delete in FK-safe order, scoped to rows created by this suite.
+    if (jobId) await prisma.notificationJob.deleteMany({ where: { id: jobId } });
+    await prisma.auditLog.deleteMany({
+      where: {
+        OR: [
+          { targetRef: { in: [doctorId, apptId].filter(Boolean) } },
+          { actorId: { in: [adminUserId, doctorUserId, patientId].filter(Boolean) } },
+        ],
+      },
+    });
+    if (apptId) await prisma.appointment.deleteMany({ where: { id: apptId } });
+    if (doctorId) await prisma.availabilityBlock.deleteMany({ where: { doctorId } });
+    if (doctorId) await prisma.doctor.deleteMany({ where: { id: doctorId } });
+    await prisma.user.deleteMany({
+      where: { email: { in: [adminEmail, doctorEmail, patientEmail, nosyEmail].filter(Boolean) } },
+    });
+    await prisma.$disconnect();
   });
 });

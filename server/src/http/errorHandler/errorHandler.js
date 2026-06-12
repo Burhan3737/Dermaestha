@@ -14,7 +14,10 @@ export function errorHandler(err, req, res, _next) {
   }
   // instanceof alone misses ZodErrors from shared/ (root zod@4) — the server pins zod@3; duck-type as fallback.
   if (err instanceof ZodError || (err?.name === 'ZodError' && Array.isArray(err?.issues))) {
-    const details = err.issues.reduce((acc, i) => ({ ...acc, [i.path.join('.')]: i.message }), {});
+    const details = err.issues.reduce(
+      (acc, i) => ({ ...acc, [(i.path ?? []).join('.')]: i.message ?? 'Invalid' }),
+      {},
+    );
     return res
       .status(400)
       .json({ error: { code: 'VALIDATION_FAILED', message: 'Validation failed.', details } });
