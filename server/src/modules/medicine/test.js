@@ -39,6 +39,29 @@ describe('medicine.list (F11.01)', () => {
       orderBy: { name: 'asc' },
     });
   });
+
+  it('includeInactive drops the isActive filter (admin catalogue view, F11.01)', async () => {
+    prisma.medicine.findMany.mockResolvedValue([]);
+    await list({ includeInactive: true });
+    expect(prisma.medicine.findMany).toHaveBeenCalledWith({
+      where: {},
+      orderBy: { name: 'asc' },
+    });
+  });
+
+  it('includeInactive composes with search', async () => {
+    prisma.medicine.findMany.mockResolvedValue([]);
+    await list({ search: 'ada', includeInactive: true });
+    expect(prisma.medicine.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { name: { contains: 'ada', mode: 'insensitive' } },
+          { genericName: { contains: 'ada', mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { name: 'asc' },
+    });
+  });
 });
 
 describe('medicine.create / update (F11.02/.03)', () => {
