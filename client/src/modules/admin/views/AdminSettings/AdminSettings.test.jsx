@@ -50,4 +50,20 @@ describe('AdminSettings (A-05)', () => {
       }),
     );
   });
+
+  it('PUT failure closes the modal and surfaces the error', async () => {
+    api.put.mockRejectedValue(Object.assign(new Error('Validation failed'), { code: 'VALIDATION_FAILED', status: 400 }));
+    renderView();
+    await screen.findByLabelText('Minimum booking lead time (minutes)');
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm save' }));
+    expect(await screen.findByText('Validation failed')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Confirm save' })).toBeNull(); // modal closed
+  });
+
+  it('unseeded settings shows the empty state', async () => {
+    api.get.mockResolvedValue(null);
+    renderView();
+    expect(await screen.findByText(/No settings record found/)).toBeTruthy();
+  });
 });

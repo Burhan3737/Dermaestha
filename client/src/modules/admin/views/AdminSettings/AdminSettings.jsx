@@ -26,15 +26,18 @@ export function AdminSettings() {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const save = () =>
-    saveSettings.mutate(
-      {
-        minBookingLeadMinutes: parseInt(form.minBookingLeadMinutes, 10),
-        fallbackFeePctBps: parseInt(form.fallbackFeePctBps, 10),
-        fallbackFeeFixed: Math.round(parseFloat(form.fallbackFeeFixed) * 100),
-      },
-      { onSuccess: () => setConfirming(false) },
-    );
+  const save = () => {
+    const payload = {
+      minBookingLeadMinutes: parseInt(form.minBookingLeadMinutes, 10),
+      fallbackFeePctBps: parseInt(form.fallbackFeePctBps, 10),
+      fallbackFeeFixed: Math.round(parseFloat(form.fallbackFeeFixed) * 100),
+    };
+    if (Object.values(payload).some(Number.isNaN)) return;
+    saveSettings.mutate(payload, {
+      onSuccess: () => setConfirming(false),
+      onError: () => setConfirming(false),
+    });
+  };
 
   return (
     <SidebarLayout links={ADMIN_LINKS}>
@@ -44,6 +47,10 @@ export function AdminSettings() {
         {settings.isLoading && <p>Loading…</p>}
         {settings.error && <Alert variant="danger">{settings.error.message}</Alert>}
         {saveSettings.error && <Alert variant="danger">{saveSettings.error.message}</Alert>}
+
+        {!settings.isLoading && !settings.error && !form && (
+          <p className="empty">No settings record found. Run the database seed to initialise defaults.</p>
+        )}
 
         {form && (
           <form
