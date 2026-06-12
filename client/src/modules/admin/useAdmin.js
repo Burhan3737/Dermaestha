@@ -12,7 +12,7 @@ const qs = (obj) => {
 
 /**
  * Admin module data/mutations (house pattern: one hook per module, enabled-gated queries).
- * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null, recordDetailId?: string|null }} [opts]
+ * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null, recordDetailId?: string|null, alerts?: boolean }} [opts]
  */
 export function useAdmin(opts = {}) {
   const {
@@ -22,6 +22,7 @@ export function useAdmin(opts = {}) {
     recordsFilters = null,
     auditFilters = null,
     recordDetailId = null,
+    alerts: alertsEnabled = false,
   } = opts;
   const qc = useQueryClient();
 
@@ -87,6 +88,12 @@ export function useAdmin(opts = {}) {
     onSuccess: invalidateDoctors,
   });
 
+  const alerts = useQuery({
+    queryKey: ['admin-alerts'],
+    queryFn: () => api.get('/admin/alerts'),
+    enabled: alertsEnabled,
+  });
+
   const records = useQuery({
     queryKey: ['admin-records', recordsFilters],
     queryFn: () => api.get(`/admin/records${qs(recordsFilters)}`),
@@ -109,6 +116,7 @@ export function useAdmin(opts = {}) {
   const invalidateRecord = () => {
     qc.invalidateQueries({ queryKey: ['admin-record'] });
     qc.invalidateQueries({ queryKey: ['admin-records'] });
+    qc.invalidateQueries({ queryKey: ['admin-alerts'] });
   };
 
   /** Resend a failed notification job. @param {{ jobId: string }} args */
@@ -127,6 +135,7 @@ export function useAdmin(opts = {}) {
     medicines, createMedicine, updateMedicine,
     doctors, createDoctor, updateDoctor, setDoctorActive,
     resetDoctorPassword, uploadDoctorPhoto, saveDoctorBlocks,
+    alerts,
     records, auditEntries,
     recordDetail, resendEmail, setDisputed,
   };
