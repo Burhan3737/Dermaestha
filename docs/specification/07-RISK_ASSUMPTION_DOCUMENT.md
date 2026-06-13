@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------- |
 | Document ID      | `07-RISK_ASSUMPTION_DOCUMENT`                                     |
 | Status           | Canonical                                                         |
-| Version          | 1.3                                                               |
+| Version          | 1.4                                                               |
 | Last updated     | 2026-06-14                                                        |
 | Sources absorbed | `docs/product/PRD.md §5.2, §2.3, §3; server/ + client/ TODO scan` |
 | Related docs     | 01, 02, 08                                                        |
@@ -135,6 +135,8 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
     5. **`.left` timestamp field** — confirm the participant-left payload's timestamp field (the adapter currently falls back to the envelope `event_ts`).
     6. **Webhook registration** — register the webhook with `retryType: 'exponential'` (the default `circuit-breaker` DISABLES the webhook after 3 consecutive failures) via `server/scripts/register-daily-webhook.mjs`, and provide `DAILY_API_KEY` / `DAILY_DOMAIN` / `DAILY_WEBHOOK_SECRET`.
 
+11. **Node ≥22.14.0 required by `@daily-co/daily-js@0.91.0` (Slice H · S3).** The video-UI dependency `@daily-co/daily-js@^0.91.0` (client) declares an engines floor of Node ≥22.14.0; the build environment was on 22.12.0 (an install-time engine **warning** only, not a failure). Follow-up: pin the CI and deploy (Docker) Node version to ≥22.14.0 so the engine constraint is satisfied and never escalates. (The runtime image is currently `node:22-slim` — doc 10 §Dockerfile — which tracks the latest 22.x and already satisfies the floor; the action is to make the pin explicit/verified rather than rely on the tag's current resolution.)
+
 ---
 
 ## Revision footer
@@ -145,3 +147,4 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
 | 2026-06-13 | Added §2.3 Slice G as-built risks (Zod skew, DA5 session invalidation, unsampled exception audit, unindexed audit/slot columns) + open questions 7–8 (settings bootstrap gap, audit-tab filter UI deferral) | Slice G as-built sweep |
 | 2026-06-13 | Added open question 9 — the PayFast Pakistan merchant-verification checklist as a launch gate (signature, CHECKOUT_URL IPN, refund/status APIs, credentials, base URLs, amount unit, browser handoff) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | Added open question 10 — the Daily.co live-delivery launch gate (HMAC signed-string raw-body validation, `GET /v1/rooms/:name` 404 shape, room lifecycle after `exp`, test-ping signing, `.left` timestamp field, webhook `retryType=exponential` registration + `DAILY_API_KEY`/`DAILY_DOMAIN`/`DAILY_WEBHOOK_SECRET`) | Slice H · S2 (Daily.co video adapter; ADR-33) |
+| 2026-06-14 | Added open question 11 — `@daily-co/daily-js@0.91.0` requires Node ≥22.14.0 (build env was 22.12.0, install-time warning only); pin CI/deploy Node accordingly | Slice H · S3 (video consultation UI; ADR-34) |

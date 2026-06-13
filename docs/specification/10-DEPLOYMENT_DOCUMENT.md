@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
 | Status           | Canonical                                                                                               |
-| Version          | 1.5                                                                                                     |
-| Last updated     | 2026-06-13                                                                                              |
+| Version          | 1.6                                                                                                     |
+| Last updated     | 2026-06-14                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
 | Related docs     | 03, 08, 15                                                                                              |
 
@@ -165,6 +165,8 @@ npm run build:client          # produces client/dist/
 #   Sets NODE_ENV=production, EXPOSE 3000
 #   CMD: node server/src/index.js
 ```
+
+> **Node version floor:** the client dependency `@daily-co/daily-js@0.91.0` (video UI, ADR-34) requires **Node ≥22.14.0**. The `node:22-slim` tag tracks the latest 22.x and currently satisfies this, but the version must not be pinned below 22.14.0 in CI or the Dockerfile (doc 07 open-q 11).
 
 **After the image is deployed:**
 
@@ -330,3 +332,4 @@ A formal version scheme and Git tagging convention have not been established. At
 | 2026-06-05 | Added pre-deploy check: `VIDEO_PROVIDER` must not be `mock` in production (§3) | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Re-pointed the refund-exhaustion alert ref to `modules/appointment/service.js`; fixed two deprecated/broken deploy-checklist pointers (`ARCHITECTURE.md §5` -> doc 04 §4b; malformed `doc 15 §CONFIG.md §7` -> doc 15 §7) | Restructure (ADR-26) + deprecated-doc hygiene |
 | 2026-06-13 | Added `dermestha_uploads` app-service volume (§2); added pre-deploy checks for `UPLOADS_DIR` persistence + Settings-singleton (id=1) known gap (§3); made `db:seed` required not optional (§4.1); added uploaded-photo rollback note (§6) | Slice G as-built sweep |
+| 2026-06-14 | Added a Node-version-floor note under the Dockerfile build steps: `@daily-co/daily-js@0.91.0` (video UI) requires Node ≥22.14.0; `node:22-slim` satisfies it but must not be pinned below that (doc 07 open-q 11) | Slice H · S3 (video consultation UI; ADR-34) |

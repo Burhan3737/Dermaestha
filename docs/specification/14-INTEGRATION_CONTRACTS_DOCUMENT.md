@@ -4,7 +4,7 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.8                                |
+| Version          | 1.9                                |
 | Last updated     | 2026-06-14                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
@@ -262,7 +262,7 @@ Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v
 
 ## 6. Analytics event catalog
 
-Ingested at `POST /api/analytics/events` as `{ type, networkType?, meta? }`. `networkType` (e.g. `"3g"`, `"4g"`, `"wifi"`) backs the 3G-success KPI.
+Ingested at `POST /api/analytics/events` as `{ type, networkType, meta }`. `networkType` (e.g. `"3g"`, `"4g"`, `"wifi"`, or `"unknown"`) is a **sibling of `meta`** — the client `lib/analytics/track.js` (ADR-34) attaches it to **every** event from `navigator.connection.effectiveType`; it is never nested inside `meta`. `networkType` backs the 3G-success KPI (#3).
 
 | `type`               | Fired when                            | `meta`                                 |
 | -------------------- | ------------------------------------- | -------------------------------------- |
@@ -270,7 +270,7 @@ Ingested at `POST /api/analytics/events` as `{ type, networkType?, meta? }`. `ne
 | `booking_started`    | patient locks a slot                  | `{ doctorId }`                         |
 | `booking_confirmed`  | `→confirmed`                          | `{ doctorId, fee }`                    |
 | `video_join_attempt` | Join Call clicked                     | `{ appointmentId, role }`              |
-| `video_join_success` | participant token accepted / media up | `{ appointmentId, role, networkType }` |
+| `video_join_success` | Daily `joined-meeting` (media up)     | `{ appointmentId, role }`              |
 
 Keep the catalog closed: adding an event = adding a row here first, so the KPI dashboard and the emitter stay in lockstep (matches the single-source discipline of ARCHITECTURE.md §6b).
 
@@ -301,3 +301,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-12 | Updated the `prescription_ready` trigger (§5) to fire on every prescription submit incl. corrections, with `dedupeKey` = prescription id (vars unchanged) | Slice F (F08): per-prescription enqueue via outbox `dedupe_key` |
 | 2026-06-13 | Added `verifyReturn` to the `PaymentProvider` typedef (§1); added `'manual_required'` to `RefundResult.status` + nullable `refundRef` (§2); rewrote the PayFast IPN-specifics subsection from the South-Africa passphrase model to the **PayFast Pakistan** IPG contract (GetAccessToken→PostTransaction, `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` signature, rupees-decimal wire amounts, dual-channel CHECKOUT_URL + SUCCESS/FAILURE return, ipguat/ipg1 hosts, no refund/status API) marked researched-not-vendor-confirmed and gated by doc 07 §3 (§2) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | Added `verifyWebhook` to the `VideoProvider` typedef + optional `createRoom({ notAfterIso })` + the `NormalizedVideoEvent` typedef (§1); replaced the simplified dev participant shape with Daily's versioned envelope (`payload.owner`, `room`=name, `user_id` role anchor) + documented the raw-body HMAC verification (`X-Webhook-Timestamp`/`X-Webhook-Signature`, base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time) and the live-delivery launch gate → doc 07 (§3); corrected the `daily.mock` note's "not yet wired" opening (the concrete `daily.js` is now wired) | Slice H · S2 (Daily.co video adapter; ADR-33) |
+| 2026-06-14 | §6 analytics catalog: corrected the wire shape to the as-built `{ type, networkType, meta }` (`networkType` is the envelope **sibling** the client `track.js` attaches to every event, ADR-34) and removed `networkType` from the `video_join_success` `meta` cell (it was wrongly nested); aligned the `video_join_success` trigger to the Daily `joined-meeting` event | Slice H · S3 (video UI; ADR-34): fix wrong stated fact in the catalog |

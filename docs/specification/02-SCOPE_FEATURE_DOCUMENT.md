@@ -4,8 +4,8 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.2                                           |
-| Last updated     | 2026-06-13                                    |
+| Version          | 1.3                                           |
+| Last updated     | 2026-06-14                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
 
@@ -144,6 +144,7 @@ One-line: the confirmed appointment progresses through the §4.3 state machine; 
   - If the patient joins before the doctor: waiting screen "Doctor will be with you shortly".
   - **Room-Isolation Rule**: room identity is appointment-scoped — patient and doctor share the same room ID and cannot join the wrong room (§3.4); tokens are time-bound (slot-start − 10 min through slot-end + 5 min).
   - **Hard-Cutoff Rule**: the session has a hard cutoff at slot-end + 5 minutes (room expires); a soft warning is shown to the doctor at 5 minutes remaining.
+  - **KPI #3 telemetry (video-join success by network type)**: the client emits `video_join_attempt` on the "Join Call" click (patient upcoming P9 + doctor today D2) and `video_join_success` on the Daily `joined-meeting` event once media is up (patient video room P5, doctor video room D3), through the fire-and-forget client seam `lib/analytics/track.js` → `POST /api/analytics/events` (doc 14 §6; ADR-34). The emit is best-effort and no-ops until the analytics route ships (S6); `networkType` rides the envelope (sibling of `meta`) and backs the 3G-success KPI.
   - **No-Show Grace Rule (policy #7)**: if neither party has joined by slot-start + 15 minutes, the appointment is marked `patient_no_show` or `doctor_no_show` (whichever absent — see §3 state machine, with doctor-absence precedence).
 - **F05.04 - State machine ownership**: non-payment transitions are driven by the appointment-evaluation worker (`system` actor). See §3.
 
@@ -559,3 +560,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §2.2/§3.3–§3.6/§4/§6 |
 | 2026-06-13 | F10–F14 admin as-built: status/isActive split + mustChangePassword, 409 IMMUTABLE_FIELD, availability route, medicine reactivate + includeInactive (admin), exception→audit bridge, slot-end+12h predicate, email-resend status guard, F13 state/Karachi filters + email jobs + dispute set/clear, lead-time 30–1440, basis-points fees, settings.updated snapshots, 12 new audit event types | Slice G as-built sweep |
 | 2026-06-13 | Added two PayFast-Pakistan alert sources to the F12.01 alert-feed enumeration: `payment.manual_review_required` (no gateway status-query API) + `payment.refund_manual_required` (no gateway refund API) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
+| 2026-06-14 | F05.03: noted the KPI #3 emit points — `video_join_attempt` on the Join Call click (P9 + D2) and `video_join_success` on Daily `joined-meeting` (P5/D3) via the fire-and-forget client `lib/analytics/track.js` seam (doc 14 §6; ADR-34) | Slice H · S3 (video consultation UI; ADR-34) |

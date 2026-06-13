@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.12                          |
+| Version          | 1.13                          |
 | Last updated     | 2026-06-14                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
@@ -237,7 +237,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                | Role       | Purpose                  | Notes                                                          |
 | ---------------------------- | ---------- | ------------------------ | -------------------------------------------------------------- |
-| `POST /api/analytics/events` | public/any | Ingest a telemetry event | `{ type, networkType?, meta? }`; see doc 14 (analytics catalog) |
+| `POST /api/analytics/events` | public/any | Ingest a telemetry event | Route owned/defined by S6 (not yet built). As of Slice H · S3 the **client caller exists**: `lib/analytics/track.js` (ADR-34) POSTs `{ type, networkType, meta }` (`networkType` is a sibling of `meta`) fire-and-forget — it swallows all errors and no-ops cleanly until this route ships. See doc 14 §6 (analytics catalog) |
 
 ---
 
@@ -344,3 +344,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-13 | Slice H · S1: added `POST /api/payments/verify-return` (patient, dual-channel confirm) to F04 and `POST /api/admin/payments/:appointmentId/record-refund` (admin, manual refund → `payment.manual_refund_recorded`); registered the new alert kinds `payment.manual_review_required` + `payment.refund_manual_required` in the `GET /api/admin/alerts` row (now 7 kinds) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-13 | Slice G admin as-built sweep: `GET /api/doctors?includeInactive` admin flat-list branch + `POST /api/doctors` pending-state + `reactivate` status→active; added `PUT /api/doctors/:id/availability` (admin) and `GET /api/admin/records/:id`; renamed email-resend route to `:jobId` (failed-only, 409 `INVALID_STATE`); corrected `GET /api/admin/alerts` to the real 5 kinds; documented records/audit/settings filters + shapes; added 409 `PMC_TAKEN`/`EMAIL_TAKEN`, 400 `INVALID_FILE`, 500 `system.unhandled_exception` audit bridge; medicines `?includeInactive`; `disputed` allowed in ANY state via `POST .../dispute`; §2 `/uploads/doctors/<id>.<ext>` static serve; §6.1 A3/A5 coverage rows | Slice G as-built sweep |
 | 2026-06-14 | `POST /api/webhooks/daily` row (F04) now documents HMAC raw-body signature verification → `401` + `video.webhook_rejected` audit on bad signature; verified joins record `doctorJoinedAt`/`patientJoinedAt` (doc 14 §3) | Slice H · S2 (Daily.co video adapter; ADR-33) |
+| 2026-06-14 | Analytics-events row: noted that the **client caller** now exists (`lib/analytics/track.js`, ADR-34) POSTing `{ type, networkType, meta }` fire-and-forget; the route itself stays owned/defined by S6 (not yet built) | Slice H · S3 (video consultation UI; ADR-34) |

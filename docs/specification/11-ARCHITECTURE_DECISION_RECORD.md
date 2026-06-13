@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.12                                                                                               |
+| Version          | 1.13                                                                                               |
 | Last updated     | 2026-06-14                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -47,6 +47,7 @@
 32. [ADR-31 — Admin email re-trigger via outbox failed→pending reset, no parallel send path](#adr-31--admin-email-re-trigger-via-outbox-failedpending-reset-no-parallel-send-path)
 33. [ADR-32 — PayFast Pakistan adapter: dual-channel confirmation + manual refund/reconcile fallback + researched-API risk](#adr-32--payfast-pakistan-adapter-dual-channel-confirmation--manual-refundreconcile-fallback--researched-api-risk)
 34. [ADR-33 — Daily.co video adapter: verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC, webhook `retryType=exponential`](#adr-33--dailyco-video-adapter-verifynormalize-in-the-adapter-role-via-meeting-token-user_id-raw-body-hmac-webhook-retrytypeexponential)
+35. [ADR-34 — Video UI: Daily Prebuilt iframe (lazy-loaded, brand-themed) + app chrome, get-ready screen, shared role-aware VideoRoom, fire-and-forget KPI telemetry](#adr-34--video-ui-daily-prebuilt-iframe-lazy-loaded-brand-themed--app-chrome-get-ready-screen-shared-role-aware-videoroom-fire-and-forget-kpi-telemetry)
 
 ---
 
@@ -486,6 +487,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-34 — Video UI: Daily Prebuilt iframe (lazy-loaded, brand-themed) + app chrome, get-ready screen, shared role-aware VideoRoom, fire-and-forget KPI telemetry
+
+**Date:** 2026-06-14
+
+**Status:** Accepted
+
+**Context:** Slice H · S3 builds the patient/doctor video consultation UI (P-11, P-12, D-04) on top of the now-concrete Daily adapter (ADR-33). ADR-24 had anticipated "the client Daily SDK on P-12" as the real-Daily swap; the placeholder chrome shipped in Slice D was app-rendered tiles/controls with NO video SDK. Three UI decisions had to be settled. (1) **In-call surface:** build custom in-call tiles/controls/device pickers, or embed Daily's hosted UI. Hand-building the call surface (grid, mute/camera toggles, device pickers, reconnection, 3G adaptation) duplicates exactly what the vendor already ships and is the highest-risk, lowest-differentiation UI in the app. (2) **Device check (P-11):** the approved mockup showed an app-managed camera-preview pane on the get-ready screen; Daily Prebuilt has its own prejoin screen that owns camera/mic selection and preview. (3) **KPI #3 telemetry** (join-attempt → join-success) needs a client emit seam, but S6 owns the `POST /api/analytics/events` route — the UI must not block on it.
+
+**Decision:** (1) **Daily Prebuilt iframe + app chrome.** `useDailyCall` (`client/src/modules/video/useDailyCall.js`) lazy-imports `@daily-co/daily-js` (dynamic `import()`, mirroring the ADR-09 pdf-lib boundary so the SDK never enters the main bundle), calls `DailyIframe.createFrame` into a container ref with a brand `theme` object + `showLeaveButton`, and `frame.join({ url, token })`. Daily owns the in-call tiles, controls, device pickers, reconnection, and 3G adaptation; the app owns only the surrounding chrome (countdown timer, doctor "5 minutes remaining" warning, hard slot-end+5m cutoff, leave). (2) **P-11 is a get-ready screen with NO app-managed preview pane** — Daily's prejoin owns the device check (approved minor deviation from the mockup, recorded in doc 06). It is a distinct route (`/video/:id/ready` → `WaitingRoom`) with the 10-min Join gate; the patient Join Call CTA (P-08 Upcoming + the doctor today list) routes through `/ready` and emits `video_join_attempt`. (3) **One shared role-aware `VideoRoom`** serves both P-12 (patient) and D-04 (doctor) at `/video/:id` — role comes from the session; the separate screen IDs are retained in doc 06. (4) **Fire-and-forget KPI telemetry** via a new client `lib/analytics/track.js`: `track(type, meta)` POSTs `{ type, networkType, meta }` to `/api/analytics/events` and swallows all errors (`.catch(() => {})`), so it no-ops cleanly until S6 ships the route. `video_join_attempt` is emitted on the Join click (patient P-08 + doctor today list); `video_join_success` is emitted from the Daily `joined-meeting` event in `useDailyCall`. The existing Slice D mock path (`joinSimUrl`) is retained for offline/CI; the real Daily iframe mounts only when no `joinSimUrl` is present and the room is open.
+
+**Consequences:** The highest-risk in-call UI is delegated to the vendor that already solves it (reconnection, device handling, 3G), and the SDK stays out of the main bundle via lazy import — consistent with the KPI #8 bundle discipline (ADR-09). The mockup's P-11 preview pane is intentionally not built because the Daily prejoin supplies the equivalent device check; this is the one approved deviation. A single `VideoRoom` removes duplicate patient/doctor call code while preserving the doc 06 screen IDs for traceability. The `track.js` seam decouples the UI from S6: KPI emits are best-effort and never surface an error to the user, and the analytics route stays owned/defined by S6 (doc 05 records only the client caller). Standing constraint: `@daily-co/daily-js@0.91.0` requires Node ≥22.14.0 (doc 07 follow-up) — CI/deploy Node must be pinned accordingly.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -503,3 +518,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-13 | Added ADR-29 (doctor photos on local Docker volume), ADR-30 (F12 alerts as live audit-row query, no alerts table), ADR-31 (admin email re-trigger via outbox failed→pending reset) | Slice G as-built sweep |
 | 2026-06-13 | Added ADR-32 (PayFast Pakistan adapter: dual-channel `verifyWebhook`/`verifyReturn` confirmation, manual refund/reconcile fallback with `manual_required`/`manual_review_required`/`manual_refund_recorded`, researched-not-confirmed gated by doc 07 §3) | Slice H · S1 (PayFast Pakistan adapter); new architectural decision |
 | 2026-06-14 | Added ADR-33 (Daily.co video adapter: `verifyWebhook` verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC over `DAILY_WEBHOOK_SECRET`, webhook `retryType=exponential`; supersedes ADR-24's role-inference follow-up — dev `user_name` hack removed from prod; live-delivery gated by doc 07 §10) | Slice H · S2 (Daily.co video adapter); new architectural decision |
+| 2026-06-14 | Added ADR-34 (Video UI: lazy-loaded brand-themed Daily Prebuilt iframe + app chrome; P-11 get-ready screen with no app preview pane — Daily prejoin owns device check; one shared role-aware `VideoRoom` for P-12/D-04; fire-and-forget client `track.js` KPI #3 seam) | Slice H · S3 (video consultation UI); new architectural decision |

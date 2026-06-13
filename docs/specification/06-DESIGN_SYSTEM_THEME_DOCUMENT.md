@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.3                                                                                       |
-| Last updated     | 2026-06-13                                                                                |
+| Version          | 1.4                                                                                       |
+| Last updated     | 2026-06-14                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -185,9 +185,13 @@ Returned as finished centered cards (~520 px, icon circle + title + body + singl
 
 "Join Call" button is disabled until 10 minutes before the appointment slot.
 
+### Pre-call get-ready room (P-11)
+
+P-11 is a **get-ready** screen: doctor/slot context, a lighting prompt, a "Doctor will be with you shortly" status, and the Join gate (active 10 min before slot). It has **no app-managed camera-preview pane** — the device check (camera/mic selection + preview) is owned by Daily Prebuilt's own prejoin screen shown on entering the room. This is an **approved minor deviation** from the mockup, which showed an in-app preview pane (ADR-34).
+
 ### Video slot timer and cutoff (P-12 / D-04)
 
-A slot timer is visible throughout the call. A soft "5 minutes remaining" warning appears on the doctor's view. The hard cutoff is slot-end + 5 minutes.
+P-12 (patient) and D-04 (doctor) are served by **one shared, role-aware `VideoRoom`** (role comes from the session); the separate screen IDs are retained for traceability. The in-call surface is a brand-themed **Daily Prebuilt iframe** (Daily owns the tiles, controls, and device pickers); the app renders only the surrounding chrome. A slot timer is visible throughout the call. A soft "5 minutes remaining" warning appears on the doctor's view. The hard cutoff is slot-end + 5 minutes.
 
 ### Prescription immutability (D-05)
 
@@ -565,3 +569,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-11 | Repointed the type-scale `DESIGN.md §2.2` ref into this document (DESIGN.md deprecated-by-policy) | Deprecated-doc hygiene |
 | 2026-06-13 | Corrected admin sidebar order/labels (Records & audit before System health; A-03 = "System health"); added `/admin`→`/admin/doctors` default route, Pagination component + building block, `formatKarachiTable` utility, A-05 settings-save confirm gate, A-01 photo-upload interaction + inventory note, and the modal `role="dialog"`/no-focus-trap convention | Slice G as-built sweep |
 | 2026-06-13 | Added a canonical screen-ID registry note under the §2 inventory: the 24 rows are authoritative, and the patient bottom-nav Profile destination is intentionally not a dedicated v1 screen (no `P-NN` ID; account management deferred to v1.1+) | doc-06/doc-13 screen-ID reconciliation |
+| 2026-06-14 | Added a "Pre-call get-ready room (P-11)" note — P-11 has no app-managed camera-preview pane (Daily prejoin owns the device check; approved minor deviation from the mockup) — and noted that P-12 + D-04 are served by one shared role-aware `VideoRoom` (separate screen IDs retained) rendering a brand-themed Daily Prebuilt iframe | Slice H · S3 (video consultation UI; ADR-34) |

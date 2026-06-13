@@ -104,6 +104,26 @@ Lead Opus subagent: plan (`docs/superpowers/plans/2026-06-13-slice-h-s2-dailyco-
 
 **Verification (controller-independent):** `npm test` → 37 files / **287 passed** (267→+20); `npm --workspace client test` → 30 / **97 passed** (a first client run errored transiently under heavy machine load — re-run clean). No forbidden paths in branch diff. Merged `--no-ff` (`f6d3bd5`).
 
+## S3 — Video consultation UI (IMPLEMENTED + MERGED to main, merge `1ea70ac`, 2026-06-14)
+
+Lead Opus subagent: plan (`docs/superpowers/plans/2026-06-13-slice-h-s3-video-consultation-ui.md`) + implemented via TDD subagents on `feature/slice-h-s3-video-ui` (7 commits `414e374`→`394a4d3`). Controller verified + merged.
+
+**Code files (subagent report, captured):**
+- `client/src/lib/analytics/track.js` (C) + `.test.js` (C) — fire-and-forget `track(type, meta)` → `api.post('/analytics/events', {type,networkType,meta})` `.catch(()=>{})`. **S3-owned KPI seam reused by S4/S6.**
+- `client/src/modules/video/useDailyCall.js` (C) + `.test.jsx` (C) — lazy `import('@daily-co/daily-js')`, themed `createFrame`+`join`, `joined-meeting`→`video_join_success`, cleanup/`destroy`.
+- `client/src/modules/video/views/WaitingRoom/` (C, +test) — P-11 get-ready (`/video/:id/ready`), 10-min-gated Join → `/video/:id`. `views/VideoRoom/VideoRoom.jsx` (M, +test) — folds in `useDailyCall` on the real path (`joinSimUrl===null`), retains mock placeholder + dev sim, removed dead Mic/Cam. `video.routes.jsx` (M) — +ready route.
+- `client/src/modules/appointment/views/Upcoming/` (M, +test) — P-08 Join → ready + `video_join_attempt`. `client/src/modules/doctor/views/DoctorToday/` (M, +test) — D-02 Join → ready + emit.
+- `client/package.json` + `package-lock.json` (M) — `@daily-co/daily-js ^0.91.0` (lazy-chunked). Plan doc (C).
+
+**Decisions / findings:**
+- `apiClient` already prepends `/api` → `track.js` posts to `'/analytics/events'` (resolves to `POST /api/analytics/events`); spec prose §4 showing `/api/analytics/events` would double-prefix — clarification for docs 05/14.
+- **D-02 (`DoctorToday`) was already substantially built** (today's list, 10-min Join gate, awaiting-Rx badge, write-Rx action, History, `DoctorCancelModal` wired) — S3's delta was only the ready-route redirect + emit. The S3 spec overstated D-02 as net-new (doc 13 understated as-built). Reconcile doc 13.
+- `video_join_success` fires only on real Daily `joined-meeting` (not the mock/CI path), matching design. P-11 uses `PatientLayout` for both roles (doctor-specific layout = follow-up, out of scope).
+- **Node engine:** `@daily-co/daily-js@0.91.0` wants Node ≥22.14.0; build env is 22.12.0 — warning only (install/tests/build all pass); flag for CI/deploy Node pinning (doc 07/10 follow-up).
+- Test-harness fixes (test-file-only): `vi.hoisted` for the Daily mock factory; `api.post.mockResolvedValue(undefined)` for mock-mode — production code unchanged.
+
+**Verification (controller-independent):** `npm --workspace client test` → 33 files / **112 passed** (97→+15); `npm test` → **287 passed** (server untouched by S3); `npm --workspace client run build` → success, `daily-esm-*.js` (260 kB) is a SEPARATE chunk (main bundle not bloated). No forbidden paths. Merged `--no-ff` (`1ea70ac`).
+
 ## Open items / next session
 - Then S2 → S3 → S4 → S5 → S6 via the same loop.
 - Tracked spec-doc impact per slice lives in each spec's §"Spec-doc impact" table (applied at each slice's merge, by the controller).
