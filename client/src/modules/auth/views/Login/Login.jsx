@@ -7,7 +7,7 @@ import { Field } from '../../../../shared/Field/Field.jsx';
 import { Button } from '../../../../shared/Button/Button.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
 
-const DASHBOARD = { patient: '/', doctor: '/doctor', admin: '/admin' };
+const DASHBOARD = { patient: '/browse', doctor: '/doctor', admin: '/admin' };
 
 export function Login() {
   const { login } = useAuth();
