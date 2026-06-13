@@ -159,6 +159,9 @@ const ALERT_EVENT_TYPES = [
   'payment.refund_exhausted',
   'email.send_failed_final',
   'system.unhandled_exception',
+  // Slice H S1: PayFast PK manual-intervention alerts (no gateway status/refund API).
+  'payment.manual_review_required',
+  'payment.refund_manual_required',
 ];
 const AWAITING_PRESCRIPTION_HOURS = 12;
 

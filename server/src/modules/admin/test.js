@@ -341,13 +341,15 @@ describe('admin.listAlerts (F12.01 — five sources, no dedicated table)', () =>
     expect(apptArg.where.prescriptions).toEqual({ none: {} });
     expect(apptArg.where.slotEnd.lte).toEqual(new Date('2099-01-10T00:00:00Z')); // NOW − 12h
     expect(apptArg.take).toBe(100);
-    // the audit-source list covers all four eventTypes
+    // the audit-source list covers all six eventTypes (including Slice H S1 manual-intervention types)
     const auditArg = prisma.auditLog.findMany.mock.calls[0][0];
     expect(auditArg.where.eventType.in).toEqual([
       'payment.reconciliation_mismatch',
       'payment.refund_exhausted',
       'email.send_failed_final',
       'system.unhandled_exception',
+      'payment.manual_review_required',
+      'payment.refund_manual_required',
     ]);
   });
 });
