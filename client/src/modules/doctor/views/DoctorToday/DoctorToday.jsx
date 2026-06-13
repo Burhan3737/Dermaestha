@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.jsx';
 import { formatKarachi } from '../../../../lib/format/format.js';
 import { DoctorCancelModal } from '../../../appointment/components/DoctorCancelModal/DoctorCancelModal.jsx';
+import { track } from '../../../../lib/analytics/track.js';
 import { useDoctor } from '../../useDoctor.js';
 
 const karachiDay = (iso) =>
@@ -53,7 +54,11 @@ export function DoctorToday() {
               {!a.forSelf && <div>for: {a.subjectName}</div>}
               {tab === 'today' &&
                 (active ? (
-                  <Link className="btn btn--secondary" to={`/video/${a.id}`}>
+                  <Link
+                    className="btn btn--secondary"
+                    to={`/video/${a.id}/ready`}
+                    onClick={() => track('video_join_attempt', { appointmentId: a.id, role: 'doctor' })}
+                  >
                     Join Call
                   </Link>
                 ) : (
