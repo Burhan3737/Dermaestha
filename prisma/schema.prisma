@@ -68,6 +68,7 @@ enum RefundStatus {
   retrying
   settled
   failed
+  manual_required
 }
 
 enum AuditActorType {
