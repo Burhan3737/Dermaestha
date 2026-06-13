@@ -7,8 +7,12 @@
   },
   "workspaces": [
     "server",
-    "client"
+    "client",
+    "shared"
   ],
+  "overrides": {
+    "zod": "^3.23.0"
+  },
   "scripts": {
     "dev:server": "node --watch server/src/index.js",
     "dev:client": "npm --workspace client run dev",
