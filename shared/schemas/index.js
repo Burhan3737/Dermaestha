@@ -6,3 +6,4 @@ export * from './appointment/appointment.js';
 export * from './medicine/medicine.js';
 export * from './prescription/prescription.js';
 export * from './admin/admin.js';
+export * from './analytics/analytics.js';
