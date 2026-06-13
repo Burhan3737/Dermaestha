@@ -23,4 +23,27 @@ describe('daily.mock VideoProvider', () => {
     const decoded = Buffer.from(t.token, 'base64url').toString('utf8');
     expect(decoded).toContain('appt_appt123|patient|2026-06-04T10:00:00.000Z');
   });
+
+  it('verifyWebhook normalizes the unsigned dev-simulator shape (role from user_name)', () => {
+    const evt = dailyMock.verifyWebhook({
+      body: { type: 'participant.joined', room: 'appt_a1', user_name: 'doctor', timestamp: '2026-06-04T10:00:00.000Z' },
+    });
+    expect(evt).toMatchObject({
+      type: 'participant.joined',
+      appointmentId: 'a1',
+      role: 'doctor',
+      timestamp: '2026-06-04T10:00:00.000Z',
+    });
+  });
+
+  it('verifyWebhook maps a non-doctor user_name to patient', () => {
+    const evt = dailyMock.verifyWebhook({
+      body: { type: 'participant.joined', room: 'appt_a1', user_name: 'patient', timestamp: 't' },
+    });
+    expect(evt.role).toBe('patient');
+  });
+
+  it('verifyWebhook returns null for an empty/unknown body', () => {
+    expect(dailyMock.verifyWebhook({ body: {} })).toBeNull();
+  });
 });

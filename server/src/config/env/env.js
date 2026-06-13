@@ -18,6 +18,9 @@ const schema = z.object({
   EMAIL_PROVIDER: z.enum(['stub', 'console', 'resend']).default('stub'),
   DAILY_API_KEY: z.string().optional(),
   DAILY_DOMAIN: z.string().optional(),
+  // Daily webhook HMAC secret (the `hmac` returned by POST /v1/webhooks). Base64; optional until
+  // the webhook is registered. See server/scripts/register-daily-webhook.mjs.
+  DAILY_WEBHOOK_SECRET: z.string().optional(),
   VIDEO_PROVIDER: z.enum(['stub', 'mock', 'daily']).default('stub'),
   VIDEO_MOCK_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),

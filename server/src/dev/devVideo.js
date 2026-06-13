@@ -3,6 +3,7 @@ import { Router } from 'express';
 import express from 'express';
 import * as videoService from '../modules/video/service.js';
 import * as evaluation from '../modules/appointment/service.js';
+import { videoProvider } from '../integrations/video/index.js';
 
 /** Dev-only video + worker simulation. Mounted ONLY when VIDEO_PROVIDER=mock. */
 export const devVideoRouter = Router();
@@ -27,12 +28,15 @@ devVideoRouter.post(
   express.urlencoded({ extended: false }),
   async (req, res, next) => {
     try {
-      await videoService.recordJoinFromDailyEvent({
-        type: 'participant.joined',
-        room: req.body.room,
-        user_name: req.body.user_name,
-        timestamp: new Date().toISOString(),
+      const evt = videoProvider.verifyWebhook({
+        body: {
+          type: 'participant.joined',
+          room: req.body.room,
+          user_name: req.body.user_name,
+          timestamp: new Date().toISOString(),
+        },
       });
+      if (evt) await videoService.recordJoinFromDailyEvent(evt);
       res.json({ ok: true });
     } catch (e) {
       next(e);
@@ -44,12 +48,15 @@ devVideoRouter.post(
 devVideoRouter.post('/video/join', express.json(), async (req, res, next) => {
   try {
     const role = req.session?.role === 'doctor' ? 'doctor' : 'patient';
-    await videoService.recordJoinFromDailyEvent({
-      type: 'participant.joined',
-      room: `appt_${req.body.appointmentId}`,
-      user_name: role,
-      timestamp: new Date().toISOString(),
+    const evt = videoProvider.verifyWebhook({
+      body: {
+        type: 'participant.joined',
+        room: `appt_${req.body.appointmentId}`,
+        user_name: role,
+        timestamp: new Date().toISOString(),
+      },
     });
+    if (evt) await videoService.recordJoinFromDailyEvent(evt);
     res.json({ ok: true });
   } catch (e) {
     next(e);

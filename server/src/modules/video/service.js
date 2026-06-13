@@ -56,23 +56,22 @@ export async function issueAppointmentToken({ id, role, userId, now = new Date()
   };
 }
 
-/** Maps a documented Daily participant.joined event to the join column (first-join wins). */
-export async function recordJoinFromDailyEvent({ type, room, user_name, timestamp }) {
+/**
+ * Records a NORMALIZED Daily participant.joined event to the join column (first-join wins).
+ * Verification + role normalization happen in the adapter's verifyWebhook (doc 14 §1); this
+ * function no longer strips 'appt_' or infers role from user_name (ADR-24 hack removed).
+ * @param {import('../../integrations/video/index.js').NormalizedVideoEvent} evt
+ */
+export async function recordJoinFromDailyEvent({ type, appointmentId, role, timestamp }) {
   if (type !== 'participant.joined') return;
-  const id = String(room || '').replace(/^appt_/, '');
-  if (!id) return;
-  const a = await prisma.appointment.findUnique({ where: { id } });
+  if (!appointmentId || !role) return;
+  const a = await prisma.appointment.findUnique({ where: { id: appointmentId } });
   if (!a) return;
-  // DEV/MOCK ONLY: role is inferred from the literal user_name ('doctor'/'patient') the dev
-  // simulator sends. The real Daily adapter must NOT rely on this — Daily echoes the participant's
-  // display name (e.g. "Sara Khan"), so the real swap must map role from is_owner / a stable
-  // participant id, not a substring match. (See ADR-24 follow-up.)
-  const role = String(user_name).toLowerCase().includes('doctor') ? 'doctor' : 'patient';
   const field = role === 'doctor' ? 'doctorJoinedAt' : 'patientJoinedAt';
   if (a[field]) return; // first-join wins
   // Prefer the event's own timestamp (a delayed webhook must not record server-receipt time).
   await prisma.appointment.update({
-    where: { id },
+    where: { id: appointmentId },
     data: { [field]: timestamp ? new Date(timestamp) : new Date() },
   });
 }

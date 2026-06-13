@@ -18,7 +18,13 @@ export function createApp() {
   // Behind a TLS-terminating proxy in prod (Railway/PaaS): required so express-session sets the
   // Secure cookie and express-rate-limit keys on the real client IP, not the proxy.
   app.set('trust proxy', 1);
-  app.use(express.json());
+  // Global JSON body parser, EXCEPT the Daily webhook — that route mounts its own
+  // express.json({ verify }) to capture req.rawBody for byte-correct HMAC (express.json is
+  // idempotent, so a second parser behind this one would never run its verify callback).
+  app.use((req, res, next) => {
+    if (req.path === '/api/webhooks/daily') return next();
+    return express.json()(req, res, next);
+  });
   app.use(sessionMiddleware);
 
   // All /api + /dev routes (see routes.js).
