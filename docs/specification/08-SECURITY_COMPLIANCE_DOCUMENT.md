@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.8                                                                                                     |
+| Version          | 1.9                                                                                                     |
 | Last updated     | 2026-06-14                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
@@ -258,7 +258,7 @@ DRAP (Drug Regulatory Authority of Pakistan) and PMDC/PMC regulatory compliance 
 
 ### 4.2 Patient consent
 
-Consent to the Terms of Service and Privacy Policy is captured at patient sign-up via a mandatory checkbox (P2). Acceptance is recorded on the `users` record as `tos_accepted_at` with timestamp. The `/legal/terms` and `/legal/privacy` page contents are M4 deliverables (PRD §5.1).
+Consent to the Terms of Service and Privacy Policy is captured at patient sign-up via a mandatory checkbox (P2). Acceptance is recorded on the `users` record as `tos_accepted_at` with timestamp. The `/legal/terms` and `/legal/privacy` pages are built (Slice H · S4) as public/unauthenticated, banner-marked **DRAFT** content pending legal review (ADR-35); the **Privacy page cross-references this document's §2 data-handling policies** for how patient and health information is classified, minimized, retained, and access-controlled. Final lawyer-reviewed copy replacing the DRAFT is a pre-launch gate (doc 13).
 
 Policy versioning and re-prompting users on policy updates are **deferred to v1.1** (PRD §2.3). v1 records a single acceptance at sign-up only.
 
@@ -285,3 +285,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | 2026-06-13 | Relaxed A01/§3.1 RBAC wording to allow supplemental param-level authz (`includeInactive`); corrected A09 A3-exception source to `system.unhandled_exception` audit rows (not the DSN); added Admin-writes rate-limit row (§A07); expanded photo-upload control (§2.2 magic-byte sniff/SVG/server-named/unlink/2MB); added DA5 session-revocation known gap (§A07) | Slice G as-built sweep |
 | 2026-06-13 | A08: noted PayFast **Pakistan** has no refund/status-query API → admin out-of-band record-refund is the primary refund path (idempotency-key-safe) and reconciliation surfaces stuck payments for manual review (`payment.manual_review_required`; ADR-32) | Slice H · S1 (PayFast Pakistan adapter) |
 | 2026-06-14 | A08: added Daily webhook signature-verification control — `POST /api/webhooks/daily` is HMAC-SHA256 verified over the raw body (base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time); bad signature → `401` + `video.webhook_rejected` audit (doc 14 §3; ADR-33) | Slice H · S2 (Daily.co video adapter) |
+| 2026-06-14 | §4.2: noted the public/unauthenticated `/legal/terms`,`/legal/privacy` pages are built as banner-marked DRAFT pending legal review, and that the Privacy page cross-references this document's §2 data-handling policies (final copy = pre-launch gate; ADR-35) | Slice H · S4 (public surface — landing + legal) |

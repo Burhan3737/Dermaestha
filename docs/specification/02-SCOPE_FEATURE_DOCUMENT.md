@@ -4,7 +4,7 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.3                                           |
+| Version          | 1.4                                           |
 | Last updated     | 2026-06-14                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
@@ -107,6 +107,7 @@ One-line: patient picks a future 30-minute slot within a doctor's availability, 
   - **No-Overlap Rule**: a patient cannot book overlapping slots with the same or different doctors.
   - **Double-Booking Rule (#1)**: slot double-booking is impossible at the storage layer; a second attempt to book the same `(doctor, slot-time)` fails at write time (§3.3 #1).
   - On confirm, the patient is redirected to the payment aggregator's hosted page (F04).
+  - **KPI #1 telemetry (landing → booking conversion funnel)**: the client emits `landing_view` on the public landing (P-01) mount (`{ referrer? }`) and `booking_started` on a successful slot-lock (`{ doctorId }`), through the fire-and-forget client seam `lib/analytics/track.js` → `POST /api/analytics/events` (doc 14 §6; ADR-35). The emit is best-effort and no-ops until the analytics route ships (S6). The funnel's terminal `booking_confirmed` event is emitted server-side post-confirmation and remains S6.
 
 Uses the shared `Button`, `Card`, confirmation `Modal`, and slot-grid components (doc 06).
 
@@ -341,7 +342,7 @@ One-line: minimal shared-login auth for doctors and admin with admin-set initial
 
 One-line: hosted Terms of Service and Privacy Policy pages linked from sign-up; acceptance captured at sign-up.
 
-- **F16.01 - Legal pages**: `/legal/terms` and `/legal/privacy` page contents (M4 deliverables) are linked from the sign-up consent checkbox (F01.01).
+- **F16.01 - Legal pages**: `/legal/terms` and `/legal/privacy` are public/unauthenticated pages linked from the sign-up consent checkbox (F01.01) and the landing footer (P-01). Built as a **structured DRAFT** (Slice H · S4): both render through one reusable `LegalPage` template (brand topnav, title, "last updated", a persistent **DRAFT banner**, and structured sections; ADR-35) with explicit placeholder copy. **Final lawyer-reviewed copy is a pre-launch gate** — it replaces the DRAFT content behind the same template before launch.
 - **F16.02 - Consent record (§3.6)**: a mandatory acceptance is recorded at sign-up with a timestamp. Versioning and re-prompt-on-update are deferred to v1.1.
 
 ---
@@ -561,3 +562,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | 2026-06-13 | F10–F14 admin as-built: status/isActive split + mustChangePassword, 409 IMMUTABLE_FIELD, availability route, medicine reactivate + includeInactive (admin), exception→audit bridge, slot-end+12h predicate, email-resend status guard, F13 state/Karachi filters + email jobs + dispute set/clear, lead-time 30–1440, basis-points fees, settings.updated snapshots, 12 new audit event types | Slice G as-built sweep |
 | 2026-06-13 | Added two PayFast-Pakistan alert sources to the F12.01 alert-feed enumeration: `payment.manual_review_required` (no gateway status-query API) + `payment.refund_manual_required` (no gateway refund API) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | F05.03: noted the KPI #3 emit points — `video_join_attempt` on the Join Call click (P9 + D2) and `video_join_success` on Daily `joined-meeting` (P5/D3) via the fire-and-forget client `lib/analytics/track.js` seam (doc 14 §6; ADR-34) | Slice H · S3 (video consultation UI; ADR-34) |
+| 2026-06-14 | F16.01: legal pages built as a banner-marked structured DRAFT via the reusable `LegalPage` template (final lawyer copy = pre-launch gate); F03.03: noted the KPI #1 emit points — `landing_view` on P-01 mount + `booking_started` on slot-lock via the shared `lib/analytics/track.js` seam (`booking_confirmed` remains S6/server) | Slice H · S4 (public surface — landing + legal; ADR-35) |

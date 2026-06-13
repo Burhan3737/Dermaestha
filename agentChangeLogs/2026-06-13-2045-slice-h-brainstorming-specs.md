@@ -124,6 +124,27 @@ Lead Opus subagent: plan (`docs/superpowers/plans/2026-06-13-slice-h-s3-video-co
 
 **Verification (controller-independent):** `npm --workspace client test` → 33 files / **112 passed** (97→+15); `npm test` → **287 passed** (server untouched by S3); `npm --workspace client run build` → success, `daily-esm-*.js` (260 kB) is a SEPARATE chunk (main bundle not bloated). No forbidden paths. Merged `--no-ff` (`1ea70ac`).
 
+## S4 — Public surface (landing + legal) (IMPLEMENTED + MERGED to main, merge `a94ccce`, 2026-06-14)
+
+Lead Opus subagent: plan (`docs/superpowers/plans/2026-06-13-slice-h-s4-public-surface.md`) + 5 TDD subagents on `feature/slice-h-s4-public` (6 commits `f3c1b2a`→`d99c223`). Controller verified + merged.
+
+**Code files (subagent report, captured):**
+- `client/src/modules/marketing/views/Landing/` (C: Landing.jsx + .css + .test.jsx) + `marketing.routes.jsx` (C) — P-01 verbatim port at `/`; `landing_view` emit; logged-in-patient `/`→`/browse` redirect.
+- `client/src/modules/legal/` (C) — `LegalPage` component + `Terms.jsx`/`Privacy.jsx` (structured DRAFT + "pending legal review" banner) + `legal.routes.jsx` (public `/legal/terms`,`/legal/privacy`) + test.
+- Routing relocation: `doctor.routes.jsx` (M, listing `/`→`/browse`) + `doctor.routes.test.jsx` (C); `routes.jsx` (M, aggregate marketing+legal); `PatientLayout` (M, Browse→/browse); `auth/Login` + `SignUp` (M, `DASHBOARD.patient`→/browse) + Login.test (M); `Upcoming.jsx` + `PaymentReturn.jsx` (M, stray `<Link to="/">` listing CTAs → /browse).
+- `client/src/modules/booking/useBooking.js` (M) + `Booking.test.jsx` (M) — `booking_started` emit on slot-lock success (reuses S3's `track.js`).
+- Plan doc (C). **No server changes.** `track.js` REUSED (not recreated — controller-verified untouched).
+
+**Decisions / findings:**
+- Hero secondary CTA: mockup's "How it works" anchor → relabeled "Create your account" → `/signup` (spec §2 mandates Browse+Signup CTAs); the anchor stays reachable via topnav. One intentional hero deviation.
+- Logged-in **patient** `/`→`/browse` redirect (acquisition page not shown to authed patients); doctor/admin see landing as a safe fallback. `RoleRoute` mismatch fallback now lands on `/` (landing) — behaviorally safe; flagged.
+- Featured-doctors grid is static placeholder (per spec "static for v1").
+- **Lint situation clarified:** `npm run lint` reports 12 pre-existing `react-hooks/purity` errors in untouched files — **confirmed identical on `main`** (NOT introduced by S4; differs from the earlier "ESLint 9 vs .eslintrc" report — config evidently runs now). S4's own files lint clean. Repo-wide follow-up (S6/hardening or separate).
+
+**Verification (controller-independent):** `npm --workspace client test` → 36 files / **123 passed** (112→+11); `npm test` → **287** (server untouched); `npm --workspace client run build` → success (351 modules). No forbidden paths; `track.js` untouched. Merged `--no-ff` (`a94ccce`).
+
+**Pre-launch gate (carried):** final lawyer-reviewed ToS + Privacy copy must replace the DRAFT before go-live (signup consent links to these pages).
+
 ## Open items / next session
 - Then S2 → S3 → S4 → S5 → S6 via the same loop.
 - Tracked spec-doc impact per slice lives in each spec's §"Spec-doc impact" table (applied at each slice's merge, by the controller).

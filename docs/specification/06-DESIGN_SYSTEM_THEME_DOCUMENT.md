@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.4                                                                                       |
+| Version          | 1.5                                                                                       |
 | Last updated     | 2026-06-14                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -99,6 +99,8 @@ flowchart LR
 | Public / logged-out | Browse, How it works, For doctors — Login (secondary button)                |
 | Logged-in           | Browse / Appointments / Profile (bottom tabs on mobile; top nav on desktop) |
 
+**Public SPA route map (Slice H · S4, ADR-35).** `/` serves the public **P-01 landing** (acquisition surface); the **doctor listing (P-02) is at `/browse`** (relocated from `/`). A patient with an active session hitting `/` is redirected to `/browse` (logged-out marketing page is never shown to a signed-in patient); doctors/admins are unaffected (role routing sends them to their own panels). These are client-side SPA routes (doc 05's REST inventory is unaffected).
+
 ### Doctor sidebar links
 
 Today — Availability (weekly grid) — History
@@ -150,6 +152,14 @@ Doctors — Medicines — Records & audit — System health — Settings
 - Error state: `color-danger` border, `color-danger-deep` helper text below the field.
 - Label sits above the field in Archivo label-case 12 px (`.field > label`).
 - Helper text and error text both use `fs-caption` (12 px); helper in `color-text-muted`, error in `color-danger-deep`.
+
+### Landing (P-01)
+
+P-01 is the public acquisition page served at `/` (Slice H · S4, **Built**). It carries its own brand topnav (Browse, "How it works", For doctors, Login) — the mockup's "How it works" call-to-action lives in the **topnav as an in-page anchor**, not as a hero button. The hero CTAs are **Browse** (`/browse`) and **Create your account / Sign up** (`/signup`). The "Featured specialists" grid uses **static placeholder data for v1** (no live query); the footer links to the legal pages (`/legal/terms`, `/legal/privacy`). The hero retains the single staggered reveal noted under Motion.
+
+### Legal pages (F16)
+
+`/legal/terms` and `/legal/privacy` are public/unauthenticated pages (Slice H · S4, **Built**) sharing one reusable **`LegalPage`** layout pattern: brand topnav, page title, a "last updated" line, a persistent **DRAFT banner**, and a list of structured `{ heading, body }` sections. They ship with explicit placeholder copy; final lawyer-reviewed copy replaces it behind the same template before launch (a pre-launch gate; ADR-35). Linked from the sign-up consent checkbox (below) and the P-01 footer.
 
 ### Mandatory consent checkbox (P-04)
 
@@ -570,3 +580,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-13 | Corrected admin sidebar order/labels (Records & audit before System health; A-03 = "System health"); added `/admin`→`/admin/doctors` default route, Pagination component + building block, `formatKarachiTable` utility, A-05 settings-save confirm gate, A-01 photo-upload interaction + inventory note, and the modal `role="dialog"`/no-focus-trap convention | Slice G as-built sweep |
 | 2026-06-13 | Added a canonical screen-ID registry note under the §2 inventory: the 24 rows are authoritative, and the patient bottom-nav Profile destination is intentionally not a dedicated v1 screen (no `P-NN` ID; account management deferred to v1.1+) | doc-06/doc-13 screen-ID reconciliation |
 | 2026-06-14 | Added a "Pre-call get-ready room (P-11)" note — P-11 has no app-managed camera-preview pane (Daily prejoin owns the device check; approved minor deviation from the mockup) — and noted that P-12 + D-04 are served by one shared role-aware `VideoRoom` (separate screen IDs retained) rendering a brand-themed Daily Prebuilt iframe | Slice H · S3 (video consultation UI; ADR-34) |
+| 2026-06-14 | P-01 landing → Built: added the §2 public SPA route map (`/`→landing, listing P-02 relocated to `/browse`, logged-in-patient `/`→`/browse` redirect) and §3 "Landing (P-01)" (hero CTAs Browse + Sign-up, "How it works" anchor in the topnav, static featured-doctors grid) + "Legal pages (F16)" (reusable `LegalPage` DRAFT-banner pattern for `/legal/terms`,`/legal/privacy`) interaction notes | Slice H · S4 (public surface — landing + legal; ADR-35) |

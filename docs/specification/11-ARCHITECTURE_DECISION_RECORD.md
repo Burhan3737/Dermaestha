@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.13                                                                                               |
+| Version          | 1.14                                                                                               |
 | Last updated     | 2026-06-14                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -48,6 +48,7 @@
 33. [ADR-32 — PayFast Pakistan adapter: dual-channel confirmation + manual refund/reconcile fallback + researched-API risk](#adr-32--payfast-pakistan-adapter-dual-channel-confirmation--manual-refundreconcile-fallback--researched-api-risk)
 34. [ADR-33 — Daily.co video adapter: verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC, webhook `retryType=exponential`](#adr-33--dailyco-video-adapter-verifynormalize-in-the-adapter-role-via-meeting-token-user_id-raw-body-hmac-webhook-retrytypeexponential)
 35. [ADR-34 — Video UI: Daily Prebuilt iframe (lazy-loaded, brand-themed) + app chrome, get-ready screen, shared role-aware VideoRoom, fire-and-forget KPI telemetry](#adr-34--video-ui-daily-prebuilt-iframe-lazy-loaded-brand-themed--app-chrome-get-ready-screen-shared-role-aware-videoroom-fire-and-forget-kpi-telemetry)
+36. [ADR-35 — Landing at root, doctor listing relocated to `/browse`; legal pages ship as a review-gated structured DRAFT](#adr-35--landing-at-root-doctor-listing-relocated-to-browse-legal-pages-ship-as-a-review-gated-structured-draft)
 
 ---
 
@@ -501,6 +502,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-35 — Landing at root, doctor listing relocated to `/browse`; legal pages ship as a review-gated structured DRAFT
+
+**Date:** 2026-06-14
+
+**Status:** Accepted
+
+**Context:** Slice H · S4 builds the public acquisition surface (P-01 landing) and the two legal pages (F16). Before S4, `/` served the doctor listing (P-02). A public marketing landing needs the root URL — it is the entry point organic and paid traffic land on — which forces a decision on where the doctor listing moves and how an already-logged-in patient is treated at `/`. Separately, the ToS/Privacy pages are a launch requirement, but final, lawyer-reviewed legal copy is not available during the build and writing placeholder prose that reads as authoritative is a real liability hazard. KPI #1 (landing → booking conversion) also needs a client emit seam, and — as with ADR-34's KPI #3 — the `POST /api/analytics/events` route is owned by S6, so the UI must not block on it.
+
+**Decision:** (1) **Landing at root; listing relocated.** `/` now serves the public P-01 `Landing` (`modules/marketing`); the doctor listing (P-02) moves from `/` to **`/browse`** (`modules/doctor` route). Hero CTAs are **Browse** (`/browse`) + **Sign up** (`/signup`); the mockup's "How it works" call-to-action becomes an in-page topnav anchor rather than a hero button. The featured-doctors grid is **static** placeholder data for v1 (no live query). (2) **Logged-in-patient redirect.** A patient with an active session hitting `/` is redirected to `/browse` (`<Navigate replace>`), so the logged-out acquisition page is never shown to someone already signed in; doctors/admins are unaffected (they land on their own panels via role routing). (3) **Legal pages as a review-gated structured DRAFT.** `/legal/terms` and `/legal/privacy` (`modules/legal`, public/unauthenticated) render through one reusable `LegalPage` component (brand topnav, title, "last updated", a persistent **DRAFT banner**, and structured `{ heading, body }` sections). Every section body is explicitly placeholder copy; **final lawyer-reviewed copy replacing the DRAFT content is a pre-launch gate** (doc 07 / doc 13). The Privacy page cross-references the doc 08 data-handling policy. (4) **KPI #1 telemetry, fire-and-forget.** Reuses the shared `lib/analytics/track.js` seam (ADR-34): `landing_view` (`{ referrer? }`) is emitted on the P-01 mount, and `booking_started` (`{ doctorId }`) on a successful slot-lock (`modules/booking/useBooking.js`); both no-op until S6 ships the route. The funnel's terminal `booking_confirmed` event is server-emitted post-confirmation and remains S6.
+
+**Consequences:** Organic/paid traffic lands on a conversion-oriented page while the listing keeps a stable, bookmarkable home at `/browse`; logged-in patients skip the marketing page entirely. The DRAFT-banner + structured-section pattern lets the legal routes ship now (unblocking the launch surface and the sign-up consent links) without passing off unreviewed prose as authoritative — the single remaining action is a copy swap behind the same component once legal sign-off lands. KPI #1's landing→booking funnel begins emitting from the client immediately and degrades silently until the S6 route exists, mirroring ADR-34. The relocation is a client-routing change only (doc 06); doc 05's REST inventory is unaffected. The static featured grid is a deliberate v1 simplification (a live "featured doctors" query is a later enhancement).
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -519,3 +534,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-13 | Added ADR-32 (PayFast Pakistan adapter: dual-channel `verifyWebhook`/`verifyReturn` confirmation, manual refund/reconcile fallback with `manual_required`/`manual_review_required`/`manual_refund_recorded`, researched-not-confirmed gated by doc 07 §3) | Slice H · S1 (PayFast Pakistan adapter); new architectural decision |
 | 2026-06-14 | Added ADR-33 (Daily.co video adapter: `verifyWebhook` verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC over `DAILY_WEBHOOK_SECRET`, webhook `retryType=exponential`; supersedes ADR-24's role-inference follow-up — dev `user_name` hack removed from prod; live-delivery gated by doc 07 §10) | Slice H · S2 (Daily.co video adapter); new architectural decision |
 | 2026-06-14 | Added ADR-34 (Video UI: lazy-loaded brand-themed Daily Prebuilt iframe + app chrome; P-11 get-ready screen with no app preview pane — Daily prejoin owns device check; one shared role-aware `VideoRoom` for P-12/D-04; fire-and-forget client `track.js` KPI #3 seam) | Slice H · S3 (video consultation UI); new architectural decision |
+| 2026-06-14 | Added ADR-35 (landing at root + doctor listing relocated to `/browse`; logged-in-patient `/`→`/browse` redirect; legal pages as a review-gated structured DRAFT via reusable `LegalPage`; KPI #1 `landing_view`/`booking_started` client emits over the shared `track.js`) | Slice H · S4 (public surface — landing + legal); new architectural decision |
