@@ -9,6 +9,7 @@ import { paymentWebhookRouter, paymentReturnRouter } from './modules/payment/ind
 import { videoWebhookRouter } from './modules/video/index.js';
 import { medicinesRouter, adminMedicinesRouter } from './modules/medicine/index.js';
 import { adminRouter } from './modules/admin/index.js';
+import { analyticsRouter } from './modules/analytics/index.js';
 import { prescriptionsRouter } from './modules/prescription/index.js';
 import { healthRouter } from './health/index.js';
 import { devCheckoutRouter } from './dev/devCheckout.js';
@@ -33,6 +34,7 @@ export function registerRoutes(app) {
   // Each domain module owns its own webhook route; both mount under /api/webhooks (D11).
   app.use('/api/webhooks', paymentWebhookRouter); // POST /api/webhooks/payfast
   app.use('/api/webhooks', videoWebhookRouter); // POST /api/webhooks/daily
+  app.use('/api/analytics', analyticsRouter); // POST /api/analytics/events (public)
   app.use('/api', healthRouter);
   // Unknown /api path → JSON 404 envelope (never the SPA HTML).
   app.use('/api', (_req, _res, next) => next(new AppError('NOT_FOUND', 'Not found.', 404)));
