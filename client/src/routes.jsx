@@ -1,5 +1,6 @@
 // @ts-check
 import { marketingRoutes } from './modules/marketing/marketing.routes.jsx';
+import { legalRoutes } from './modules/legal/legal.routes.jsx';
 import { authRoutes } from './modules/auth/auth.routes.jsx';
 import { doctorRoutes } from './modules/doctor/doctor.routes.jsx';
 import { bookingRoutes } from './modules/booking/booking.routes.jsx';
@@ -14,6 +15,7 @@ import { adminRoutes } from './modules/admin/admin.routes.jsx';
  */
 export const buildRoutes = (session) => [
   ...marketingRoutes(session),
+  ...legalRoutes,
   ...authRoutes,
   ...doctorRoutes(session),
   ...bookingRoutes(session),
