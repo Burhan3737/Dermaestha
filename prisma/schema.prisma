@@ -198,6 +198,7 @@ model Appointment {
   // The UNIQUE no-double-booking guarantee is the partial index added in the migration
   // (see file header). These are plain query indexes only.
   @@index([doctorId, slotStart])
+  @@index([slotStart])
   @@index([patientUserId])
   @@index([state])
   @@map("appointments")
@@ -331,6 +332,7 @@ model AuditLog {
   @@index([eventType])
   @@index([actorType])
   @@index([at])
+  @@index([targetRef])
   @@map("audit_log")
 }
 
