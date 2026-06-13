@@ -1,11 +1,13 @@
 // @ts-check
 import { logger } from '../../lib/logger/logger.js';
+import { render } from './templates.js';
 
-/** Dev email adapter: logs instead of sending. Selected when EMAIL_PROVIDER=console. */
+/** Dev email adapter: logs the rendered email instead of sending. Selected when EMAIL_PROVIDER=console. */
 /** @type {import('./index.js').EmailProvider} */
 export const consoleEmail = {
   async send({ template, to, vars }) {
-    logger.info('DEV email', { template, to, vars });
+    const { subject, text } = render(template, vars);
+    logger.info('DEV email', { to, subject, text });
     return { providerId: `dev_${Date.now()}` };
   },
   parseWebhook() {
