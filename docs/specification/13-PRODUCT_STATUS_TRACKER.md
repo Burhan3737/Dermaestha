@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Document ID      | `13-PRODUCT_STATUS_TRACKER`                                                                                                                           |
 | Status           | Canonical                                                                                                                                             |
-| Version          | 1.9                                                                                                                                                   |
+| Version          | 1.10                                                                                                                                                   |
 | Last updated     | 2026-06-13                                                                                                                                            |
 | Sources absorbed | `server/src + client/src inspection; agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md; ARCHITECTURE.md §5b; docs/specification/02; PRD §5.1` |
 | Related docs     | 02, 03, 05                                                                                                                                            |
@@ -140,7 +140,7 @@ Feature IDs are those defined in `docs/specification/02-SCOPE_FEATURE_DOCUMENT.m
 
 | Feature                                              | Owning module(s)                            | Milestone | Status      | Notes                                                                                                        |
 | ---------------------------------------------------- | ------------------------------------------- | --------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
-| F01 — Patient authentication & account               | Auth & session (1), User (2)                | M1        | In progress | Auth routes + service (signup/login/logout/me/forgot/reset/change) built & tested (Slice A); reset email delivery stubbed until Resend (M4); no email verification in v1 by design; profile (P-13) later |
+| F01 — Patient authentication & account               | Auth & session (1), User (2)                | M1        | In progress | Auth routes + service (signup/login/logout/me/forgot/reset/change) built & tested (Slice A); reset email delivery live via the Slice E Resend adapter; no email verification in v1 by design; patient profile/account view later |
 | F02 — Doctor discovery (public listing & profile)    | Doctor (3)                                  | M1        | Built       | Slice B: `GET /api/doctors` (paginated, active-only, no-leak card + next-slot hint), `GET /api/doctors/:id` (404-no-leak), P-02/P-03 views; tested |
 | F03 — Slot booking & slot-lock                       | Slot & booking (5), Availability (4)        | M1→M2     | Built       | Slice C: `POST /api/appointments/lock` → `slot_locked` (10-min hold) + who-for (P8); Single-Lock/No-Overlap; lazy expiry + reclaim-on-conflict over `uniq_active_slot` (ADR-23); P-06 booking view. Tested |
 | F04 — Payment                                        | Payment (6), Appointment state machine (7)  | M2        | Built       | Slice C: idempotent intent + checkout handoff; signature-verified webhook → atomic `confirmed` + `feeAtBooking` (#2/#6), idempotent on replay; P-07 return view. Slice E: F04.03 hourly reconciliation worker (lost-IPN confirm via the shared `confirmPaidAppointment` commit; edge #6a full gross refund). Exercised via dev mock gateway (ADR-22); concrete PayFast adapter pending (Slice H). Tested |
@@ -165,8 +165,8 @@ Feature IDs are those defined in `docs/specification/02-SCOPE_FEATURE_DOCUMENT.m
 
 | Milestone                      | Deliverable                                                                                                                 | Status      |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| M1 — Booking flow (Week 2)     | Patient sign-up + ToS consent, login (shared), doctor listing, slot booking (no payment), confirmation email                | Not started |
-| M2 — Video + Payments (Week 4) | Full video consultation (mobile-tested on 3G); PayFast payment flow + signed webhooks + reconciliation cron                 | Not started |
+| M1 — Booking flow (Week 2)     | Patient sign-up + ToS consent, login (shared), doctor listing, slot booking (no payment), confirmation email                | In progress |
+| M2 — Video + Payments (Week 4) | Full video consultation (mobile-tested on 3G); PayFast payment flow + signed webhooks + reconciliation cron                 | In progress |
 | M3 — Prescriptions (Week 6)    | Doctor prescription builder + patient-ID header; medicine catalogue prices; patient itemised PDF download                   | Done        |
 | M4 — Launch-ready (Week 8)     | Admin panel (doctor onboarding, medicine catalogue, alert feed); landing page; email automation; legal content; full E2E QA | In progress |
 
@@ -201,15 +201,15 @@ Listed in PRD §6 as a **separately scoped and costed module**, explicitly NOT p
 
 ## 6. Remaining for v1
 
-Everything below is absent from `server/src` and `client/src` as of 2026-06-01. This is the full build backlog for the v1 8-week scope.
+This section is the v1 build backlog (baseline 2026-06-01), reconciled as each slice ships: `[x]` built, `[~]` partial, `[ ]` remaining. Unchecked items are the true outstanding work for the v1 8-week scope.
 
 ### M1 — Booking flow
 
-- [ ] Auth service: sign-up (name, email, phone, password, ToS consent capture to `tos_accepted_at`)
-- [ ] Auth service: login (shared `/login`; role-based routing on success to patient/doctor/admin dashboard)
-- [ ] Auth service: forgot-password (enumeration-safe; 1-hour token; Resend integration)
-- [ ] Auth routes: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
-- [ ] DA3 forced-first-login-change middleware gate (checks `must_change_password`)
+- [x] Auth service: sign-up (name, email, phone, password, ToS consent capture to `tos_accepted_at`) — Slice A
+- [x] Auth service: login (shared `/login`; role-based routing on success to patient/doctor/admin dashboard) — Slice A
+- [x] Auth service: forgot-password (enumeration-safe; 1-hour token; Resend integration) — Slice A (real Resend delivery Slice E)
+- [x] Auth routes: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` — Slice A
+- [x] DA3 forced-first-login-change middleware gate (checks `must_change_password`) — Slice A
 - [x] Doctor service: public listing (active-only, paginated) and public profile endpoint — Slice B
 - [x] Doctor routes: `GET /api/doctors`, `GET /api/doctors/:id` — Slice B
 - [x] Availability service: save/update weekly recurring blocks; generate 30-minute slots from blocks; lead-time filter; block-with-bookings guard — Slice B
@@ -221,17 +221,17 @@ Everything below is absent from `server/src` and `client/src` as of 2026-06-01. 
 - [~] Patient views (client): P-02 ✓, P-03 ✓, P-04 ✓, P-05 ✓ (Slice A/B); P-06 booking ✓, P-07 payment return ✓, P-08 upcoming ✓, P-10 cancel modal ✓ (Slice C)
 - [x] Doctor views (client): D-03 weekly availability grid (Slice B); D-01 forced first-login password change (Slice A)
 - [x] Layout chromes: `PatientLayout` (TopNav + BottomTabs), `SidebarLayout` (doctor/admin) — Slice B
-- [ ] Shared design components (~16 from `_component-reference.html`): `Button`, `Card`, `Input`, `Modal`, slot-grid, etc.
-- [ ] Typed API client (`client/src/lib/apiClient/apiClient.js` or equivalent)
-- [ ] Auth/session context provider (React)
-- [ ] Route config: wire all M1 views with `RoleRoute` guards
+- [~] Shared design components (~16 from `_component-reference.html`): `Button`, `Card`, `Input`, `Modal`, slot-grid, etc. — ~9/16 built (see §3 frontend; `Pagination` added Slice G); rest land as views need them
+- [x] Typed API client (`client/src/lib/apiClient/apiClient.js`) — Slice A (`api.patch` + multipart `api.upload` added Slice G)
+- [x] Auth/session context provider (React) — Slice A (`client/src/context/session/session.jsx`)
+- [x] Route config: wire all M1 views with `RoleRoute` guards — Slice A/B/C (admin A-01..A-05 added Slice G)
 
 ### M2 — Video + Payments
 
 - [x] Payment service: idempotent intent, checkout handoff, signed-webhook verify, `fee_at_booking` snapshot, atomic commit (appointment + payment) — Slice C; F04.03 reconciliation worker + `queryPaymentStatus` — Slice E
 - [~] Payment routes: `POST /api/appointments/:id/pay`, `POST /api/webhooks/payfast` — Slice C; no `…/reconcile` route yet
-- [ ] Video service: Daily.co room creation and time-bound token issuance (replace stub), participant-event ingestion
-- [ ] Video routes: `POST /api/appointments/:id/video/token`
+- [~] Video service: room creation + time-bound token issuance + participant-event ingestion — Slice D (against the stub adapter; the concrete Daily.co network adapter is Slice H)
+- [x] Video routes: `POST /api/appointments/:id/video/token` — Slice D
 - [x] Appointment state-machine service: transition validation, audit-log writes, side-effect triggers (refund, email) — Slice C (Slice-C transitions; video-side transitions extend it in Slice D)
 - [x] Appointment routes: `GET /api/appointments` (patient/doctor scoped), `GET /api/appointments/:id` — Slice C
 - [x] Refund service: net-of-fee amount, idempotent refund call, fallback fee model — Slice C; F06.03 retry/backoff worker + exhaustion alert + `refund_delayed` email (G1) — Slice E
@@ -239,9 +239,9 @@ Everything below is absent from `server/src` and `client/src` as of 2026-06-01. 
 - [x] Cancellation route: `POST /api/appointments/:id/cancel` (unified patient/doctor by session role) — Slice C
 - [x] Workers directory (`server/src/workers/`): reconciliation worker (hourly cron) — Slice E; notification-dispatch + refund-retry workers (`* * * * *`) — Slice E; appointment-evaluation worker — Slice D. All in-process `node-cron` over clock-injected functions (ADR-25/27); `/dev/worker/*` on-demand triggers
 - [ ] Analytics service: emit events for KPI #1 (landing→booking) and #3 (video-join success by network type)
-- [ ] Audit log query API (admin-only): `GET /api/admin/audit-log`
-- [ ] Patient views: P-07 payment redirect/confirmation, P-08 upcoming appointments (with "Join Call"), P-09 video consultation room
-- [ ] Doctor views: D-02 today's appointments, D-03 video consultation room
+- [x] Audit log query API (admin-only): `GET /api/admin/audit` — Slice G (with `GET /api/admin/records` + `/records/:id`)
+- [~] Patient views: P-07 payment return ✓, P-08 upcoming (with "Join Call") ✓ (Slice C), P-09 past appointments ✓ (Slice F); patient video room (P-11/P-12 per §3 inventory) pending
+- [~] Doctor views: D-03 availability grid ✓ (Slice B); D-02 today's-appointments base view partial (Slice F action/badge only); doctor video room (D-04 per §3 inventory) pending
 
 ### M3 — Prescriptions
 
@@ -289,3 +289,4 @@ Everything below is absent from `server/src` and `client/src` as of 2026-06-01. 
 | 2026-06-11 | Status sweep after Slice E (M1 ~90%, M2 ~95%; modules 8/13 updated; reconciliation + notification-dispatch + refund-retry workers → Built; payment/email adapter rows; F04/F06/F07 → Built-for-v1; M2/M4 checklists) | Reflect built F07 outbox + F04.03/F06.03 workers + real Resend adapter + G1–G4 fixes (ADR-27) (v1.7) |
 | 2026-06-12 | Status sweep after Slice F (M3 → In progress ~85–90%; modules 10/11 → Built; F08 → Built, F11 → Built backend; frontend views 13/24 + P-09/P-13/D-05/D-02; client PDF renderer → Built; Zod seam; M3 checklist ticked with stale screen IDs P-10/P-11→P-09/P-13 and D-04→D-05 corrected; M4 email line `prescription_ready` built). Also corrected the stale "Video chrome (Daily SDK wrapper): Not started" row → Built in Slice D | Reflect built F08 prescriptions + F11 backend + client PDF (Slice F); video-chrome correction (v1.8) |
 | 2026-06-13 | Status sweep after Slice G (M3 → Done 100%, M4 → In progress ~60%; modules 3/11/14/15/16/17 → Built; F10/F11/F12/F14/F15 → Built, F13 → Built with intentional UI gaps; cross-cutting error-tracking/Zod/route-config rows; views 18/24 + A-01..A-05; §5 M4 → In progress; M4 admin checklist ticked + settings route PATCH→PUT + admin screen-ID list corrected to A-01..A-05; M3 A-02 note) | Reflect built F10–F14 admin panel + A-01..A-05 views + DA5 reset (Slice G as-built sweep) (v1.9) |
+| 2026-06-13 | Post-sweep status sync: §5 roadmap M1/M2 → In progress (match §2); §6 backlog reconciled to as-built — M1 Auth items + typed API client + session context + route config ticked (Slice A–C, missed in prior sweeps), M2 video service [~]/video-token route + audit-query API ticked, P-07/P-08/P-09 + D-02/D-03 view rows corrected to §3 canonical screen IDs; §6 intro reframed; F01 Resend note (Slice E live) | Keep the tracker synced to reality after Slice G (v1.10) |
