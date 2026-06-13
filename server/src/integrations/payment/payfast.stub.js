@@ -10,6 +10,9 @@ export const payfastStub = {
   verifyWebhook: () => {
     throw new AppError('NOT_IMPLEMENTED', 'payfast.verifyWebhook is M2', 501);
   },
+  verifyReturn: () => {
+    throw new AppError('NOT_IMPLEMENTED', 'payfast.verifyReturn is M2', 501);
+  },
   refund: ni('refund'),
   listUnconfirmed: ni('listUnconfirmed'),
   queryPaymentStatus: ni('queryPaymentStatus'),
