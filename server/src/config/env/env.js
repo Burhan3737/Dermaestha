@@ -25,7 +25,7 @@ const schema = z.object({
   VIDEO_MOCK_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().optional(),
-  ERROR_TRACKING_DSN: z.string().optional(),
+  SENTRY_DSN: z.string().optional(),
   UPLOADS_DIR: z.string().default('./uploads'),
 });
 

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@sentry/node": "^10.57.0",
     "argon2": "^0.41.0",
     "bcryptjs": "^2.4.3",
     "connect-pg-simple": "^9.0.1",
