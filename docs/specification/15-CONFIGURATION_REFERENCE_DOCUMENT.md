@@ -3,7 +3,7 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.8                                          |
+| Version          | 1.9                                          |
 | Last updated     | 2026-06-14                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
@@ -160,7 +160,7 @@ Source: CONFIG.md §7. Cross-reference: [doc 04 — Database Document](04-DATABA
 
 3. **`dosage_forms` is a Postgres `text[]`.** Confirm the target host supports array columns (RDS/Aurora/Railway PG all do).
 
-4. **Dual-Zod known inconsistency.** The root workspace resolves `zod@4.x` (used by `shared/schemas/`), while `server/` pins `zod@3.x`. `instanceof ZodError` is therefore unreliable across the workspace boundary, so `server/src/http/errorHandler/errorHandler.js` duck-types a ZodError (`err.name === 'ZodError' && Array.isArray(err.issues)`) as a workaround. Align to a single zod version before the next major milestone.
+4. **Single-zod alignment (resolved, Slice H · S6).** The repo now resolves a single `zod@3` copy: `shared/` is a workspace declaring `zod ^3.23.0` and the root `package.json` adds `overrides.zod ^3.23.0` to collapse the only `zod@4` (a transitive dep via `eslint-plugin-react-hooks → zod-validation-error`). `instanceof ZodError` is reliable across the workspace boundary, so the prior `errorHandler` duck-typing was removed in favor of a plain `instanceof` check (ADR-37; doc 07 §2.3). The override is a global constraint — a future dependency requiring `zod@4` would be forced to v3.
 
 ---
 
@@ -231,7 +231,7 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 
 | Variable             | Purpose                          | Example / Default   |
 | -------------------- | -------------------------------- | ------------------- |
-| `ERROR_TRACKING_DSN` | Error-tracking DSN (e.g. Sentry) | _(optional in dev)_ |
+| `SENTRY_DSN` | Optional string. Sentry error-tracking DSN (`@sentry/node`). Unset → error tracking is a logging no-op (dev/test/CI never egress); set → `initErrorTracking()` activates it at boot with `sendDefaultPii:false` + a `beforeSend` PII scrub (doc 08 §A05; ADR-36). Renamed from the earlier placeholder `ERROR_TRACKING_DSN`. | _(optional in dev; set in prod)_ |
 
 ### File Storage
 
@@ -299,3 +299,4 @@ All **three** `settings` tunables are editable at runtime via `PUT /api/admin/se
 | 2026-06-13 | Added `UPLOADS_DIR` File-Storage env var (§8); added `minBookingLeadMinutes` ceiling 1440 + `fallbackFeePctBps`/`fallbackFeeFixed` bounds (§1, §6); expanded Tunable-Defaults note to all three settings tunables (§8); added Dual-Zod known-inconsistency migration caveat (§7) | Slice G as-built sweep |
 | 2026-06-13 | PayFast env section (§8): added `PAYFAST_SECURED_KEY`, `PAYFAST_MERCHANT_NAME`, `PAYFAST_STORE_ID`; redefined `PAYFAST_PASSPHRASE` as dev-mock-only; removed `PAYFAST_MERCHANT_KEY` (South-Africa-only, dropped); noted `PAYFAST_MODE` default `sandbox`; changed `PAYMENT_PROVIDER` enum to `stub\|mock\|payfast` | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | Added `DAILY_WEBHOOK_SECRET` to the Daily.co env section (§8); updated the `VIDEO_PROVIDER` row so `daily` resolves to the real `daily.js` adapter (HMAC-verified webhook + slot-bounded rooms, gated by doc 07) rather than the stub | Slice H · S2 (Daily.co video adapter; ADR-33) |
+| 2026-06-14 | Renamed the Error-Tracking env var `ERROR_TRACKING_DSN` → `SENTRY_DSN` (string, optional; DSN-gated Sentry + PII scrub; ADR-36); flipped §7 #4 Dual-Zod "known inconsistency" → resolved (single zod@3 via `shared` workspace + root `overrides.zod`; duck-typing removed; ADR-37) | Slice H · S6 (launch foundation + hardening) |

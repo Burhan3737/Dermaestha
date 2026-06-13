@@ -1,6 +1,6 @@
 # 2026-06-13-2045 — slice-h-brainstorming-specs
 
-**Status:** Partial
+**Status:** Partial (Slice H S1–S6 all brainstormed→built→merged→pushed; S7 E2E/QA gate remains, to be brainstormed with the user)
 **Goal:** Brainstorm Slice H (the final v1-completion slice) decomposed into independent sub-slices, producing one verified design spec per sub-slice, ahead of parallel plan-writing.
 **Skill(s) used:** superpowers:brainstorming (user invoked /brainstorming)
 **Ticket / issue:** None
@@ -162,7 +162,28 @@ Lead Opus subagent: plan (`docs/superpowers/plans/2026-06-13-slice-h-s5-email-te
 
 **Pre-launch confirm (non-blocking):** real support email + footer entity to replace the placeholder.
 
+## S6 — Launch foundation + hardening (IMPLEMENTED + MERGED to main, merge `ab9e62e`, 2026-06-14)
+
+Lead Opus subagent: plan + implemented (TDD, direct — no nested dispatch tool available) on `feature/slice-h-s6-foundation` (9 commits `0492dbf`→`d5de5b9`). Controller verified (incl. clean-install single-copy) + merged.
+
+**Code files (subagent report, captured):**
+- **Analytics:** `shared/schemas/analytics/analytics.js` (+test) — closed-catalog schema; `server/src/modules/analytics/{service,controller,index,test}.js` (C) — `POST /api/analytics/events` (public, rate-limited, validated) + best-effort writer; `server/src/routes.js` (M) — mount at `/api/analytics`; `payment/service.js` (M, +test) — server-side `booking_confirmed` in `confirmPaidAppointment` (AFTER the tx, best-effort; webhook + reconciliation paths), `meta:{doctorId,fee}`.
+- **Sentry:** `lib/errorTracking/errorTracking.js` (M, +test) — DSN-gated `Sentry.init` + `beforeSend` PII scrub; `env.js` + `.env.example` (M) — `ERROR_TRACKING_DSN`→`SENTRY_DSN`; `server/package.json` (M) — `@sentry/node`.
+- **errorHandler:** (M, +test) — dropped ZodError duck-typing → `instanceof ZodError` (single-copy); obsolete cross-instance test replaced with a real shared-schema proof.
+- **Settings bootstrap:** `lib/settings/ensureSettings.js` (C, +test) — idempotent upsert; `index.js` (M) — `await ensureSettings()` at boot; `seed.js` (M) — parity.
+- **DB indexes:** `schema.prisma` (M) — `Appointment @@index([slotStart])` + `AuditLog @@index([targetRef])`; migration `20260613213051_slice_h_s6_indexes` (C).
+- **Zod dedupe:** root `package.json` (M) — `+shared` workspace + `overrides.zod ^3.23.0`; `shared/package.json` (C); `package-lock.json` (M, regenerated). Plan doc (C).
+
+**Decisions / findings:**
+- **Zod root `overrides` required (deviation from spec wording, justified):** the root `zod@4.4.3` was TRANSITIVE (`client → eslint-plugin-react-hooks@7.1.1 → zod-validation-error@4.0.2`), not a stray direct dep — so making `shared` a workspace alone wouldn't stop npm hoisting v4. Added root `overrides:{zod:^3.23.0}`; `zod-validation-error` accepts `^3.25.0` → whole tree collapses to one `zod@3.25.76`. Lockfile regenerated (`rm -rf node_modules package-lock.json && npm install`). Controller-verified: `npm ls zod` → single v3 copy.
+- `booking_confirmed` placed AFTER the `$transaction` (best-effort; analytics can never roll back a confirm). Fires on both confirm paths.
+- Sentry stays OFF by default (`SENTRY_DSN` unset; old `ERROR_TRACKING_DSN` was empty → zero behavior change). `initErrorTracking(dsn=env.SENTRY_DSN)` takes an optional arg for testability.
+- **Zod override is a global constraint** — a future dep genuinely needing zod@4 would be forced to v3 (ADR consequence). `npm audit`: 5 pre-existing vulns (not introduced). Node `EBADENGINE` warning (22.12.0 vs @sentry/node's ^20.19||^22.13||>=24) — install/tests/build unaffected; flag for prod Node version (ties to the S3 daily-js ≥22.14 note).
+
+**Verification (controller-independent):** clean `npm install` + `npm ls zod` → single `zod@3.25.76`; `npm test` → 42 files / **312 passed** (297→+15); `npm --workspace client test` → **123**; `npm --workspace client run build` → success; `prisma migrate status` → up to date. No forbidden paths. Merged `--no-ff` (`ab9e62e`).
+
 ## Open items / next session
-- Then S2 → S3 → S4 → S5 → S6 via the same loop.
-- Tracked spec-doc impact per slice lives in each spec's §"Spec-doc impact" table (applied at each slice's merge, by the controller).
-- After S6 merged: STOP, brainstorm S7 with user.
+- **ALL OF S1–S6 ARE MERGED TO `main` AND PUSHED TO `origin/main`.** Merge sequence: S1 `b987472` → S2 `f6d3bd5` → S3 `1ea70ac` → S4 `a94ccce` → S5 `bfb8c7b` → S6 `ab9e62e`; each followed by a controller-reviewed canon-doc sweep commit + push. Final suite state: **312 server+shared / 123 client** green; client build clean; `prisma migrate status` up to date; single `zod@3.25.76` copy.
+- ADRs added this session: **ADR-32** (PayFast PK), **ADR-33** (Daily adapter), **ADR-34** (video UI), **ADR-35** (public surface), **ADR-36** (Sentry), **ADR-37** (Zod single-copy).
+- **NEXT: S7 — E2E QA + launch gate — to be brainstormed collaboratively with the user (NOT auto-executed), per the agreed workflow. STOP here.**
+- **Pre-launch gates carried (for S7 / launch):** PayFast PK merchant-verification checklist (doc 07 §3); Daily.co live-delivery HMAC validation + webhook registration (doc 07 §10); F16 final lawyer-reviewed legal copy; email support-address/footer entity; Sentry `SENTRY_DSN` + scrubbing review; prod Node ≥22.14 (daily-js + @sentry/node engine); pre-existing `npm audit` (5) + repo lint debt.

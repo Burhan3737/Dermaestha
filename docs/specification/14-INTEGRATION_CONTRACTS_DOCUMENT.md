@@ -4,7 +4,7 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.10                               |
+| Version          | 1.11                               |
 | Last updated     | 2026-06-14                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
@@ -262,7 +262,7 @@ Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v
 
 ## 6. Analytics event catalog
 
-Ingested at `POST /api/analytics/events` as `{ type, networkType, meta }`. `networkType` (e.g. `"3g"`, `"4g"`, `"wifi"`, or `"unknown"`) is a **sibling of `meta`** — the client `lib/analytics/track.js` (ADR-34) attaches it to **every** event from `navigator.connection.effectiveType`; it is never nested inside `meta`. `networkType` backs the 3G-success KPI (#3).
+Ingested at `POST /api/analytics/events` as `{ type, networkType, meta }`. **As of Slice H · S6 the ingestion endpoint exists** (built — public, rate-limited 60/min/IP, body validated against this closed catalog: unknown `type` → `400 VALIDATION_FAILED`, success `202 { ok: true }`; doc 05). The catalog itself is unchanged. `networkType` (e.g. `"3g"`, `"4g"`, `"wifi"`, or `"unknown"`) is a **sibling of `meta`** — the client `lib/analytics/track.js` (ADR-34) attaches it to **every** event from `navigator.connection.effectiveType`; it is never nested inside `meta`. `networkType` backs the 3G-success KPI (#3).
 
 | `type`               | Fired when                            | `meta`                                 |
 | -------------------- | ------------------------------------- | -------------------------------------- |
@@ -303,3 +303,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-14 | Added `verifyWebhook` to the `VideoProvider` typedef + optional `createRoom({ notAfterIso })` + the `NormalizedVideoEvent` typedef (§1); replaced the simplified dev participant shape with Daily's versioned envelope (`payload.owner`, `room`=name, `user_id` role anchor) + documented the raw-body HMAC verification (`X-Webhook-Timestamp`/`X-Webhook-Signature`, base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time) and the live-delivery launch gate → doc 07 (§3); corrected the `daily.mock` note's "not yet wired" opening (the concrete `daily.js` is now wired) | Slice H · S2 (Daily.co video adapter; ADR-33) |
 | 2026-06-14 | §6 analytics catalog: corrected the wire shape to the as-built `{ type, networkType, meta }` (`networkType` is the envelope **sibling** the client `track.js` attaches to every event, ADR-34) and removed `networkType` from the `video_join_success` `meta` cell (it was wrongly nested); aligned the `video_join_success` trigger to the Daily `joined-meeting` event | Slice H · S3 (video UI; ADR-34): fix wrong stated fact in the catalog |
 | 2026-06-14 | §5: resolved "final copy is M4" — final plain-text copy for all 8 templates shipped in Slice H · S5 (`server/src/integrations/email/templates.js`, shared `render()`); merge-vars unchanged | Slice H · S5 (email template copy) |
+| 2026-06-14 | §6 intro: noted the `POST /api/analytics/events` ingestion endpoint now EXISTS (built — public, rate-limited, closed-catalog validated; doc 05); the catalog itself is unchanged | Slice H · S6 (launch foundation + hardening) |

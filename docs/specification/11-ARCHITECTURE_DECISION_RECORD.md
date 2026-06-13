@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.14                                                                                               |
+| Version          | 1.15                                                                                               |
 | Last updated     | 2026-06-14                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -49,6 +49,8 @@
 34. [ADR-33 — Daily.co video adapter: verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC, webhook `retryType=exponential`](#adr-33--dailyco-video-adapter-verifynormalize-in-the-adapter-role-via-meeting-token-user_id-raw-body-hmac-webhook-retrytypeexponential)
 35. [ADR-34 — Video UI: Daily Prebuilt iframe (lazy-loaded, brand-themed) + app chrome, get-ready screen, shared role-aware VideoRoom, fire-and-forget KPI telemetry](#adr-34--video-ui-daily-prebuilt-iframe-lazy-loaded-brand-themed--app-chrome-get-ready-screen-shared-role-aware-videoroom-fire-and-forget-kpi-telemetry)
 36. [ADR-35 — Landing at root, doctor listing relocated to `/browse`; legal pages ship as a review-gated structured DRAFT](#adr-35--landing-at-root-doctor-listing-relocated-to-browse-legal-pages-ship-as-a-review-gated-structured-draft)
+37. [ADR-36 — Sentry DSN-gated error tracking with PII scrubbing, alongside the audit bridge](#adr-36--sentry-dsn-gated-error-tracking-with-pii-scrubbing-alongside-the-audit-bridge)
+38. [ADR-37 — Single zod@3 copy via the `shared` workspace + root `overrides.zod`; ZodError duck-typing removed](#adr-37--single-zod3-copy-via-the-shared-workspace--root-overrideszod-zoderror-duck-typing-removed)
 
 ---
 
@@ -516,6 +518,34 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-36 — Sentry DSN-gated error tracking with PII scrubbing, alongside the audit bridge
+
+**Date:** 2026-06-14
+
+**Status:** Accepted
+
+**Context:** Slice H · S6 (launch foundation) needs production exception visibility. The app already writes a `system.unhandled_exception` audit row from the global error handler (ADR-30, feeding the F12/A3 alert feed), but that is an in-DB operational signal, not a developer-facing stack-trace tool. An external error-tracking sink would forward stack traces off-box — which raises a data-handling concern, because request bodies, cookies, auth headers, and user identity (emails / patient identifiers) are exactly the PII the system must not egress (doc 08). Non-production environments must also not emit.
+
+**Decision:** Adopt **Sentry** (`@sentry/node`) as the error-tracking sink, initialized once at boot by `initErrorTracking()`. It is **DSN-gated**: with no `SENTRY_DSN` set it is a logging no-op (so dev/test/CI never egress), active only when the DSN is configured. It runs with `sendDefaultPii: false` and a `beforeSend` hook that scrubs PII before any event leaves the process — it deletes the request body (`request.data`), cookies, the `Authorization`/`Cookie` headers, and the entire `user` object. The `captureException(...)` call sits in the global error handler **alongside** the existing audit bridge (ADR-30): the two are parallel, independent paths — Sentry is the external developer tool, the audit row is the internal A3 alert source. Sentry does **not** feed A3.
+
+**Consequences:** Production gets off-box stack-trace aggregation without leaking patient PII or credentials, and the egress posture is explicit and documented (doc 08 §A05). The DSN being optional keeps local/CI runs silent with zero config. The two-path design means an A3 alert and a Sentry event can both fire for one exception (intentional — different audiences); neither can mask the 500 response. `SENTRY_DSN` is the canonical env var (replacing the earlier placeholder `ERROR_TRACKING_DSN`; doc 15).
+
+---
+
+## ADR-37 — Single zod@3 copy via the `shared` workspace + root `overrides.zod`; ZodError duck-typing removed
+
+**Date:** 2026-06-14
+
+**Status:** Accepted
+
+**Context:** Validation schemas live in `shared/` and are imported by both the client and the server. A dual-Zod version skew had crept in (doc 07 §2.3): the server resolved `zod@3` while a `zod@4` copy was also present in the tree, so `err instanceof ZodError` was unreliable across the package boundary and the `errorHandler` had to **duck-type** `ZodError` (shape sniffing) to classify validation failures into the `400 VALIDATION_FAILED` envelope. Investigation showed the `zod@4` copy was **transitive** — pulled in via `eslint-plugin-react-hooks → zod-validation-error` — not a direct dependency anyone had chosen.
+
+**Decision:** Collapse the tree to a **single `zod@3` copy**: `shared/` is a real workspace declaring `zod ^3.23.0`, and the root `package.json` adds `overrides.zod ^3.23.0` to force the lone transitive `zod@4` down to v3. With one copy resolved everywhere, `instanceof ZodError` is reliable across the shared/server boundary, so the `errorHandler` **ZodError duck-typing was removed** in favor of a plain `instanceof` check.
+
+**Consequences:** Validation-error classification is now type-correct and simpler, with no shape-sniffing fallback to drift. The override is a **global constraint**: any future dependency that requires `zod@4` would be silently forced to v3 and could break — that risk must be re-evaluated if such a dependency is introduced (and the override removed or scoped). The skew risk in doc 07 §2.3 is resolved; the `shared` workspace also already pinned `zod ^3.23.0`, so the two declarations agree.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -535,3 +565,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-14 | Added ADR-33 (Daily.co video adapter: `verifyWebhook` verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC over `DAILY_WEBHOOK_SECRET`, webhook `retryType=exponential`; supersedes ADR-24's role-inference follow-up — dev `user_name` hack removed from prod; live-delivery gated by doc 07 §10) | Slice H · S2 (Daily.co video adapter); new architectural decision |
 | 2026-06-14 | Added ADR-34 (Video UI: lazy-loaded brand-themed Daily Prebuilt iframe + app chrome; P-11 get-ready screen with no app preview pane — Daily prejoin owns device check; one shared role-aware `VideoRoom` for P-12/D-04; fire-and-forget client `track.js` KPI #3 seam) | Slice H · S3 (video consultation UI); new architectural decision |
 | 2026-06-14 | Added ADR-35 (landing at root + doctor listing relocated to `/browse`; logged-in-patient `/`→`/browse` redirect; legal pages as a review-gated structured DRAFT via reusable `LegalPage`; KPI #1 `landing_view`/`booking_started` client emits over the shared `track.js`) | Slice H · S4 (public surface — landing + legal); new architectural decision |
+| 2026-06-14 | Added ADR-36 (Sentry DSN-gated error tracking; `sendDefaultPii:false` + `beforeSend` PII scrub; parallel to the ADR-30 audit bridge, does not feed A3; `SENTRY_DSN` canonical) and ADR-37 (single zod@3 copy via `shared` workspace + root `overrides.zod`; transitive zod@4 collapsed; errorHandler ZodError duck-typing removed; override is a global constraint) | Slice H · S6 (launch foundation + hardening); two new architectural decisions |

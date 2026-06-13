@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.7                                                           |
-| Last updated     | 2026-06-13                                                    |
+| Version          | 1.8                                                           |
+| Last updated     | 2026-06-14                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
 
@@ -252,6 +252,7 @@ model Appointment {
   // The UNIQUE no-double-booking guarantee is the partial index added in the migration
   // (see file header). These are plain query indexes only.
   @@index([doctorId, slotStart])
+  @@index([slotStart])
   @@index([patientUserId])
   @@index([state])
   @@map("appointments")
@@ -412,6 +413,7 @@ model AuditLog {
   @@index([eventType])
   @@index([actorType])
   @@index([at])
+  @@index([targetRef])
   @@map("audit_log")
 }
 ```
@@ -602,6 +604,7 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 | --------------------- | ------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
 | `availability_blocks` | `@@index`                             | `doctor_id`               | Slot-generation query for a given doctor                              |
 | `appointments`        | `@@index`                             | `(doctor_id, slot_start)` | Slot lookup; feeds availability/booking screen filters                |
+| `appointments`        | `@@index`                             | `slot_start`              | Admin records time-range (`from`/`to`) queries (F13); migration `20260613213051_slice_h_s6_indexes` |
 | `appointments`        | `@@index`                             | `patient_user_id`         | Patient appointment history screen (P-06)                             |
 | `appointments`        | `@@index`                             | `state`                   | Worker state-sweep queries (evaluation worker, reconciliation worker) |
 | `payments`            | `@@index`                             | `appointment_id`          | Payment lookup per appointment                                        |
@@ -611,15 +614,16 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 | `audit_log`           | `@@index`                             | `event_type`              | Admin audit search filter (A5)                                        |
 | `audit_log`           | `@@index`                             | `actor_type`              | Admin audit search filter (A5)                                        |
 | `audit_log`           | `@@index`                             | `at`                      | Time-range queries on audit log (A5)                                  |
+| `audit_log`           | `@@index`                             | `target_ref`              | Admin audit search filters on `target_ref` (F13); migration `20260613213051_slice_h_s6_indexes` |
 | `analytics_events`    | `@@index`                             | `type`                    | KPI aggregation by event type                                         |
 | `analytics_events`    | `@@index`                             | `at`                      | Time-range KPI queries                                                |
 | `session`             | `@@index` (map: `IDX_session_expire`) | `expire`                  | Session store cleanup sweep                                           |
 
-### 4d. Deferred indexes (proposed, not yet applied)
+### 4d. Admin search/time-range indexes (applied)
 
-These indexes were **recommended by the Slice G admin-panel review** to back admin search/time-range queries but are **NOT in the live `prisma/schema.prisma`** — they are deferred. The tables above (§4a–§4c) remain accurate to the live schema; the rows below are not yet migrated.
+These indexes were **recommended by the Slice G admin-panel review** to back admin search/time-range queries and were **applied in Slice H · S6** via migration `20260613213051_slice_h_s6_indexes`. They are now live in `prisma/schema.prisma` and included in the §4c inventory above.
 
-| Table          | Proposed index           | Would back                                                  |
+| Table          | Index                    | Backs                                                       |
 | -------------- | ------------------------ | ----------------------------------------------------------- |
 | `audit_log`    | `@@index([targetRef])`   | Admin audit search filters on `targetRef` (F13)             |
 | `appointments` | `@@index([slotStart])`   | Admin records time-range (`from`/`to`) queries (F13)        |
@@ -684,3 +688,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-12 | Added `NotificationJob.dedupe_key` (default `''`) and widened the `@@unique` to `(appointment_id, type, dedupe_key)` (§2n, §4a); migration `20260612003907_slice_f_outbox_dedupe_key`; aligned `doctorSnapshot` shape to drop the non-existent `signature` field (§2g, §3) | Slice F (F08 prescriptions): per-prescription `prescription_ready` enqueue; doctor model has no signature in v1 |
 | 2026-06-13 | Corrected `AuditLog.targetRef` example to bare id / route-path (not `type:id`) (§2j); documented `Doctor.photoUrl` `/uploads/doctors/<id>.<ext>` static-serve format (§2c); added §4d deferred-index note (`audit_log.targetRef`, `appointments.slotStart`) | Slice G as-built sweep |
 | 2026-06-13 | Added `manual_required` to the `RefundStatus` enum (§2a) + a `Payment` prose note on the PayFast-PK manual-refund degradation (§2f); migration `20260613181905_slice_h_refund_manual_required` | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
+| 2026-06-14 | Applied the two deferred admin indexes — `appointments.slotStart` + `audit_log.targetRef` — to the embedded schema (§2e, §2j), §4c inventory, and §4d (now "applied", no longer deferred); migration `20260613213051_slice_h_s6_indexes` | Slice H · S6 (launch foundation + hardening) |

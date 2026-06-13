@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
 | Status           | Canonical                                                                                               |
-| Version          | 1.6                                                                                                     |
+| Version          | 1.7                                                                                                     |
 | Last updated     | 2026-06-14                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
 | Related docs     | 03, 08, 15                                                                                              |
@@ -100,12 +100,12 @@ Complete every item before triggering a production deploy.
 
 - [ ] **Prisma version pinned** — `package.json` must pin `prisma@6.x` and `@prisma/client@6.x` (Prisma 7 dropped in-schema `datasource.url`). Current pin is `6.19.3`. See doc 15 §7 (Migration Caveats).
 - [ ] **Environment variables set** — all required vars from doc 15 are configured in Railway's environment dashboard; no var is left empty for production.
-- [ ] **Secrets rotated per environment** — `SESSION_SECRET`, `PAYFAST_*`, `DAILY_API_KEY`, `RESEND_API_KEY`, `ERROR_TRACKING_DSN`.
+- [ ] **Secrets rotated per environment** — `SESSION_SECRET`, `PAYFAST_*`, `DAILY_API_KEY`, `RESEND_API_KEY`, `SENTRY_DSN`.
 - [ ] **PayFast KYC complete** — merchant account must be fully verified before `PAYFAST_MODE=live` can process payments (ARCHITECTURE.md §12).
 - [ ] **Dev provider switches OFF** — `PAYMENT_PROVIDER` and `EMAIL_PROVIDER` are unset or `stub` (NOT `mock`/`console`) so the dev mock payment gateway and the `/dev/checkout` routes are never mounted in production (ADR-22; doc 08; doc 15).
 - [ ] **Dev video switch OFF** — `VIDEO_PROVIDER` is unset or `stub` (NOT `mock`) so the dev mock video provider, the `/dev/video/*` join-simulator routes, and the `/dev/worker/*` evaluation trigger are never mounted in production (ADR-24; doc 08; doc 15).
 - [ ] **Uploads directory configured** — `UPLOADS_DIR` is set (default `./uploads`) and the path is writable and backed by persistent storage (a Railway volume), otherwise doctor profile photos are lost on every redeploy. See doc 15 §8 (File Storage).
-- [ ] **First deploy only: Settings singleton exists** — the `settings` row (`id = 1`) must exist before any settings access. `prisma migrate deploy` and `npm run bootstrap:admin` do **not** create it — only `npm run db:seed` does. On first production deploy, run the seed or execute `INSERT INTO settings (id) VALUES (1);`. Without the row, `GET /api/admin/settings` returns `null` and `PUT` throws. **Known gap** pending a migrate-deploy seed step.
+- [ ] **Settings singleton — automatic.** The `settings` row (`id = 1`) is bootstrapped **automatically at server boot** by `ensureSettings()` (`server/src/index.js`), which idempotently upserts `id = 1` (schema defaults fill the row). No manual `INSERT`, seed step, or first-deploy action is required; `GET`/`PUT /api/admin/settings` work on a fresh DB. (Slice H · S6, resolving the prior known gap.)
 - [ ] **First deploy only: admin bootstrap** — run `npm run bootstrap:admin` after the initial deploy (see §9 and §4 step 8).
 
 ---
@@ -125,8 +125,9 @@ docker compose up --build
 # 3. Apply migrations (first time or after schema changes)
 npx prisma migrate dev
 
-# 4. Seed data — REQUIRED (creates the Settings singleton id=1 + dev admin;
-#    admin/settings endpoints fail without it)
+# 4. Seed data — creates the dev admin (admin login fails without it).
+#    The Settings singleton (id=1) is bootstrapped automatically at boot by
+#    ensureSettings(), so settings endpoints work even before seeding.
 npm run db:seed
 ```
 
@@ -268,7 +269,7 @@ Run these checks after every production deploy (or after a Railway redeploy).
 
 ### Error tracking
 
-An error-tracking integration is configured via the `ERROR_TRACKING_DSN` environment variable (doc 15). The DSN is optional in development and required in production. Unhandled exceptions and caught critical errors are forwarded to the configured error-tracking service.
+Error tracking is **Sentry** (`@sentry/node`), configured via the `SENTRY_DSN` environment variable (doc 15). The DSN is optional in development (with no DSN the integration is a logging no-op) and required in production. It is initialized once at boot (`initErrorTracking()`); unhandled exceptions and caught critical errors are forwarded to Sentry with `sendDefaultPii: false` and a `beforeSend` PII scrub (request body, cookies, auth headers, user identity removed — doc 08 §A05; ADR-36).
 
 ### Admin alert feed (A3)
 
@@ -333,3 +334,4 @@ A formal version scheme and Git tagging convention have not been established. At
 | 2026-06-11 | Re-pointed the refund-exhaustion alert ref to `modules/appointment/service.js`; fixed two deprecated/broken deploy-checklist pointers (`ARCHITECTURE.md §5` -> doc 04 §4b; malformed `doc 15 §CONFIG.md §7` -> doc 15 §7) | Restructure (ADR-26) + deprecated-doc hygiene |
 | 2026-06-13 | Added `dermestha_uploads` app-service volume (§2); added pre-deploy checks for `UPLOADS_DIR` persistence + Settings-singleton (id=1) known gap (§3); made `db:seed` required not optional (§4.1); added uploaded-photo rollback note (§6) | Slice G as-built sweep |
 | 2026-06-14 | Added a Node-version-floor note under the Dockerfile build steps: `@daily-co/daily-js@0.91.0` (video UI) requires Node ≥22.14.0; `node:22-slim` satisfies it but must not be pinned below that (doc 07 open-q 11) | Slice H · S3 (video consultation UI; ADR-34) |
+| 2026-06-14 | Settings singleton (id=1) is now bootstrapped automatically at boot via `ensureSettings()` — replaced the manual-insert first-deploy checklist item + adjusted the local-dev seed note (§3, §4.1); renamed `ERROR_TRACKING_DSN` → `SENTRY_DSN` (secrets checklist §3 + error-tracking paragraph §8, now naming Sentry + PII scrub; ADR-36) | Slice H · S6 (launch foundation + hardening) |
