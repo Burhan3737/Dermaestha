@@ -10,13 +10,19 @@ vi.mock('../../integrations/video/index.js', () => ({
   videoProvider: {
     createRoom: vi.fn(async (id) => ({ roomName: `appt_${id}`, roomUrl: `u/${id}` })),
     issueToken: vi.fn(async () => ({ token: 'tok', expiresAt: '2026-06-04T10:35:00.000Z' })),
+    verifyWebhook: vi.fn(),
   },
 }));
+vi.mock('../../services/audit/audit.service.js', () => ({ record: vi.fn(async () => {}) }));
+vi.mock('../../lib/logger/logger.js', () => ({ logger: { warn: vi.fn(), info: vi.fn() } }));
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import { issueAppointmentToken, recordJoinFromDailyEvent } from './service.js';
 import * as videoSvc from './service.js';
 import { daily } from './controller.js';
+import { videoProvider } from '../../integrations/video/index.js';
+import * as audit from '../../services/audit/audit.service.js';
+import { AppError } from '../../http/AppError.js';
 
 const SLOT_START = new Date('2026-06-04T10:00:00.000Z');
 const SLOT_END = new Date('2026-06-04T10:30:00.000Z');
@@ -136,14 +142,41 @@ describe('recordJoinFromDailyEvent', () => {
 });
 
 describe('daily webhook', () => {
-  it('forwards a participant event to recordJoinFromDailyEvent and 200s', async () => {
+  it('records a verified, normalized event and 200s', async () => {
+    const evt = { type: 'participant.joined', appointmentId: 'a1', role: 'doctor', timestamp: 't', eventId: 'e' };
+    videoProvider.verifyWebhook.mockReturnValue(evt);
     const spy = vi.spyOn(videoSvc, 'recordJoinFromDailyEvent').mockResolvedValue();
-    const req = { body: { type: 'participant.joined', room: 'appt_a1', user_name: 'doctor' } };
     const res = { json: vi.fn() };
     const next = vi.fn();
-    await daily(req, res, next);
-    expect(spy).toHaveBeenCalledWith(req.body);
+    await daily({ headers: {}, body: {}, rawBody: '{}' }, res, next);
+    expect(spy).toHaveBeenCalledWith(evt);
     expect(res.json).toHaveBeenCalledWith({ ok: true });
+    expect(next).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('does not record when verifyWebhook returns null (test ping / tokenless) but still 200s', async () => {
+    videoProvider.verifyWebhook.mockReturnValue(null);
+    const spy = vi.spyOn(videoSvc, 'recordJoinFromDailyEvent').mockResolvedValue();
+    const res = { json: vi.fn() };
+    await daily({ headers: {}, body: { test: 'test' }, rawBody: '{}' }, res, vi.fn());
+    expect(spy).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ ok: true });
+    spy.mockRestore();
+  });
+
+  it('on a bad signature: audits video.webhook_rejected and forwards a 401, never recording', async () => {
+    videoProvider.verifyWebhook.mockImplementation(() => {
+      throw new AppError('INVALID_SIGNATURE', 'bad', 401);
+    });
+    const spy = vi.spyOn(videoSvc, 'recordJoinFromDailyEvent').mockResolvedValue();
+    const next = vi.fn();
+    await daily({ headers: {}, body: {}, rawBody: 'x' }, { json: vi.fn() }, next);
+    expect(spy).not.toHaveBeenCalled();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'video.webhook_rejected', actorType: 'system' }),
+    );
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: 'INVALID_SIGNATURE', status: 401 }));
     spy.mockRestore();
   });
 });
