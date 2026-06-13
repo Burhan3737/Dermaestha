@@ -4,7 +4,7 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.9                                |
+| Version          | 1.10                               |
 | Last updated     | 2026-06-14                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
@@ -241,7 +241,7 @@ The active email adapter posts to `POST https://api.resend.com/emails` with head
 
 ## 5. Email merge-variable catalog (8 triggers)
 
-Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final copy is M4. All email times render in Asia/Karachi (F07.02).
+Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final plain-text copy shipped in Slice H · S5 (`server/src/integrations/email/templates.js`, shared `render()`). All email times render in Asia/Karachi (F07.02).
 
 | `EmailTemplate`        | Trigger                                   | Merge vars                                                   |
 | ---------------------- | ----------------------------------------- | ------------------------------------------------------------ |
@@ -302,3 +302,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-13 | Added `verifyReturn` to the `PaymentProvider` typedef (§1); added `'manual_required'` to `RefundResult.status` + nullable `refundRef` (§2); rewrote the PayFast IPN-specifics subsection from the South-Africa passphrase model to the **PayFast Pakistan** IPG contract (GetAccessToken→PostTransaction, `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` signature, rupees-decimal wire amounts, dual-channel CHECKOUT_URL + SUCCESS/FAILURE return, ipguat/ipg1 hosts, no refund/status API) marked researched-not-vendor-confirmed and gated by doc 07 §3 (§2) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | Added `verifyWebhook` to the `VideoProvider` typedef + optional `createRoom({ notAfterIso })` + the `NormalizedVideoEvent` typedef (§1); replaced the simplified dev participant shape with Daily's versioned envelope (`payload.owner`, `room`=name, `user_id` role anchor) + documented the raw-body HMAC verification (`X-Webhook-Timestamp`/`X-Webhook-Signature`, base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time) and the live-delivery launch gate → doc 07 (§3); corrected the `daily.mock` note's "not yet wired" opening (the concrete `daily.js` is now wired) | Slice H · S2 (Daily.co video adapter; ADR-33) |
 | 2026-06-14 | §6 analytics catalog: corrected the wire shape to the as-built `{ type, networkType, meta }` (`networkType` is the envelope **sibling** the client `track.js` attaches to every event, ADR-34) and removed `networkType` from the `video_join_success` `meta` cell (it was wrongly nested); aligned the `video_join_success` trigger to the Daily `joined-meeting` event | Slice H · S3 (video UI; ADR-34): fix wrong stated fact in the catalog |
+| 2026-06-14 | §5: resolved "final copy is M4" — final plain-text copy for all 8 templates shipped in Slice H · S5 (`server/src/integrations/email/templates.js`, shared `render()`); merge-vars unchanged | Slice H · S5 (email template copy) |

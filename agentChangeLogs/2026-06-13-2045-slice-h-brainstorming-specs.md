@@ -145,6 +145,23 @@ Lead Opus subagent: plan (`docs/superpowers/plans/2026-06-13-slice-h-s4-public-s
 
 **Pre-launch gate (carried):** final lawyer-reviewed ToS + Privacy copy must replace the DRAFT before go-live (signup consent links to these pages).
 
+## S5 — Email template copy (IMPLEMENTED + MERGED to main, merge `bfb8c7b`, 2026-06-14)
+
+Lead Opus subagent: plan (`docs/superpowers/plans/2026-06-13-slice-h-s5-email-template-copy.md`) + TDD subagents on `feature/slice-h-s5-email` (4 commits `11bbd75`→`66ac8e1`). Server-only. Controller verified + merged.
+
+**Code files (subagent report, captured):**
+- `server/src/integrations/email/templates.js` (C) + `templates.test.js` (C, 9 tests) — `formatPKR` (rupees), `FOOTER`, `SUPPORT_EMAIL` placeholder, all 8 `{subject, body(vars)}` + `render()`; null lines omitted, footer once, money via formatPKR.
+- `resend.js` (M) — replaced `SUBJECTS`+`renderText` with `render()`; HTTP path/error mapping unchanged. `resend.test.js` (M). `console.dev.js` (M) — logs the rendered email; `console.dev.test.js` (M). `index.js` untouched (typedef already matched). Plan doc (C).
+
+**Decisions / findings:**
+- `formatPKR` uses `Math.round(paisa/100)` (faithful to spec's "integer rupees"; identical output for real data since PayFast PK reports `gatewayFee:null` + whole-rupee fees). Deliberate, flagged.
+- No copy/var mismatch vs doc 14 §5 (all 8 use only catalog vars; `password_reset` greets "Hi,"). `refund_confirmation`/`cancellation_apology` get a superset of vars from the caller; each body composes only its own lines (verified via notification integration test).
+- `SUPPORT_EMAIL`/footer entity = documented code constants (`support@dermestha.example`), not env — per spec.
+
+**Verification (controller-independent):** `npm test` → 38 files / **297 passed** (287→+10); `npm --workspace client test` → **123** (untouched, server-only slice). No forbidden paths. Merged `--no-ff` (`bfb8c7b`).
+
+**Pre-launch confirm (non-blocking):** real support email + footer entity to replace the placeholder.
+
 ## Open items / next session
 - Then S2 → S3 → S4 → S5 → S6 via the same loop.
 - Tracked spec-doc impact per slice lives in each spec's §"Spec-doc impact" table (applied at each slice's merge, by the controller).
