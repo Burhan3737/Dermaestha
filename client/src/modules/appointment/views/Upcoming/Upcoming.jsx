@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { PatientLayout } from '../../../../layouts/PatientLayout/PatientLayout.jsx';
 import { formatPkr, formatKarachi } from '../../../../lib/format/format.js';
 import { CancelModal } from '../../components/CancelModal/CancelModal.jsx';
+import { track } from '../../../../lib/analytics/track.js';
 import { useAppointment } from '../../useAppointment.js';
 
 export function Upcoming() {
@@ -44,7 +45,11 @@ export function Upcoming() {
               const closesAt = new Date(a.slotEnd).getTime() + 5 * 60 * 1000;
               const active = Date.now() >= opensAt && Date.now() <= closesAt;
               return active ? (
-                <Link className="btn btn--secondary" to={`/video/${a.id}`}>
+                <Link
+                  className="btn btn--secondary"
+                  to={`/video/${a.id}/ready`}
+                  onClick={() => track('video_join_attempt', { appointmentId: a.id, role: 'patient' })}
+                >
                   Join Call
                 </Link>
               ) : (

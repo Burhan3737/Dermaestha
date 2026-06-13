@@ -7,6 +7,8 @@ import { api } from '../../../../lib/apiClient/apiClient.js';
 
 vi.mock('../../../../lib/apiClient/apiClient.js', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 vi.mock('../../../../context/session/session.jsx', () => ({ useSession: () => ({ session: { role: 'patient' } }) }));
+vi.mock('../../../../lib/analytics/track.js', () => ({ track: vi.fn() }));
+import { track } from '../../../../lib/analytics/track.js';
 
 function setup() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -113,6 +115,20 @@ describe('P-08 Upcoming', () => {
     await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
     const join = screen.getByRole('link', { name: /join call/i });
     expect(join.getAttribute('href')).toContain('/video/a1');
+  });
+
+  it('routes Join Call through the waiting room and emits video_join_attempt', async () => {
+    const soon = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    api.get.mockResolvedValue({
+      data: [{ id: 'a1', slotStart: soon, slotEnd: soon, state: 'confirmed', feeAtBooking: 250000,
+        forSelf: true, subjectName: null, doctorName: 'Dr A', specialization: 'Acne', doctorPhotoUrl: null }],
+    });
+    setup();
+    await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
+    const join = screen.getByRole('link', { name: /join call/i });
+    expect(join.getAttribute('href')).toBe('/video/a1/ready');
+    join.click();
+    expect(track).toHaveBeenCalledWith('video_join_attempt', { appointmentId: 'a1', role: 'patient' });
   });
 
   it('opens the cancel modal and posts the cancel on confirm', async () => {
