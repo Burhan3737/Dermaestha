@@ -23,7 +23,7 @@ export function PaymentReturn() {
         {q.isError && (
           <>
             <h1>Payment did not complete</h1>
-            <Link className="btn btn--secondary" to="/">
+            <Link className="btn btn--secondary" to="/browse">
               Back to doctors
             </Link>
           </>

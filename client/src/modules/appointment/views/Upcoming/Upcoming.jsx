@@ -29,7 +29,7 @@ export function Upcoming() {
         {list.data && rows.length === 0 && (
           <div className="empty-state">
             <p>No upcoming appointments.</p>
-            <Link className="btn btn--primary" to="/">
+            <Link className="btn btn--primary" to="/browse">
               Browse doctors
             </Link>
           </div>
