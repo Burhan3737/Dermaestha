@@ -21,6 +21,7 @@ vi.mock('../appointment/service.js', () => ({ transition: vi.fn().mockResolvedVa
 vi.mock('../notification/service.js', () => ({
   enqueueBookingEmails: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../analytics/service.js', () => ({ record: vi.fn().mockResolvedValue(undefined) }));
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
@@ -28,6 +29,7 @@ import { emailProvider } from '../../integrations/email/index.js';
 import * as state from '../appointment/service.js';
 import * as notification from '../notification/service.js';
 import * as audit from '../../services/audit/audit.service.js';
+import * as analytics from '../analytics/service.js';
 import { createIntent, processWebhook, reconcileUnconfirmed } from './service.js';
 
 beforeEach(() => vi.clearAllMocks());
@@ -121,6 +123,10 @@ describe('payment.processWebhook', () => {
       }),
     );
     expect(emailProvider.send).not.toHaveBeenCalled(); // no direct send path remains
+    expect(analytics.record).toHaveBeenCalledWith({
+      type: 'booking_confirmed',
+      meta: { doctorId: 'd1', fee: 250000 },
+    });
   });
 
   it('on an already-confirmed appointment is an idempotent no-op', async () => {
@@ -197,6 +203,10 @@ describe('payment.reconcileUnconfirmed (F04.03)', () => {
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'payment.reconciled_confirmed', targetRef: 'a1' }),
     );
+    expect(analytics.record).toHaveBeenCalledWith({
+      type: 'booking_confirmed',
+      meta: { doctorId: 'd1', fee: 250000 },
+    });
   });
 
   it('edge #6a: slot conflict → full gross refund, no second appointment, admin alert', async () => {
