@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Document ID      | `13-PRODUCT_STATUS_TRACKER`                                                                                                                           |
 | Status           | Canonical                                                                                                                                             |
-| Version          | 1.11                                                                                                                                                   |
+| Version          | 1.12                                                                                                                                                   |
 | Last updated     | 2026-06-13                                                                                                                                            |
 | Sources absorbed | `server/src + client/src inspection; agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md; ARCHITECTURE.md §5b; docs/specification/02; PRD §5.1` |
 | Related docs     | 02, 03, 05                                                                                                                                            |
@@ -170,6 +170,16 @@ Feature IDs are those defined in `docs/specification/02-SCOPE_FEATURE_DOCUMENT.m
 | M3 — Prescriptions (Week 6)    | Doctor prescription builder + patient-ID header; medicine catalogue prices; patient itemised PDF download                   | Done        |
 | M4 — Launch-ready (Week 8)     | Admin panel (doctor onboarding, medicine catalogue, alert feed); landing page; email automation; legal content; full E2E QA | In progress |
 
+### Technical follow-ups (pre/at-launch — post-Slice G)
+
+Engineering hygiene surfaced during the Slice G build + review; these are not product features. Full detail lives in the cross-referenced docs; this table is the actionable tracker.
+
+| Item                                                                                                                                                      | Target                     | Detail                       | Status |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------- | ------ |
+| Add `AuditLog @@index([targetRef])` + `Appointment @@index([slotStart])` (migration) — admin audit / records / alert queries currently full-scan          | Before traffic grows       | doc 04 §4d; doc 07 §2.3       | Open   |
+| `Settings(id=1)` singleton bootstrap on first prod deploy — no automated migrate/seed step exists; GET returns `null` and PUT throws without the row       | Before / at first prod deploy | doc 10 §3; doc 07 open-q 7 | Open   |
+| Align on a single Zod version (root `zod@4` vs server `zod@3`; `errorHandler` duck-types `ZodError` as a workaround)                                        | Before next milestone      | doc 15 §7; doc 07 §2.3        | Open   |
+
 ### v1.1 (2–4 weeks post-launch)
 
 | Item                                                | Status          |
@@ -291,3 +301,4 @@ This section is the v1 build backlog (baseline 2026-06-01), reconciled as each s
 | 2026-06-13 | Status sweep after Slice G (M3 → Done 100%, M4 → In progress ~60%; modules 3/11/14/15/16/17 → Built; F10/F11/F12/F14/F15 → Built, F13 → Built with intentional UI gaps; cross-cutting error-tracking/Zod/route-config rows; views 18/24 + A-01..A-05; §5 M4 → In progress; M4 admin checklist ticked + settings route PATCH→PUT + admin screen-ID list corrected to A-01..A-05; M3 A-02 note) | Reflect built F10–F14 admin panel + A-01..A-05 views + DA5 reset (Slice G as-built sweep) (v1.9) |
 | 2026-06-13 | Post-sweep status sync: §5 roadmap M1/M2 → In progress (match §2); §6 backlog reconciled to as-built — M1 Auth items + typed API client + session context + route config ticked (Slice A–C, missed in prior sweeps), M2 video service [~]/video-token route + audit-query API ticked, P-07/P-08/P-09 + D-02/D-03 view rows corrected to §3 canonical screen IDs; §6 intro reframed; F01 Resend note (Slice E live) | Keep the tracker synced to reality after Slice G (v1.10) |
 | 2026-06-13 | Screen-ID reconciliation vs doc 06 canon: §6 M4 doctor-views row (D-05 was the built builder; history is part of D-02) and patient-views row (P-12=video, P-13=prescription per doc 06; refund status is a P-08/P-09 dashboard element, Profile tab has no inventory ID) corrected to the doc-06 registry | Align doc 13 screen IDs to the doc-06 canonical inventory (v1.11) |
+| 2026-06-13 | Added a §5 "Technical follow-ups (pre/at-launch — post-Slice G)" tracker: AuditLog/Appointment index migration, Settings(id=1) prod bootstrap, Zod single-version alignment — each cross-linked to its detail doc (04/07/10/15) | Single actionable home for the deferred technical items (v1.12) |

@@ -115,7 +115,8 @@ All work on feature/slice-g; rollback = delete branch. No schema migrations plan
 
 ## Open items / next session
 **Canon-doc sweep: DONE** (user-approved 2026-06-13). 13 docs updated to as-built; doc 14 unchanged. Remaining for the user:
-1. Branch finish (Task 22 Step 5): merge to main vs PR; push requires approval.
+1. Branch finish (Task 22 Step 5): merge to main vs PR; push requires approval. Tests green at the finish gate (248 server / 97 client).
+   - Note: items 2–4 below are now consolidated as an actionable checklist in **doc 13 §5 "Technical follow-ups (pre/at-launch — post-Slice G)"** (user-chosen home), each cross-linked to its detail doc.
 2. Schema indexes: `@@index([targetRef])` on AuditLog + `@@index([slotStart])` on Appointment (migration; contradicts plan's zero-schema-change premise). Recorded as deferred in doc 04 §4d + doc 07 §2.3.
 3. Settings(id=1) prod bootstrap gap (pre-existing): no automated migrate/seed in the Docker entrypoint. Recorded in doc 10 §3 + doc 07 open-question 7.
 4. Zod dependency alignment (pre-existing): root zod@4 vs server zod@3; duck-type fix shipped. Recorded in doc 15 §7 + doc 07 §2.3.
