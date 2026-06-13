@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------- |
 | Document ID      | `07-RISK_ASSUMPTION_DOCUMENT`                                     |
 | Status           | Canonical                                                         |
-| Version          | 1.0                                                               |
-| Last updated     | 2026-06-01                                                        |
+| Version          | 1.1                                                               |
+| Last updated     | 2026-06-13                                                        |
 | Sources absorbed | `docs/product/PRD.md §5.2, §2.3, §3; server/ + client/ TODO scan` |
 | Related docs     | 01, 02, 08                                                        |
 
@@ -84,6 +84,17 @@ Every row below is taken verbatim from PRD §5.2.
 
 A grep was run across `server/` and `client/src/` (all `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs` files, excluding `node_modules`). **No TODO or FIXME markers were found in the application source code.** One match existed inside `server/node_modules/zod/` (a third-party library file), which is not application code. No additional risk rows were added from the scan.
 
+### 2.3 Slice G as-built risks (not from PRD §5.2)
+
+These rows surfaced during the Slice G (admin-panel) build and are recorded here to keep §2.1 a faithful verbatim reproduction of PRD §5.2.
+
+| Risk                                                                                       | Likelihood | Impact     | Mitigation                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------ | ---------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Dual-Zod version skew — root `zod@4` (used by `shared/` schemas) vs server `zod@3`         | Low        | Medium     | `errorHandler` duck-types `ZodError` as a workaround, so both versions classify correctly today; risk of silent mis-classification if the shared schemas adopt v4-only APIs the server's v3 cannot represent. Single-version alignment is a noted open follow-up.                      |
+| DA5 admin password-reset does not invalidate live sessions                                 | Low        | Medium     | `mustChangePassword` is read from the session snapshot taken at login, so a concurrently-logged-in doctor keeps access until session TTL (default 7 days); deleting the session row is the manual remedy. Accepted at 3–5 doctor scale.                                                |
+| Unhandled-exception audit rows have no sampling / rate-limit (ADR-30)                       | Low        | Low–Medium | A hot-failing route can flood `audit_log` and the F12 alert feed. No mitigation in v1; acceptable at current traffic. Revisit with per-source sampling if a route fails in a tight loop.                                                                                              |
+| `AuditLog.targetRef` and `Appointment.slotStart` are unindexed                             | Low        | Medium     | Admin audit / records / alert queries full-scan these columns. The index migration was deferred from Slice G; apply it before traffic grows.                                                                                                                                          |
+
 ---
 
 ## 3. Open questions
@@ -102,6 +113,10 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
 
 6. **WCAG accessibility gap acknowledgment.** The PRD defers WCAG 2.1 AA conformance to a fast-follow and acknowledges the risk for a low-tech-literacy, mobile-first audience (PRD §2.3). Before launch, the team should agree on a minimum accessibility standard for the core booking/payment/join flow so the gap period has a defined boundary.
 
+7. **`Settings(id=1)` production bootstrap gap.** The settings singleton row must exist before the first settings access (F14), but it is created only by `prisma/seed.js` — there is no automated step in the Docker entrypoint. The deploy runbook must insert it (run the seed, or `INSERT INTO settings(id) VALUES (1)`). Decide before launch: add a `migrate-deploy` seed step, or document this as a manual deploy step.
+
+8. **Audit-tab filter UI deferred (Slice G).** The server `/api/admin/audit` endpoint accepts filters (`eventType` / `actorType` / `userId` / `email` / date) and the records endpoint accepts a state filter, but the A-03 / A-04 admin UI renders pagination only for the audit tab and no state-filter control. Decide: build the filter UI in a follow-up, or accept the filter-less feed as a v1 limitation.
+
 ---
 
 ## Revision footer
@@ -109,3 +124,4 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
 | Date       | Change           | Why                                                           |
 | ---------- | ---------------- | ------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §5.2/§2.3 + code TODO scan |
+| 2026-06-13 | Added §2.3 Slice G as-built risks (Zod skew, DA5 session invalidation, unsampled exception audit, unindexed audit/slot columns) + open questions 7–8 (settings bootstrap gap, audit-tab filter UI deferral) | Slice G as-built sweep |

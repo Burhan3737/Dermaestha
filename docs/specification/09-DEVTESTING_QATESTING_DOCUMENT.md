@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------- |
 | Document ID      | `09-DEVTESTING_QATESTING_DOCUMENT`                |
 | Status           | Canonical                                         |
-| Version          | 1.2                                               |
-| Last updated     | 2026-06-01                                        |
+| Version          | 1.3                                               |
+| Last updated     | 2026-06-13                                        |
 | Sources absorbed | `docs/specification/02, 04, 08; vitest.config.js` |
 | Related docs     | 02, 04, 08, 12                                    |
 
@@ -236,7 +236,7 @@ A feature is considered complete when all of the following criteria are met:
 - [ ] All data-integrity invariants that the feature touches (per the doc 04 §6 scope-to-database table) are verified.
 - [ ] Audit log entries are emitted for every state transition and admin action defined in doc 08 §A09 that the feature triggers.
 - [ ] No open Critical or High severity bugs are linked to the feature.
-- [ ] The feature's status in doc 13 (the Architecture Decision Record) is updated to reflect the final implementation decision if a decision was made during development.
+- [ ] The feature's status in doc 11 (the Architecture Decision Record) is updated to reflect the final implementation decision if a decision was made during development.
 
 ---
 
@@ -278,3 +278,4 @@ The release recommendation is a brief document (or structured comment) that stat
 | 2026-06-01 | Initial creation | Derived from docs 02/04/08 + repo test setup |
 | 2026-06-11 | Re-pointed the transition-table ref to `modules/appointment/service.js` (merged) and updated the Vitest glob to include `server/src/**/test.js` + `shared/**/*.test.js` | Folder-structure restructure (ADR-26); domain-module tests are co-located as `test.js` |
 | 2026-06-11 | Corrected the stale "no `.test.jsx` files exist yet" clause — the client suite exists and is co-located per unit | Reflect actual client test tree (pre-existing drift, fixed during the restructure pass) |
+| 2026-06-13 | Fixed §8 DoD ADR misreference (doc 13 → doc 11); no structural testing changes — the Slice G admin integration suite (`server/src/test/admin.integration.test.js`, 8 tests) lands in the already-documented `server/src/test/` location, taking final counts to 248 server / 97 client | Slice G as-built sweep |

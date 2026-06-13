@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.9                           |
-| Last updated     | 2026-06-12                    |
+| Version          | 1.10                          |
+| Last updated     | 2026-06-13                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -51,7 +51,9 @@ All routes are same-origin under the `/api` prefix. There is no version segment 
 /api/<resource>[/:id][/<sub-resource>]
 ```
 
-File upload (doctor photo) uses `multipart/form-data`; all other routes use `Content-Type: application/json`.
+File upload (doctor photo) uses `multipart/form-data` (field `"photo"`); all other routes use `Content-Type: application/json`.
+
+Uploaded doctor photos are served at `GET /uploads/doctors/<id>.<ext>` via `express.static` (`X-Content-Type-Options: nosniff`, `index: false`) — outside the `/api` prefix.
 
 Express serves `client/dist` and the SPA catch-all **after** all `/api` routes. Legal pages (`/legal/terms`, `/legal/privacy`) are static SPA routes — not `/api` endpoints.
 
@@ -80,14 +82,14 @@ Validation is Zod-first (`shared/schemas`), then the controller calls a service;
 | `200`  | OK                                                           | —                                                                     |
 | `201`  | Resource created                                             | —                                                                     |
 | `204`  | OK, no body (logout)                                         | —                                                                     |
-| `400`  | Malformed / Zod validation fail                              | `VALIDATION_FAILED`                                                   |
+| `400`  | Malformed / Zod validation fail                              | `VALIDATION_FAILED`, `INVALID_FILE` (photo upload — no file / bad magic bytes / >2MB) |
 | `401`  | Not authenticated                                            | `UNAUTHENTICATED`                                                     |
 | `403`  | Wrong role / not owner (DA6); or session must change password (DA3) | `FORBIDDEN`, `MUST_CHANGE_PASSWORD`                                                           |
 | `404`  | Not found _or_ not visible to caller (avoid existence leaks) | `NOT_FOUND`                                                           |
-| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `LOCK_EXPIRED`, `IMMUTABLE_FIELD`, `INVALID_STATE`, `BLOCK_HAS_BOOKINGS`, `ACTIVE_LOCK_EXISTS`, `OVERLAP`, `INVALID_TRANSITION` |
+| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `LOCK_EXPIRED`, `IMMUTABLE_FIELD`, `INVALID_STATE`, `BLOCK_HAS_BOOKINGS`, `ACTIVE_LOCK_EXISTS`, `OVERLAP`, `INVALID_TRANSITION`, `PMC_TAKEN`, `EMAIL_TAKEN` (P2002 on doctor create) |
 | `422`  | Well-formed but semantically rejected                        | `BOOKING_TOO_SOON`, `REFUND_INELIGIBLE`, `SLOT_NOT_BOOKABLE`, `VIDEO_WINDOW_CLOSED` |
 | `429`  | Rate-limited / locked out                                    | `RATE_LIMITED`, `ACCOUNT_LOCKED`                                      |
-| `500`  | Unexpected; logged to error tracking                         | `INTERNAL`                                                            |
+| `500`  | Unexpected; logged to error tracking                         | `INTERNAL` — a non-`AppError`/non-`ZodError` 500 also writes a fire-and-forget `system.unhandled_exception` audit row (F12.01 alert source; `targetRef` = route path, `reason` = message ≤ 500 chars) |
 
 Additional rules:
 
@@ -135,12 +137,12 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                          | Role   | Purpose                                        | Notes                                                                 |
 | -------------------------------------- | ------ | ---------------------------------------------- | --------------------------------------------------------------------- |
-| `GET /api/doctors`                     | public | Listing (active only) for Browse (P1)          | paginated; never shows `isActive=false`                               |
+| `GET /api/doctors`                     | public/admin | Listing (active only) for Browse (P1); admin all-doctors branch | default: paginated, never shows `isActive=false`. `?includeInactive=true` (admin only; non-admin → 403 `FORBIDDEN`) returns ALL doctors as a flat `{ data: [...] }` array (NO page envelope), each row adding `email`/`phone`/`pmcNumber`/`photoUrl`/`isActive`/`status`/`upcomingConfirmedCount` |
 | `GET /api/doctors/:id`                 | public | Public profile (P3)                            | active only                                                           |
-| `POST /api/doctors`                    | admin  | Onboard doctor + set initial password (A1/DA1) | creates User(role=doctor)+Doctor in one tx; `mustChangePassword=true` |
+| `POST /api/doctors`                    | admin  | Onboard doctor + set initial password (A1/DA1) | creates User(role=doctor)+Doctor in one tx; `mustChangePassword=true`; new doctor starts `isActive=false`, `status=pending` (Pending-State Rule; first reactivation promotes `status→active`) |
 | `PATCH /api/doctors/:id`               | admin  | Edit editable fields (A4)                      | **rejects `pmcNumber`/`email` → 409 `IMMUTABLE_FIELD` (#8)**          |
 | `POST /api/doctors/:id/deactivate`     | admin  | `isActive=false` (A4/#9)                       | no cancel, no refund cascade; login still works                       |
-| `POST /api/doctors/:id/reactivate`     | admin  | `isActive=true`                                | —                                                                     |
+| `POST /api/doctors/:id/reactivate`     | admin  | `isActive=true`                                | always sets `status→active` (covers both a pending doctor's first activation and a previously-deactivated doctor) |
 | `POST /api/doctors/:id/reset-password` | admin  | Manual recovery (DA5)                          | sets `mustChangePassword=true`; audit-logged                          |
 | `POST /api/doctors/:id/photo`          | admin  | Upload/validate photo                          | `multipart/form-data`; type/size validated                            |
 
@@ -152,6 +154,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | -------------------------------------------- | ----------------- | ------------------------------------ | ----------------------------------------------------------------------------- |
 | `GET /api/doctors/:id/availability`          | doctor(own)/admin | Read weekly grid                     | —                                                                             |
 | `PUT /api/availability`                      | doctor            | Replace own weekly blocks (D1)       | guard: blocks with existing bookings (edge #14)                               |
+| `PUT /api/doctors/:id/availability`          | admin             | Replace any doctor's weekly blocks   | same `AvailabilityReplaceSchema`; 409 `BLOCK_HAS_BOOKINGS`; `adminWriteLimiter` 60/15min keyed by session `userId`; audit `doctor.availability_updated` |
 | `GET /api/doctors/:id/slots?date=YYYY-MM-DD` | public            | **Generated** 30-min slots for a day | excludes booked (active-state) + lead-time-filtered (`minBookingLeadMinutes`) |
 
 ---
@@ -208,7 +211,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                        | Role         | Purpose                         | Notes                                           |
 | ------------------------------------ | ------------ | ------------------------------- | ----------------------------------------------- |
-| `GET /api/medicines?search=`         | doctor/admin | Search for the builder          | `{ data: [...] }` active-only, name-sorted; `search` matches `name` + `genericName` |
+| `GET /api/medicines?search=`         | doctor/admin | Search for the builder          | `{ data: [...] }` active-only, name-sorted; `search` matches `name` + `genericName`; admin may add `?includeInactive=true` to include inactive entries (non-admin with that param → 403 `FORBIDDEN`) |
 | `POST /api/admin/medicines`          | admin        | Add catalogue entry (A2)        | unit price in paisa; `201`; audit `medicine.created`                    |
 | `PATCH /api/admin/medicines/:id`     | admin        | Edit fields + `isActive` toggle (A2) | partial edit; **deactivate-only, no `DELETE`**; does **not** affect existing prescriptions (#5); unknown id → 404; audit `medicine.updated` (`meta.fields`) |
 
@@ -218,12 +221,13 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                            | Role  | Purpose                                    | Notes                                                                                                   |
 | ---------------------------------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `GET /api/admin/audit`                   | admin | Filtered audit query (A5)                  | filters: `appointmentId,userId,email,eventType,actorType,from,to`; **read-only, no write/delete route** |
-| `GET /api/admin/records`                 | admin | Unified records view (A5)                  | rows + detail link to history + prescriptions                                                           |
-| `GET /api/admin/alerts`                  | admin | Alert feed / system health (A3)            | webhook-failure, refund-exhaustion, abuse escalations                                                   |
-| `POST /api/admin/emails/:eventId/resend` | admin | Re-trigger a failed email (A3/A5)          | audit-logged                                                                                            |
-| `GET /api/admin/settings`                | admin | Read platform settings (A6)                | single row                                                                                              |
-| `PUT /api/admin/settings`                | admin | Update lead-time + fallback-fee model (A6) | `minBookingLeadMinutes` floor 30; audit-logged                                                          |
+| `GET /api/admin/audit`                   | admin | Filtered audit query (A5)                  | filters: `appointmentId,userId,email,eventType,actorType,from,to` — `appointmentId` maps to `targetRef`, `email` resolves to `actorId` (an unknown email matches NOTHING via a sentinel); `pageSize` ≤ 100; newest-first page envelope; **read-only, no write/delete route** |
+| `GET /api/admin/records`                 | admin | Unified records view (A5)                  | full filter set via `recordsQuerySchema`: `page`/`pageSize` (≤ 100), `patient` (email-or-phone contains, case-insensitive), `doctorName` (contains), `appointmentId`, `paymentRef` (exact match vs `providerRef` OR `refundRef`), `state` (`AppointmentState` enum), `from`/`to` (`YYYY-MM-DD` as Karachi day boundaries: `from`→00:00 PKT gte, `to`→exclusive next-midnight PKT). Response `{ data: [recordRow], page: { number, size, total } }`; money columns come from the payment with `status='success'` (enum is `pending`\|`success`\|`failed`, NOT "paid") |
+| `GET /api/admin/records/:id`             | admin | Appointment detail (F13.02)                | `{ appointment, history, prescriptions, notificationJobs }` — transition history + prescriptions + email jobs; 404 if not found |
+| `GET /api/admin/alerts`                  | admin | Alert feed / system health (A3)            | real 5 kinds: `payment.reconciliation_mismatch`, `payment.refund_exhausted`, `email.send_failed_final`, `system.unhandled_exception` (audit rows, cap 100), plus the derived `awaiting_prescription` (cap 100); email alerts carry `failedJobs[]`; response `{ data: [...] }` newest-first |
+| `POST /api/admin/emails/:jobId/resend`   | admin | Re-trigger a failed email (A3/A5)          | `:jobId` = `notification_jobs.id`; only `failed` jobs accepted (any other status / lost race → 409 `INVALID_STATE`); atomic reset `attempts=0, nextAttemptAt=null, lastError=null`; 404 unknown; audit `admin.email_resend` |
+| `GET /api/admin/settings`                | admin | Read platform settings (A6)                | returns shaped `{ minBookingLeadMinutes, fallbackFeePctBps, fallbackFeeFixed }`, or `null` if the singleton row is missing (unseeded DB) |
+| `PUT /api/admin/settings`                | admin | Update lead-time + fallback-fee model (A6) | full replace of the 3 tunables — `minBookingLeadMinutes` 30–1440, `fallbackFeePctBps` 0–10000 bps, `fallbackFeeFixed` ≥ 0 paisa; returns the updated shaped object; audit `settings.updated` with before/after meta |
 
 ---
 
@@ -267,7 +271,7 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 
 **Derived (not a stored state):** `awaiting_prescription` — a `completed` appointment with no prescription after 12h raises an A3 alert (doc 15).
 
-**Orthogonal flag:** `disputed` may attach to any terminal state without a transition.
+**Orthogonal flag:** `disputed` may be set OR cleared on an appointment in **any** state (the `setDisputed` service has no state check) via `POST /api/appointments/:id/dispute` (`{ disputed: boolean }`); it is never a state-machine transition; audits `appointment.disputed` / `appointment.dispute_cleared`.
 
 ---
 
@@ -293,9 +297,9 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | D5 cancel                     | `appointments/:id/cancel` (doctor → `doctor_cancelled`)                      |
 | A1 onboard doctor             | `POST /api/doctors`                                                          |
 | A2 medicines                  | `medicines/*`                                                                |
-| A3 health/alerts              | `GET /api/admin/alerts`, `emails/:id/resend`                                 |
+| A3 health/alerts              | `GET /api/admin/alerts`, `emails/:jobId/resend`                              |
 | A4 edit/deactivate            | `PATCH /api/doctors/:id`, `deactivate`/`reactivate`                          |
-| A5 records & audit            | `GET /api/admin/records`, `GET /api/admin/audit`, `appointments/:id/dispute` |
+| A5 records & audit            | `GET /api/admin/records`, `GET /api/admin/records/:id`, `GET /api/admin/audit`, `appointments/:id/dispute` |
 | A6 settings                   | `GET`/`PUT /api/admin/settings`                                              |
 | DA1 doctor create+pw          | `POST /api/doctors`                                                          |
 | DA2 shared login+route        | `POST /api/auth/login`, `GET /api/auth/me`                                   |
@@ -335,3 +339,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-11 | Repointed deprecated `CONFIG.md`/`INTEGRATIONS.md` refs to docs 15/14 | Deprecated-doc hygiene |
 | 2026-06-11 | Added dev-only worker trigger routes (`POST /dev/worker/*`); added F04.03 reconciliation-reuses-webhook-confirm note | Slice E (F04.03 reconciliation + F07 workers); schema/feature cascade |
 | 2026-06-12 | Aligned F08/F11 endpoint inventory to the built routes (prescription submit error codes incl. 409 `INVALID_STATE` + 400 `VALIDATION_FAILED`; medicine search `?search=`, admin `POST/PATCH /api/admin/medicines`, deactivate-only via `isActive`); added `?scope=history`/`hasPrescription` + detail `subjectAge`/`subjectRelation`/`patientName`; documented the state-guarded transition write (concurrent loser → 409); replaced the never-built `ALREADY_PRESCRIBED` 409 code with `INVALID_STATE` | Slice F (F08 prescriptions + F11 backend) |
+| 2026-06-13 | Slice G admin as-built sweep: `GET /api/doctors?includeInactive` admin flat-list branch + `POST /api/doctors` pending-state + `reactivate` status→active; added `PUT /api/doctors/:id/availability` (admin) and `GET /api/admin/records/:id`; renamed email-resend route to `:jobId` (failed-only, 409 `INVALID_STATE`); corrected `GET /api/admin/alerts` to the real 5 kinds; documented records/audit/settings filters + shapes; added 409 `PMC_TAKEN`/`EMAIL_TAKEN`, 400 `INVALID_FILE`, 500 `system.unhandled_exception` audit bridge; medicines `?includeInactive`; `disputed` allowed in ANY state via `POST .../dispute`; §2 `/uploads/doctors/<id>.<ext>` static serve; §6.1 A3/A5 coverage rows | Slice G as-built sweep |

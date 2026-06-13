@@ -69,6 +69,7 @@ Slice G completes the admin panel: doctor management with photo upload + DA5 res
 | `client/src/modules/admin/views/AdminAlerts/` | Created | Task 18 (566181b) + fix (9945909): A-03 feed, per-job resend scoping + 4 tests |
 | `client/src/modules/admin/views/AdminSettings/` | Created | Task 20 (1217b07) + fixes (02a81ff, 1379e11): A-05 form, confirm gate, onError surfacing, empty state + 4 tests. Client suite 96. |
 | `server/src/test/admin.integration.test.js` | Created | Task 21 (323cb7e) + fixes (574c1fb): 8-test admin journey, afterAll cleanup + settings restore, rerun-proven. Server suite 248. |
+| `docs/specification/` 02,03,04,05,06,07,08,09,10,11,12,13,15 | Modified | Canon-doc sweep (user-approved): ~84 surgical edits aligning the suite to as-built Slice G. Each doc version-bumped + revision footer dated 2026-06-13. Doc 14 unchanged (verified accurate). New: ADR-29/30/31 (doc 11); TC-F10-006/F12-004/F12-005/F13-004/F14-004 (doc 12). |
 
 ## Dependencies / config / schema
 - multer ^2.1.1 added to server workspace dependencies (Task 9, c20d900) + lockfile churn.
@@ -79,6 +80,9 @@ Slice G completes the admin panel: doctor management with photo upload + DA5 res
 - User approved branch `feature/slice-g` (CLAUDE.md requires explicit approval for branch creation).
 - Subagents are instructed NOT to create/edit anything under `agentChangeLogs/` — controller owns this single log.
 - Task 5 deviation from plan snippet (review-driven): `fee` capped at `.max(2_147_483_647)` in both doctor DTOs — parity with `medicine.unitPrice`'s Postgres Int ceiling, avoids raw DB error path (10b572c).
+- Canon sweep — two decisions resolved by editing docs (not code), per user direction: **D-1** doc 08 §A01/§3.1 DA6 wording relaxed to permit supplemental parameter-level authz in handler bodies (matches the shipped `includeInactive` gate in doctor + medicine controllers); **D-2** doc 02 §F12.01/§3 awaiting-prescription predicate set to the as-built `slotEnd ≤ now−12h` (slot-end reference).
+- Canon sweep — controller-applied consistency fixes flowing from approved edits: doc 08 §A05 (DSN no longer claimed to feed A3), doc 13 §3 Auth module (DA5 now Built), doc 13 §5 roadmap M3 (Done, matching §2).
+- Risks placed in a NEW doc 07 §2.3 (not §2.1, which is verbatim-from-PRD) — correct governance call.
 
 ## Notable findings
 - Task 6 quality review caught a crash-on-load: the plan pre-imported `replaceBlocksForDoctor` (a Task 7 export) into admin.service.js; Node ESM validates named imports at load. Removed in 92c0e68; Task 7 re-adds it once the export exists.
@@ -110,11 +114,11 @@ Slice G completes the admin panel: doctor management with photo upload + DA5 res
 All work on feature/slice-g; rollback = delete branch. No schema migrations planned.
 
 ## Open items / next session
-**Awaiting user decisions (build complete, do not proceed without approval):**
-1. Canon-doc sweep (Task 22 Step 4): proposed edits to docs 02, 05, 08, 10, 11, 12, 13, 15 + new ADR — listed in the session summary; CLAUDE.md requires explicit approval before any spec edit.
-2. Branch finish (Task 22 Step 5): merge to main vs PR; push requires approval.
-3. Schema indexes: `@@index([targetRef])` on AuditLog + `@@index([slotStart])` on Appointment (migration; contradicts plan's zero-schema-change premise).
-4. Settings(id=1) prod bootstrap gap (pre-existing): no automated migrate/seed in the Docker entrypoint.
-5. Zod dependency alignment (pre-existing): root zod@4 vs server zod@3; duck-type fix shipped, single-version alignment recommended.
+**Canon-doc sweep: DONE** (user-approved 2026-06-13). 13 docs updated to as-built; doc 14 unchanged. Remaining for the user:
+1. Branch finish (Task 22 Step 5): merge to main vs PR; push requires approval.
+2. Schema indexes: `@@index([targetRef])` on AuditLog + `@@index([slotStart])` on Appointment (migration; contradicts plan's zero-schema-change premise). Recorded as deferred in doc 04 §4d + doc 07 §2.3.
+3. Settings(id=1) prod bootstrap gap (pre-existing): no automated migrate/seed in the Docker entrypoint. Recorded in doc 10 §3 + doc 07 open-question 7.
+4. Zod dependency alignment (pre-existing): root zod@4 vs server zod@3; duck-type fix shipped. Recorded in doc 15 §7 + doc 07 §2.3.
+5. **Pre-existing doc-13 drift NOT fixed (out of Slice G scope):** §5 roadmap M1/M2 still show "Not started" though both shipped in Slices A–E; §6 intro still says "Everything below is absent as of 2026-06-01"; F01 row still says "reset email stubbed until Resend" (Resend shipped in Slice E). Flag for a general status-tracker cleanup pass.
 
 **Backlog (recorded, non-blocking):** DA5 session non-revocation; audit-tab filter UI (design-doc gap); records state-filter UI control; validateQuery/adminWriteLimiter extraction (3 copies); audit-after-write vs in-tx decision; setDoctorActive no-op audit rows; multer error message differentiation; Pagination over-page display; `admin.email_resend` naming; AdminDoctors Activate global isPending; edit-mode availability editor cannot clear a schedule (documented in UI); root `npm run lint` broken pre-existing (legacy .eslintrc + ESLint 9); exception-alert sampling for hot-failing routes.

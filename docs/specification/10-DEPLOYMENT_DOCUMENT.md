@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
 | Status           | Canonical                                                                                               |
-| Version          | 1.4                                                                                                     |
-| Last updated     | 2026-06-05                                                                                              |
+| Version          | 1.5                                                                                                     |
+| Last updated     | 2026-06-13                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
 | Related docs     | 03, 08, 15                                                                                              |
 
@@ -53,7 +53,7 @@ The same image is portable to AWS ECS Fargate / App Runner / Elastic Beanstalk w
 Defined in `docker-compose.yml`. Two services:
 
 - **db** — `postgres:16` with a named volume `dermestha_pg`; healthcheck on `pg_isready`.
-- **app** — built from the project `Dockerfile`; depends on `db` health; exposes port `3000`.
+- **app** — built from the project `Dockerfile`; depends on `db` health; exposes port `3000`. Mounts a named volume `dermestha_uploads:/app/uploads` (a third volume alongside `dermestha_pg`) so doctor profile photos survive container rebuilds.
 
 The compose file injects a minimal set of env vars (see §4). Developers should copy `.env.example` to `.env` and supply real integration keys for any service under test. Cross-reference doc 15 for the full variable catalog.
 
@@ -104,6 +104,8 @@ Complete every item before triggering a production deploy.
 - [ ] **PayFast KYC complete** — merchant account must be fully verified before `PAYFAST_MODE=live` can process payments (ARCHITECTURE.md §12).
 - [ ] **Dev provider switches OFF** — `PAYMENT_PROVIDER` and `EMAIL_PROVIDER` are unset or `stub` (NOT `mock`/`console`) so the dev mock payment gateway and the `/dev/checkout` routes are never mounted in production (ADR-22; doc 08; doc 15).
 - [ ] **Dev video switch OFF** — `VIDEO_PROVIDER` is unset or `stub` (NOT `mock`) so the dev mock video provider, the `/dev/video/*` join-simulator routes, and the `/dev/worker/*` evaluation trigger are never mounted in production (ADR-24; doc 08; doc 15).
+- [ ] **Uploads directory configured** — `UPLOADS_DIR` is set (default `./uploads`) and the path is writable and backed by persistent storage (a Railway volume), otherwise doctor profile photos are lost on every redeploy. See doc 15 §8 (File Storage).
+- [ ] **First deploy only: Settings singleton exists** — the `settings` row (`id = 1`) must exist before any settings access. `prisma migrate deploy` and `npm run bootstrap:admin` do **not** create it — only `npm run db:seed` does. On first production deploy, run the seed or execute `INSERT INTO settings (id) VALUES (1);`. Without the row, `GET /api/admin/settings` returns `null` and `PUT` throws. **Known gap** pending a migrate-deploy seed step.
 - [ ] **First deploy only: admin bootstrap** — run `npm run bootstrap:admin` after the initial deploy (see §9 and §4 step 8).
 
 ---
@@ -123,7 +125,8 @@ docker compose up --build
 # 3. Apply migrations (first time or after schema changes)
 npx prisma migrate dev
 
-# 4. (Optional) seed development data
+# 4. Seed data — REQUIRED (creates the Settings singleton id=1 + dev admin;
+#    admin/settings endpoints fail without it)
 npm run db:seed
 ```
 
@@ -213,6 +216,10 @@ This is the primary rollback mechanism and takes effect within the Railway build
 - If a migration introduced the `uniq_active_slot` partial index and the rollback target pre-dates it, the index must be dropped manually with `DROP INDEX uniq_active_slot;` before the schema is consistent with the rolled-back code.
 - Additive schema changes (new columns with defaults, new tables) are generally safe to leave in place when rolling back application code, provided the older code ignores unknown columns.
 - Destructive schema changes (column removal, type changes) make rollback complex and should be avoided in a single migration; prefer expand-contract.
+
+### Uploaded photos across rollbacks
+
+Doctor profile photos in the `dermestha_uploads` volume persist across rollbacks. Rolling back to a build that does not serve `/uploads` leaves the photo files on disk but HTTP-inaccessible; there is no automated cleanup of orphaned photo files.
 
 ### What is reversible
 
@@ -322,3 +329,4 @@ A formal version scheme and Git tagging convention have not been established. At
 | 2026-06-04 | Added pre-deploy check: dev provider switches OFF in prod (no mock gateway / `/dev` routes) | Slice C dev payment simulation (ADR-22) |
 | 2026-06-05 | Added pre-deploy check: `VIDEO_PROVIDER` must not be `mock` in production (§3) | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Re-pointed the refund-exhaustion alert ref to `modules/appointment/service.js`; fixed two deprecated/broken deploy-checklist pointers (`ARCHITECTURE.md §5` -> doc 04 §4b; malformed `doc 15 §CONFIG.md §7` -> doc 15 §7) | Restructure (ADR-26) + deprecated-doc hygiene |
+| 2026-06-13 | Added `dermestha_uploads` app-service volume (§2); added pre-deploy checks for `UPLOADS_DIR` persistence + Settings-singleton (id=1) known gap (§3); made `db:seed` required not optional (§4.1); added uploaded-photo rollback note (§6) | Slice G as-built sweep |

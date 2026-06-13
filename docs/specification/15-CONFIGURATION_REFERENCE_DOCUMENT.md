@@ -3,8 +3,8 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.5                                          |
-| Last updated     | 2026-06-11                                   |
+| Version          | 1.6                                          |
+| Last updated     | 2026-06-13                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
 
@@ -38,7 +38,7 @@ Two tiers govern constants: **(A) Settings-tunable at runtime** live in the `set
 | Constant                  | Value                                                       | Tier                        | Source                |
 | ------------------------- | ----------------------------------------------------------- | --------------------------- | --------------------- |
 | Slot-lock TTL             | **10 min**                                                  | B                           | PRD §4.3              |
-| Min booking lead          | **60 min** (floor 30 min)                                   | A (`minBookingLeadMinutes`) | PRD §4.x, edge filter |
+| Min booking lead          | **60 min** (floor 30, ceiling 1440 min / 24h)               | A (`minBookingLeadMinutes`) | PRD §4.x, edge filter |
 | Slot granularity          | **30 min**                                                  | B                           | D1                    |
 | No-show grace             | slot-start **+15 min**                                      | B                           | PRD §4.3              |
 | Video token window        | slot-start **−10 min** → slot-end **+5 min**                | B                           | §3.4                  |
@@ -146,7 +146,7 @@ Source: CONFIG.md §6.
 
 - **Currency:** PKR. Stored and transmitted as **integer paisa**. Display ÷ 100 with thousands separators.
 - **Timezone:** Store UTC (`timestamptz`); render **Asia/Karachi** (no DST).
-- **Fallback gateway-fee model** (when PayFast reports none, policy #5): `fallbackFeePctBps` (basis points) + `fallbackFeeFixed` (paisa), both in the `settings` table (A6 — runtime-tunable, no redeploy).
+- **Fallback gateway-fee model** (when PayFast reports none, policy #5): `fallbackFeePctBps` (basis points, range **0–10000**) + `fallbackFeeFixed` (paisa, **≥0**), both in the `settings` table (A6 — runtime-tunable, no redeploy).
 
 ---
 
@@ -159,6 +159,8 @@ Source: CONFIG.md §7. Cross-reference: [doc 04 — Database Document](04-DATABA
 2. **No-double-booking is a hand-added partial index.** After `prisma migrate dev --name init`, edit the generated `migration.sql` and append the `uniq_active_slot` index from `prisma/schema.prisma`'s header. Prisma's DSL cannot express the `WHERE state IN (...)` clause; **do not skip this — it is invariant #1.**
 
 3. **`dosage_forms` is a Postgres `text[]`.** Confirm the target host supports array columns (RDS/Aurora/Railway PG all do).
+
+4. **Dual-Zod known inconsistency.** The root workspace resolves `zod@4.x` (used by `shared/schemas/`), while `server/` pins `zod@3.x`. `instanceof ZodError` is therefore unreliable across the workspace boundary, so `server/src/http/errorHandler/errorHandler.js` duck-types a ZodError (`err.name === 'ZodError' && Array.isArray(err.issues)`) as a workaround. Align to a single zod version before the next major milestone.
 
 ---
 
@@ -228,9 +230,15 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 | -------------------- | -------------------------------- | ------------------- |
 | `ERROR_TRACKING_DSN` | Error-tracking DSN (e.g. Sentry) | _(optional in dev)_ |
 
+### File Storage
+
+| Variable      | Purpose                                                                                      | Example / Default |
+| ------------- | -------------------------------------------------------------------------------------------- | ----------------- |
+| `UPLOADS_DIR` | Directory for doctor profile photos; served statically at `/uploads`. In Docker this path is the `dermestha_uploads` volume (must be persistent storage in production, else photos are lost on redeploy — doc 10 §3). | `./uploads`       |
+
 ### Tunable Defaults
 
-Runtime A6 `settings` table entries override `minBookingLeadMinutes` and other booking-lead values without a redeploy.
+All **three** `settings` tunables are editable at runtime via `PUT /api/admin/settings` (A6) without a redeploy: `minBookingLeadMinutes` (30–1440), `fallbackFeePctBps` (0–10000), and `fallbackFeeFixed` (≥0 paisa).
 
 | Variable               | Purpose                                              | Default |
 | ---------------------- | ---------------------------------------------------- | ------- |
@@ -285,3 +293,4 @@ Runtime A6 `settings` table entries override `minBookingLeadMinutes` and other b
 | 2026-06-11 | Re-pointed the evaluation-worker logic ref to `modules/appointment/service.js` (merged) | Folder-structure restructure (ADR-26); `config/constants.js` ref unchanged (stayed flat) |
 | 2026-06-11 | Dropped deprecated `CONFIG.md`/`ARCHITECTURE.md §14.5` live pointers (this doc is the config canon; deployment topology -> doc 10) | Deprecated-doc hygiene |
 | 2026-06-11 | Added `EMAIL_MAX_ATTEMPTS`, `EMAIL_BACKOFF_BASE_SEC`, `RECONCILIATION_LOOKBACK_H`, `RECONCILIATION_MIN_AGE_MIN`; updated `EMAIL_PROVIDER` enum to `stub \| console \| resend`; updated `RESEND_FROM` semantics; added Refund-retry worker cadence (§3); noted Slice E first consumers of refund retry constants (§4) | Slice E (worker constants, Resend fallback, worker cadences); new tunable/config |
+| 2026-06-13 | Added `UPLOADS_DIR` File-Storage env var (§8); added `minBookingLeadMinutes` ceiling 1440 + `fallbackFeePctBps`/`fallbackFeeFixed` bounds (§1, §6); expanded Tunable-Defaults note to all three settings tunables (§8); added Dual-Zod known-inconsistency migration caveat (§7) | Slice G as-built sweep |

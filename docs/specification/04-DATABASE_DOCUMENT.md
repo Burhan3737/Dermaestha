@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.5                                                           |
-| Last updated     | 2026-06-12                                                    |
+| Version          | 1.6                                                           |
+| Last updated     | 2026-06-13                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
 
@@ -179,6 +179,8 @@ model Doctor {
 ```
 
 `isActive` controls public listing and new-booking eligibility only — a deactivated doctor can still log in and access their existing appointments (invariant #9).
+
+`photoUrl`, when set, stores the path `/uploads/doctors/<doctorId>.<ext>` (ext: `jpg`, `png`, or `webp`); the file is served by the `express.static` `/uploads` mount with `X-Content-Type-Options: nosniff`.
 
 ---
 
@@ -411,7 +413,7 @@ model AuditLog {
 }
 ```
 
-`actorId` is nullable to allow `actorType = system` entries (background workers). `targetRef` is a free-text reference to the affected record (e.g. `"appointment:clx..."`). `meta` is an open jsonb field for event-specific payload (e.g. previous state, amounts).
+`actorId` is nullable to allow `actorType = system` entries (background workers). `targetRef` is a free-text reference to the affected record: a **bare id** — the `doctor.id` or `appointmentId` — or, for the unhandled-exception bridge in the error handler, the **route path** taken from `req.path` (e.g. `'/api/doctors/xyz'`). It is not a `"type:id"`-prefixed value. `meta` is an open jsonb field for event-specific payload (e.g. previous state, amounts).
 
 ---
 
@@ -610,6 +612,15 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 | `analytics_events`    | `@@index`                             | `at`                      | Time-range KPI queries                                                |
 | `session`             | `@@index` (map: `IDX_session_expire`) | `expire`                  | Session store cleanup sweep                                           |
 
+### 4d. Deferred indexes (proposed, not yet applied)
+
+These indexes were **recommended by the Slice G admin-panel review** to back admin search/time-range queries but are **NOT in the live `prisma/schema.prisma`** — they are deferred. The tables above (§4a–§4c) remain accurate to the live schema; the rows below are not yet migrated.
+
+| Table          | Proposed index           | Would back                                                  |
+| -------------- | ------------------------ | ----------------------------------------------------------- |
+| `audit_log`    | `@@index([targetRef])`   | Admin audit search filters on `targetRef` (F13)             |
+| `appointments` | `@@index([slotStart])`   | Admin records time-range (`from`/`to`) queries (F13)        |
+
 ---
 
 ## 5. Naming conventions
@@ -668,3 +679,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-11 | Dropped the deprecated `CONFIG.md §7` pointer from the §4b migration caveat (this section is the canonical home) | Deprecated-doc hygiene (design §8.1) |
 | 2026-06-11 | Added `NotificationType`/`NotificationStatus` enums (§2a), `NotificationJob` model (§2n), `Appointment.notificationJobs` relation (§2e), `Payment.refund_attempts`/`next_refund_retry_at` (§2f), relationship + index + F07 scope entries; migration `20260610231617_slice_e_notification_outbox` | Slice E (F07 outbox + F06.03 refund-retry); schema change per change-impact matrix |
 | 2026-06-12 | Added `NotificationJob.dedupe_key` (default `''`) and widened the `@@unique` to `(appointment_id, type, dedupe_key)` (§2n, §4a); migration `20260612003907_slice_f_outbox_dedupe_key`; aligned `doctorSnapshot` shape to drop the non-existent `signature` field (§2g, §3) | Slice F (F08 prescriptions): per-prescription `prescription_ready` enqueue; doctor model has no signature in v1 |
+| 2026-06-13 | Corrected `AuditLog.targetRef` example to bare id / route-path (not `type:id`) (§2j); documented `Doctor.photoUrl` `/uploads/doctors/<id>.<ext>` static-serve format (§2c); added §4d deferred-index note (`audit_log.targetRef`, `appointments.slotStart`) | Slice G as-built sweep |
