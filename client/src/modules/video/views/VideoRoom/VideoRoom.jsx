@@ -1,8 +1,9 @@
 // @ts-check
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useSession } from '../../../../context/session/session.jsx';
 import { useVideo } from '../../useVideo.js';
+import { useDailyCall } from '../../useDailyCall.js';
 
 function mmss(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -20,11 +21,33 @@ export function VideoRoom() {
   }, []);
 
   const { token, detail, recordJoin } = useVideo({ appointmentId: id });
+  const isMock = Boolean(token.data?.joinSimUrl);
+  const containerRef = useRef(null);
 
-  // Mock mode: entering the room records this participant's join (server-provided URL).
+  // Mock mode only: entering the room records this participant's join (server-provided URL).
   useEffect(() => {
     if (token.data?.joinSimUrl) recordJoin(token.data.joinSimUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token.data?.joinSimUrl, id]);
+
+  const slotEnd = detail.data?.slotEnd ? new Date(detail.data.slotEnd).getTime() : null;
+  const hardCutoff = slotEnd != null ? slotEnd + 5 * 60 * 1000 : null;
+  const ended = hardCutoff != null && now >= hardCutoff;
+  const msToEnd = slotEnd != null ? slotEnd - now : null;
+  const isDoctor = session?.role === 'doctor';
+  const peerJoined = detail.data?.peerJoined;
+  const ready = !token.isError && !token.isPending && !detail.isPending;
+
+  // Real Daily Prebuilt path (joinSimUrl == null). Mounts when the room is open and the call is live.
+  useDailyCall({
+    enabled: ready && !isMock && !ended && Boolean(token.data?.roomUrl),
+    roomUrl: token.data?.roomUrl,
+    token: token.data?.token,
+    containerRef,
+    appointmentId: id,
+    role: session?.role,
+    onLeave: () => window.history.back(),
+  });
 
   if (token.isError)
     return (
@@ -38,13 +61,6 @@ export function VideoRoom() {
         <p className="help">Connecting…</p>
       </main>
     );
-
-  const slotEnd = detail.data?.slotEnd ? new Date(detail.data.slotEnd).getTime() : null;
-  const hardCutoff = slotEnd != null ? slotEnd + 5 * 60 * 1000 : null;
-  const ended = hardCutoff != null && now >= hardCutoff;
-  const msToEnd = slotEnd != null ? slotEnd - now : null;
-  const isDoctor = session?.role === 'doctor';
-  const peerJoined = detail.data?.peerJoined;
 
   if (ended)
     return (
@@ -70,21 +86,25 @@ export function VideoRoom() {
           5 minutes remaining
         </p>
       )}
-      <div className="video-stage">
-        {peerJoined ? (
-          <p style={{ color: 'var(--color-on-dark)' }}>● Live — connected</p>
-        ) : (
-          <p style={{ color: 'var(--color-on-dark)' }}>Doctor will be with you shortly…</p>
+      <div className="video-stage" ref={containerRef}>
+        {isMock && (
+          <>
+            {peerJoined ? (
+              <p style={{ color: 'var(--color-on-dark)' }}>● Live — connected</p>
+            ) : (
+              <p style={{ color: 'var(--color-on-dark)' }}>Doctor will be with you shortly…</p>
+            )}
+            <div className="video-self" />
+          </>
         )}
-        <div className="video-self" />
       </div>
-      <div className="video-controls">
-        <button type="button" className="video-ctrl">Mic</button>
-        <button type="button" className="video-ctrl">Cam</button>
-        <button type="button" className="video-ctrl video-ctrl--leave" onClick={() => window.history.back()}>
-          Leave
-        </button>
-      </div>
+      {isMock && (
+        <div className="video-controls">
+          <button type="button" className="video-ctrl video-ctrl--leave" onClick={() => window.history.back()}>
+            Leave
+          </button>
+        </div>
+      )}
     </main>
   );
 }
