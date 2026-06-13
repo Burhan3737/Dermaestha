@@ -7,6 +7,8 @@ import { api } from '../../../../lib/apiClient/apiClient.js';
 
 vi.mock('../../../../lib/apiClient/apiClient.js', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 vi.mock('../../../../context/session/session.jsx', () => ({ useSession: () => ({ session: { role: 'doctor' }, logout: vi.fn() }) }));
+vi.mock('../../../../lib/analytics/track.js', () => ({ track: vi.fn() }));
+import { track } from '../../../../lib/analytics/track.js';
 
 /**
  * Returns an ISO string for HH:MM on the current Karachi calendar day, offset
@@ -55,6 +57,20 @@ describe('D-02 DoctorToday', () => {
     fireEvent.change(screen.getByLabelText(/reason/i), { target: { value: 'Unwell' } });
     fireEvent.click(screen.getByRole('button', { name: /cancel & refund/i }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/appointments/a1/cancel', { reason: 'Unwell' }));
+  });
+
+  it('routes the active Join Call through the waiting room and emits video_join_attempt', async () => {
+    const noon = karachiNoonMs();
+    const start = new Date(Date.now() + 5 * 60 * 1000); // inside the 10-min window
+    api.get.mockResolvedValue({ data: [{ id: 'a1',
+      slotStart: start.toISOString(), slotEnd: new Date(start.getTime() + 18e5).toISOString(),
+      state: 'confirmed', forSelf: true, subjectName: null, patientName: 'Parent P' }] });
+    setup();
+    await waitFor(() => expect(screen.getByText('Parent P')).toBeTruthy());
+    const join = screen.getByRole('link', { name: /join call/i });
+    expect(join.getAttribute('href')).toBe('/video/a1/ready');
+    join.click();
+    expect(track).toHaveBeenCalledWith('video_join_attempt', { appointmentId: 'a1', role: 'doctor' });
   });
 
   it('switches to the History tab and requests the history scope', async () => {
