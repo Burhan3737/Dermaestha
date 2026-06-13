@@ -21,6 +21,7 @@ Slices E/F/G are merged; Slice H concludes the v1 phase. Prior slice design docs
 | `agentChangeLogs/2026-06-13-2045-slice-h-brainstorming-specs.md` | Created | This session log |
 | `agentChangeLogs/index.md` | Modified | Add this session's index line |
 | `docs/superpowers/specs/2026-06-13-slice-h-s1-payfast-adapter-design.md` | Created | S1 PayFast Pakistan adapter design spec (brainstorming output) |
+| `docs/superpowers/specs/2026-06-13-slice-h-s2-dailyco-adapter-design.md` | Created | S2 Daily.co adapter design spec (brainstorming output) |
 
 ## Dependencies / config / schema
 Planned (specced, not yet built) for S1: env var rework — add `PAYFAST_SECURED_KEY`, `PAYFAST_MERCHANT_NAME`, `PAYFAST_STORE_ID`, `PAYFAST_MODE`; `PAYMENT_PROVIDER` enum adds `payfast`; retain `PAYFAST_PASSPHRASE` (dev-mock only); drop `PAYFAST_MERCHANT_KEY` (SA-only).
@@ -31,6 +32,7 @@ Planned (specced, not yet built) for S1: env var rework — add `PAYFAST_SECURED
 - **S1 gateway is PayFast *Pakistan* (payfast.pk / apps.net.pk)** — NOT PayFast South Africa, which the current docs/env vars wrongly assume. Researched the PK API (no merchant docs available); flagged all unverified assumptions.
 - S1 confirmation = dual-channel (browser redirect + `CHECKOUT_URL` server callback), verify-by-recompute, funnel into the existing idempotent `confirmPaidAppointment`; manual-admin reconciliation as backstop.
 - S1 refund + status-query degrade to operator-assisted manual-admin (new `manual_required` refund status; quiet single alert, no retry-spin); backend hooks built now (incl. an admin `record-refund` endpoint), admin UI deferred to S6.
+- **S2 (Daily.co):** full research pass — API almost entirely confirmed from official docs. Adapter gains `verifyWebhook(req)` that verifies the HMAC (`X-Webhook-Timestamp` + `X-Webhook-Signature`, base64 HMAC-SHA256 over `ts + "." + rawBody`) AND normalizes the versioned envelope into `NormalizedVideoEvent`. Role mapped from the meeting token's `user_id` (`doctor`/`patient`, echoed back) — fixes the ADR-24-flagged `user_name` substring hack, deleted from prod. `createRoom` idempotent (GET-first); room `exp`+`eject_at_room_exp`. New `DAILY_WEBHOOK_SECRET`; register webhook with `retryType: exponential` (avoid circuit-breaker auto-disable). Raw-body capture on the webhook route; signed-string raw-vs-JSON.stringify validated against a live delivery (gated).
 
 ## Notable findings
 - PayFast Pakistan is a different company from PayFast SA: token handshake (`GetAccessToken` → `PostTransaction`), Bearer-token auth, `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` signature (no passphrase), amounts in **rupees** (we store paisa), hosts on `apps.net.pk`. The SA `MD5+passphrase+ITN-postback` model in our docs/code maps to almost nothing.
