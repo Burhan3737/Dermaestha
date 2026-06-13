@@ -3,8 +3,8 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.7                                          |
-| Last updated     | 2026-06-13                                   |
+| Version          | 1.8                                          |
+| Last updated     | 2026-06-14                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
 
@@ -209,15 +209,16 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 | ------------------ | ------------------------------------------------------------------------------------------------ | -------------------------- |
 | `PAYMENT_PROVIDER` | Selects the `PaymentProvider`: `stub` (throwing placeholder, default), `mock` (dev simulated gateway, mounts `/dev/checkout`), or `payfast` (the real PayFast **Pakistan** adapter — researched-not-vendor-confirmed, doc 14 §2; do not enable for live until the doc 07 §3 merchant-verification checklist passes) | `stub` \| `mock` \| `payfast` |
 | `EMAIL_PROVIDER`   | Selects the `EmailProvider`: `stub` \| `console` \| `resend`. Boot-time selection: `EMAIL_PROVIDER=console` forces the console logger; else a present `RESEND_API_KEY` selects the real Resend adapter; else fallback to console with a loud warning. | `stub` |
-| `VIDEO_PROVIDER`   | Selects the `VideoProvider`: `stub` (prod, throws until concrete adapter wired), `mock` (dev — real webhook path + `/dev/video/*` + `/dev/worker/*` simulator), or `daily` (resolves to stub until the concrete `daily.js` adapter is wired). Mock and `/dev/*` routes **must never be active in production** (ADR-24; doc 08; doc 10). | `stub` |
+| `VIDEO_PROVIDER`   | Selects the `VideoProvider`: `stub` (throwing placeholder, default), `mock` (dev — real webhook path + `/dev/video/*` + `/dev/worker/*` simulator), or `daily` (the real `daily.js` Daily.co adapter — slot-bounded rooms + HMAC-verified webhook; opt-in, live-delivery gated by doc 07; ADR-33). Mock and `/dev/*` routes **must never be active in production** (ADR-24; doc 08; doc 10). | `stub` |
 | `VIDEO_MOCK_SECRET` | Dev-only mock meeting-token signing key (HMAC). Optional; for use only when `VIDEO_PROVIDER=mock`. Never set in production. | _(optional, dev-only)_ |
 
 ### Daily.co (Video Adapter)
 
 | Variable        | Purpose              | Example / Default       |
 | --------------- | -------------------- | ----------------------- |
-| `DAILY_API_KEY` | Daily.co API key     | _(set per environment)_ |
-| `DAILY_DOMAIN`  | Daily.co team domain | `your-team.daily.co`    |
+| `DAILY_API_KEY`        | Daily.co API key (Bearer auth for `createRoom`/`issueToken`)                                           | _(set per environment)_ |
+| `DAILY_DOMAIN`         | Daily.co team domain                                                                                   | `your-team.daily.co`    |
+| `DAILY_WEBHOOK_SECRET` | HMAC key for `POST /api/webhooks/daily` signature verification (doc 14 §3) — the `hmac` printed by the one-time `server/scripts/register-daily-webhook.mjs` OPS step; base64-decoded before use | _(set per environment)_ |
 
 ### Resend (Email Adapter)
 
@@ -297,3 +298,4 @@ All **three** `settings` tunables are editable at runtime via `PUT /api/admin/se
 | 2026-06-11 | Added `EMAIL_MAX_ATTEMPTS`, `EMAIL_BACKOFF_BASE_SEC`, `RECONCILIATION_LOOKBACK_H`, `RECONCILIATION_MIN_AGE_MIN`; updated `EMAIL_PROVIDER` enum to `stub \| console \| resend`; updated `RESEND_FROM` semantics; added Refund-retry worker cadence (§3); noted Slice E first consumers of refund retry constants (§4) | Slice E (worker constants, Resend fallback, worker cadences); new tunable/config |
 | 2026-06-13 | Added `UPLOADS_DIR` File-Storage env var (§8); added `minBookingLeadMinutes` ceiling 1440 + `fallbackFeePctBps`/`fallbackFeeFixed` bounds (§1, §6); expanded Tunable-Defaults note to all three settings tunables (§8); added Dual-Zod known-inconsistency migration caveat (§7) | Slice G as-built sweep |
 | 2026-06-13 | PayFast env section (§8): added `PAYFAST_SECURED_KEY`, `PAYFAST_MERCHANT_NAME`, `PAYFAST_STORE_ID`; redefined `PAYFAST_PASSPHRASE` as dev-mock-only; removed `PAYFAST_MERCHANT_KEY` (South-Africa-only, dropped); noted `PAYFAST_MODE` default `sandbox`; changed `PAYMENT_PROVIDER` enum to `stub\|mock\|payfast` | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
+| 2026-06-14 | Added `DAILY_WEBHOOK_SECRET` to the Daily.co env section (§8); updated the `VIDEO_PROVIDER` row so `daily` resolves to the real `daily.js` adapter (HMAC-verified webhook + slot-bounded rooms, gated by doc 07) rather than the stub | Slice H · S2 (Daily.co video adapter; ADR-33) |

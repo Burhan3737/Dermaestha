@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------- |
 | Document ID      | `07-RISK_ASSUMPTION_DOCUMENT`                                     |
 | Status           | Canonical                                                         |
-| Version          | 1.2                                                               |
-| Last updated     | 2026-06-13                                                        |
+| Version          | 1.3                                                               |
+| Last updated     | 2026-06-14                                                        |
 | Sources absorbed | `docs/product/PRD.md §5.2, §2.3, §3; server/ + client/ TODO scan` |
 | Related docs     | 01, 02, 08                                                        |
 
@@ -127,6 +127,14 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
    7. **Amount unit & precision on the wire** — assumed rupees-decimal (e.g. `"2500.00"`); the adapter converts paisa↔rupees at the boundary.
    8. **Browser handoff mechanism** — GET redirect vs an app-served auto-submit form-POST page.
 
+10. **Daily.co live-delivery launch gate.** The real `daily` video adapter (doc 14 §1/§3) is wired, but several externals are confirmed against current docs/community SDKs, not a live delivery. The adapter must NOT go live (`VIDEO_PROVIDER=daily`) until validated:
+    1. **HMAC signed-string serialization** — validate the `timestamp + "." + rawBody` signed string (raw received bytes vs `JSON.stringify`) against a real Daily webhook delivery — the one byte-sensitive risk.
+    2. **`GET /v1/rooms/:name` 404 shape** — confirm the not-found response so idempotent room reuse / create-race branches resolve correctly.
+    3. **Room lifecycle after `exp`** — confirm rooms created with `eject_at_room_exp` behave as expected at and after the slot-bounded expiry.
+    4. **Test-ping signature** — confirm whether the create-time `{ "test": "test" }` verification ping is signed.
+    5. **`.left` timestamp field** — confirm the participant-left payload's timestamp field (the adapter currently falls back to the envelope `event_ts`).
+    6. **Webhook registration** — register the webhook with `retryType: 'exponential'` (the default `circuit-breaker` DISABLES the webhook after 3 consecutive failures) via `server/scripts/register-daily-webhook.mjs`, and provide `DAILY_API_KEY` / `DAILY_DOMAIN` / `DAILY_WEBHOOK_SECRET`.
+
 ---
 
 ## Revision footer
@@ -136,3 +144,4 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §5.2/§2.3 + code TODO scan |
 | 2026-06-13 | Added §2.3 Slice G as-built risks (Zod skew, DA5 session invalidation, unsampled exception audit, unindexed audit/slot columns) + open questions 7–8 (settings bootstrap gap, audit-tab filter UI deferral) | Slice G as-built sweep |
 | 2026-06-13 | Added open question 9 — the PayFast Pakistan merchant-verification checklist as a launch gate (signature, CHECKOUT_URL IPN, refund/status APIs, credentials, base URLs, amount unit, browser handoff) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
+| 2026-06-14 | Added open question 10 — the Daily.co live-delivery launch gate (HMAC signed-string raw-body validation, `GET /v1/rooms/:name` 404 shape, room lifecycle after `exp`, test-ping signing, `.left` timestamp field, webhook `retryType=exponential` registration + `DAILY_API_KEY`/`DAILY_DOMAIN`/`DAILY_WEBHOOK_SECRET`) | Slice H · S2 (Daily.co video adapter; ADR-33) |

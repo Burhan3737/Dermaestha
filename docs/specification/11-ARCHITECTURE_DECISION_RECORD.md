@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.11                                                                                               |
-| Last updated     | 2026-06-13                                                                                         |
+| Version          | 1.12                                                                                               |
+| Last updated     | 2026-06-14                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -46,6 +46,7 @@
 31. [ADR-30 — F12 system alerts as a live query over audit rows, no dedicated alerts table](#adr-30--f12-system-alerts-as-a-live-query-over-audit-rows-no-dedicated-alerts-table)
 32. [ADR-31 — Admin email re-trigger via outbox failed→pending reset, no parallel send path](#adr-31--admin-email-re-trigger-via-outbox-failedpending-reset-no-parallel-send-path)
 33. [ADR-32 — PayFast Pakistan adapter: dual-channel confirmation + manual refund/reconcile fallback + researched-API risk](#adr-32--payfast-pakistan-adapter-dual-channel-confirmation--manual-refundreconcile-fallback--researched-api-risk)
+34. [ADR-33 — Daily.co video adapter: verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC, webhook `retryType=exponential`](#adr-33--dailyco-video-adapter-verifynormalize-in-the-adapter-role-via-meeting-token-user_id-raw-body-hmac-webhook-retrytypeexponential)
 
 ---
 
@@ -471,6 +472,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-33 — Daily.co video adapter: verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC, webhook `retryType=exponential`
+
+**Date:** 2026-06-14
+
+**Status:** Accepted
+
+**Context:** Slice H · S2 wires the first concrete `VideoProvider` network adapter (`server/src/integrations/video/daily.js`), the production target replacing the throwing stub (ADR-24 anticipated this as a future file-swap). Three decisions had to be settled. (1) **Where verification + normalization live.** The real Daily webhook must be authenticated (it is a public route — authenticity comes from the signature, not a cookie) and its versioned envelope normalized before the join-recording service runs. (2) **How participant role is determined.** ADR-24's dev mock inferred role from `user_name` and explicitly flagged that "the real adapter must map role from `is_owner`/a stable participant id." Daily's current envelope exposes `payload.owner` (boolean) — but a doctor is the room owner and a patient is not, which is fragile, and tokenless/knocking participants have no reliable identity. (3) **Webhook delivery durability.** Daily's default webhook `retryType` is `circuit-breaker`, which DISABLES the webhook after 3 consecutive delivery failures — a silent single-point loss of all no-show data.
+
+**Decision:** (1) **Verify + normalize in the adapter.** `daily.js` exposes `verifyWebhook(req)` (added to the `VideoProvider` typedef, doc 14 §1): it verifies the HMAC and returns a normalized `NormalizedVideoEvent` (`type`/`appointmentId`/`role`/`timestamp`/`eventId`), or `null` for the create-time test ping, unrelated event types, and tokenless participants; it THROWS `AppError(INVALID_SIGNATURE, 401)` on a bad signature. The controller catches that, writes a `video.webhook_rejected` audit row, and returns 401; `recordJoinFromDailyEvent` now consumes the normalized event and no longer strips `appt_` or infers role (the ADR-24 `user_name` hack is removed from prod). (2) **Role via the meeting-token `user_id`.** `issueToken` sets the token `user_id` to the role string (`'doctor'`/`'patient'`); Daily echoes it back as `payload.user_id` on participant events, which is the authoritative role anchor (`payload.owner` is only a fallback). (3) **Raw-body HMAC.** The signed string is `timestamp + "." + rawBody`, HMAC-SHA256 keyed on the base64-decoded `DAILY_WEBHOOK_SECRET`, base64 output, constant-time compared. The webhook route mounts its own `express.json({ verify })` to capture the exact received bytes (`req.rawBody`), and `server/src/index.js` excludes `/api/webhooks/daily` from the global JSON parser so that verify callback runs. (4) **Webhook registered `retryType: 'exponential'`** via the one-time OPS script `server/scripts/register-daily-webhook.mjs`. `createRoom` gains an optional `{ notAfterIso }` to set the room `exp` (slot-bounded; `eject_at_room_exp`). The adapter is opt-in via `VIDEO_PROVIDER=daily`; the throwing `stub` stays the default and go-live is gated by the doc 07 launch checklist.
+
+**Consequences:** The production webhook→worker no-show path is genuinely authenticated, and role is anchored to a value the platform itself minted (the token `user_id`) rather than a display name or a fragile owner-flag — supersedes ADR-24's deferred role-inference follow-up. Verification + normalization living in the adapter keeps the controller and the join-recording service vendor-agnostic (a future video-vendor swap re-implements `verifyWebhook` behind the same typedef, business logic untouched). `retryType: 'exponential'` removes the silent circuit-breaker disablement risk. The standing risk is that the signed-string serialization (raw received bytes vs `JSON.stringify`) and several other externals are confirmed only against current docs/community SDKs, not a live delivery — contained by the opt-in switch (`stub` default) and the doc 07 §10 live-delivery launch gate, so a single correction lands in one file. ADR-24's dev `daily.mock` + `/dev/video/*` simulator is unchanged and remains the offline/CI path.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -487,3 +502,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-12 | Added ADR-28 (state-guarded transition write closing the double-apply race; per-prescription outbox `dedupe_key` relaxation actioning ADR-27's YAGNI deferral) | Slice F (F08 prescriptions); new architectural decision |
 | 2026-06-13 | Added ADR-29 (doctor photos on local Docker volume), ADR-30 (F12 alerts as live audit-row query, no alerts table), ADR-31 (admin email re-trigger via outbox failed→pending reset) | Slice G as-built sweep |
 | 2026-06-13 | Added ADR-32 (PayFast Pakistan adapter: dual-channel `verifyWebhook`/`verifyReturn` confirmation, manual refund/reconcile fallback with `manual_required`/`manual_review_required`/`manual_refund_recorded`, researched-not-confirmed gated by doc 07 §3) | Slice H · S1 (PayFast Pakistan adapter); new architectural decision |
+| 2026-06-14 | Added ADR-33 (Daily.co video adapter: `verifyWebhook` verify+normalize in the adapter, role via meeting-token `user_id`, raw-body HMAC over `DAILY_WEBHOOK_SECRET`, webhook `retryType=exponential`; supersedes ADR-24's role-inference follow-up — dev `user_name` hack removed from prod; live-delivery gated by doc 07 §10) | Slice H · S2 (Daily.co video adapter); new architectural decision |

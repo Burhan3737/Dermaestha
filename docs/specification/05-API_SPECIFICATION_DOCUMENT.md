@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.11                          |
-| Last updated     | 2026-06-13                    |
+| Version          | 1.12                          |
+| Last updated     | 2026-06-14                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -179,7 +179,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | ---------------------------- | ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `POST /api/webhooks/payfast` | system | `payment.success`/`failed` ingest (CHECKOUT_URL server callback) | **signature-verified or 401 + alert**; success commits appointment+payment in one tx (#2), snapshots `feeAtBooking` (#6) |
 | `POST /api/payments/verify-return` | patient | Verify + commit the browser SUCCESS_URL/FAILURE_URL return params (dual-channel confirm; doc 14 §2) | calls `verifyReturn` → the **same** `processWebhook` atomic commit as the IPN; idempotent if the callback already confirmed; bad signature → `401` + `payment.webhook_rejected` audit |
-| `POST /api/webhooks/daily`   | system | Participant join/leave events → evaluation worker | feeds no-show resolution                                                                                                 |
+| `POST /api/webhooks/daily`   | system | Participant join/leave events → evaluation worker | **HMAC signature-verified over the raw body** or `401` + `video.webhook_rejected` audit (doc 14 §3); verified joins record `doctorJoinedAt`/`patientJoinedAt`, feeding no-show resolution |
 | `POST /api/webhooks/resend`  | system | Bounce/complaint signal                           | flags email failures to A3                                                                                               |
 
 > Refunds have **no patient/doctor route** — they are a side-effect of cancel/no-show transitions, orchestrated by the refund logic in `modules/appointment/service.js` with the per-appointment idempotency key (#10), retried with backoff, admin-alerted on exhaustion. No in-app manual retry (admin acts in the gateway dashboard if needed).
@@ -343,3 +343,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-12 | Aligned F08/F11 endpoint inventory to the built routes (prescription submit error codes incl. 409 `INVALID_STATE` + 400 `VALIDATION_FAILED`; medicine search `?search=`, admin `POST/PATCH /api/admin/medicines`, deactivate-only via `isActive`); added `?scope=history`/`hasPrescription` + detail `subjectAge`/`subjectRelation`/`patientName`; documented the state-guarded transition write (concurrent loser → 409); replaced the never-built `ALREADY_PRESCRIBED` 409 code with `INVALID_STATE` | Slice F (F08 prescriptions + F11 backend) |
 | 2026-06-13 | Slice H · S1: added `POST /api/payments/verify-return` (patient, dual-channel confirm) to F04 and `POST /api/admin/payments/:appointmentId/record-refund` (admin, manual refund → `payment.manual_refund_recorded`); registered the new alert kinds `payment.manual_review_required` + `payment.refund_manual_required` in the `GET /api/admin/alerts` row (now 7 kinds) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-13 | Slice G admin as-built sweep: `GET /api/doctors?includeInactive` admin flat-list branch + `POST /api/doctors` pending-state + `reactivate` status→active; added `PUT /api/doctors/:id/availability` (admin) and `GET /api/admin/records/:id`; renamed email-resend route to `:jobId` (failed-only, 409 `INVALID_STATE`); corrected `GET /api/admin/alerts` to the real 5 kinds; documented records/audit/settings filters + shapes; added 409 `PMC_TAKEN`/`EMAIL_TAKEN`, 400 `INVALID_FILE`, 500 `system.unhandled_exception` audit bridge; medicines `?includeInactive`; `disputed` allowed in ANY state via `POST .../dispute`; §2 `/uploads/doctors/<id>.<ext>` static serve; §6.1 A3/A5 coverage rows | Slice G as-built sweep |
+| 2026-06-14 | `POST /api/webhooks/daily` row (F04) now documents HMAC raw-body signature verification → `401` + `video.webhook_rejected` audit on bad signature; verified joins record `doctorJoinedAt`/`patientJoinedAt` (doc 14 §3) | Slice H · S2 (Daily.co video adapter; ADR-33) |

@@ -85,6 +85,25 @@ Lead Opus subagent wrote the plan (`docs/superpowers/plans/2026-06-13-slice-h-s1
 
 **Canon-doc sweep (controller-reviewed + committed):** a doc-sweep subagent applied surgical edits to **8 docs** (02 F12 alerts, 04 `RefundStatus`+`manual_required`, 05 two routes + 7 alert kinds, 07 §3 #9 merchant checklist, 11 **ADR-32**, 13 adapter→Built(PK), 14 PayFast SA→PK rewrite + `verifyReturn`/`manual_required`, 15 env rework); controller then hand-edited **03 + 08** (the flagged contradiction — PayFast PK has no refund/status API → manual path + manual-review surfacing). All version-bumped + footnoted. Reviewed in full and committed by the controller (per the authorized workflow; doc 00 change protocol followed).
 
+## S2 — Daily.co video adapter (IMPLEMENTED + MERGED to main, merge `f6d3bd5`, 2026-06-14)
+
+Lead Opus subagent: plan (`docs/superpowers/plans/2026-06-13-slice-h-s2-dailyco-adapter.md`) + implemented via 4 TDD subagents on branch `feature/slice-h-s2-daily` (9 commits `67ad9e6`→`a84d078`). Final whole-branch review APPROVED (0 critical/important). Controller verified + merged.
+
+**Code files (subagent report, captured):**
+- `server/src/integrations/video/daily.js` (C) + `daily.test.js` (C, 13 tests) — real adapter: idempotent `createRoom` (GET-reuse→POST private room w/ exp+eject_at_room_exp→400-race→GET), `issueToken` (`user_id=role` anchor, `is_owner`), `verifyWebhook` (constant-time base64 HMAC over `ts + "." + rawBody`; normalize versioned envelope → `NormalizedVideoEvent`; role from `payload.user_id`, `owner` fallback; tokenless/test-ping → null). Mirrors `payfast.js`.
+- `video/index.js` (M) — selection `daily→dailyReal`; typedef +`verifyWebhook` + `createRoom` opts + `NormalizedVideoEvent`. `daily.stub.js` (M, verifyWebhook throws), `daily.mock.js` (M, dev verifyWebhook normalizes simulator shape — dev role-from-user_name lives here now) + `daily.mock.test.js` (M, +3).
+- `modules/video/service.js` (M) — `recordJoinFromDailyEvent` takes normalized event; **ADR-24 `user_name` role-inference hack DELETED from prod**; first-join-wins kept. `controller.js` (M) — verify → `video.webhook_rejected` audit + 401 on bad sig; record normalized otherwise. `index.js` (M) — `/daily` route mounts `express.json({verify})` for `rawBody`. `test.js` (M).
+- `server/src/index.js` (M) — **global JSON parser carve-out** for `/api/webhooks/daily` (express.json idempotency fix; controller-reviewed — scoped to that one path, PayFast webhook unaffected). `dev/devVideo.js` (M) — both dev record paths normalize via `verifyWebhook`. `config/env/env.js` (M) — +`DAILY_WEBHOOK_SECRET`. `server/scripts/register-daily-webhook.mjs` (C) — one-time ops helper (`retryType:exponential`). Plan doc (C).
+
+**Decisions / findings:**
+- Raw-body capture required carving the daily path out of the GLOBAL parser (express.json is idempotent → a second route parser's `verify` never runs). Controller reviewed `server/src/index.js`: scoped to `/api/webhooks/daily` only; verified by the 287-test suite incl. video.integration.
+- `recordJoinFromDailyEvent` had 3 call sites (controller + 2 in devVideo) — all moved to normalized contract.
+- `.left` timestamp + Daily test-ping-signing + `GET /rooms/:name` 404 shape are UNVERIFIED → live-delivery gate (doc 07). New error codes `VIDEO_ROOM_FAILED`/`VIDEO_TOKEN_FAILED` (502).
+- Pre-existing (confirmed again, not introduced): `npm run lint` broken repo-wide (ESLint 9 vs `.eslintrc.json`).
+- Minor (non-blocking): `daily.mock` `eventId` can be null vs typedef `string` (dev-only, never read).
+
+**Verification (controller-independent):** `npm test` → 37 files / **287 passed** (267→+20); `npm --workspace client test` → 30 / **97 passed** (a first client run errored transiently under heavy machine load — re-run clean). No forbidden paths in branch diff. Merged `--no-ff` (`f6d3bd5`).
+
 ## Open items / next session
 - Then S2 → S3 → S4 → S5 → S6 via the same loop.
 - Tracked spec-doc impact per slice lives in each spec's §"Spec-doc impact" table (applied at each slice's merge, by the controller).

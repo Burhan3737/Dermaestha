@@ -4,8 +4,8 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.7                                |
-| Last updated     | 2026-06-13                         |
+| Version          | 1.8                                |
+| Last updated     | 2026-06-14                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
 
@@ -59,11 +59,23 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
 ```js
 /**
  * @typedef {Object} VideoProvider
- * @property {(appointmentId: string) => Promise<VideoRoom>} createRoom
- *   One isolated room per appointment (identity tied to the appointment).
+ * @property {(appointmentId: string, opts?: { notAfterIso?: string }) => Promise<VideoRoom>} createRoom
+ *   One isolated room per appointment (identity tied to the appointment). Idempotent: reuses an
+ *   existing `appt_<id>` room. Optional `notAfterIso` sets the room `exp` (slot-bounded; default 24h).
  * @property {(args: TokenArgs) => Promise<{ token: string, expiresAt: string }>} issueToken
  *   Time-bound participant token scoped to the slot window.
+ * @property {(req: import('express').Request) => NormalizedVideoEvent | null} verifyWebhook
+ *   Verify the Daily HMAC signature + normalize the participant event. Returns null for irrelevant
+ *   or tokenless (knocking) events and the create-time test ping; THROWS AppError(INVALID_SIGNATURE,
+ *   401) on a bad signature.
  */
+
+/** @typedef {Object} NormalizedVideoEvent
+ *  @property {'participant.joined'|'participant.left'} type
+ *  @property {string} appointmentId      // payload.room with the 'appt_' prefix stripped
+ *  @property {'doctor'|'patient'} role   // anchored to the meeting-token user_id Daily echoes back
+ *  @property {string} timestamp          // joined_at; .left falls back to the envelope event_ts
+ *  @property {string} eventId */
 ```
 
 ### EmailProvider (Resend) — module 13
@@ -171,18 +183,27 @@ The concrete PayFast network adapter is not yet wired; the production default (`
 
 ### Participant join/leave event (Daily webhook)
 
-Participant events are received at `POST /api/webhooks/daily` and feed the evaluation worker:
+Participant events are received at `POST /api/webhooks/daily` (signature-verified) and feed the evaluation worker. Daily delivers its current **versioned envelope**:
 
 ```json
-{ "type": "participant.joined" | "participant.left",
-  "room": "appt_<id>", "user_name": "...", "timestamp": "ISO-8601" }
+{ "version": "1.0",
+  "type": "participant.joined" | "participant.left",
+  "id": "<event id>",
+  "payload": { "room": "appt_<id>", "user_id": "doctor"|"patient",
+               "user_name": "...", "owner": true,
+               "joined_at": "ISO-8601", "session_id": "..." },
+  "event_ts": 1700000000 }
 ```
+
+`payload.room` is the room **name** (`appt_<id>`); note the boolean is `payload.owner`, NOT `is_owner`. **Role** is taken from the meeting-token `user_id` Daily echoes back (`'doctor'`/`'patient'`; `payload.owner` is only a fallback) — tokenless/knocking participants have no role and are ignored (`verifyWebhook` returns null). The adapter normalizes the envelope to a `NormalizedVideoEvent` (§1), preferring `payload.joined_at` for the timestamp and falling back to the envelope `event_ts` for `.left` (which has no confirmed participant timestamp).
+
+**HMAC verification (`verifyWebhook`):** Daily signs each delivery with headers `X-Webhook-Timestamp` + `X-Webhook-Signature`. The signed string is `timestamp + "." + rawBody`; the MAC is HMAC-SHA256 keyed on the **base64-decoded** `DAILY_WEBHOOK_SECRET`, output base64, compared constant-time. A mismatch THROWS `401` (→ `video.webhook_rejected` audit, doc 05). The signed string runs over the **exact received bytes** (`req.rawBody`), so the route mounts its own `express.json({ verify })` to capture them; the create-time `{ "test": "test" }` ping verifies and returns null. **Launch gate:** the signed-string serialization (raw received bytes vs `JSON.stringify`) must be validated against a live Daily delivery before go-live (doc 07).
 
 The worker maps join/leave to no-show resolution (doctor vs patient absent at slot+15m). Transient drops do not finalize `completed` (edge #22); missing participant data → non-penalizing terminal + admin alert (§10). Tokens are browser-only; the platform never proxies media.
 
 ### Dev simulation: `daily.mock` (ADR-24)
 
-The concrete Daily.co network adapter is not yet wired; the production default (`VIDEO_PROVIDER=stub`) throws `NOT_IMPLEMENTED`. For dev/CI, a `daily.mock` adapter (`server/src/integrations/video/daily.mock.js`) implements the same `VideoProvider` typedef (ADR-10): `createRoom` returns a deterministic `appt_<id>` room name; `issueToken` returns an HMAC-signed (keyed on `VIDEO_MOCK_SECRET`) opaque dev token bounded by the slot window. A dev-only, env-guarded simulator (`/dev/video/*`, mounted only when `VIDEO_PROVIDER=mock`) emits the documented Daily participant payload above through the **same** real `POST /api/webhooks/daily` handler, so the join-recording and no-show resolution paths are exercised offline and in CI. The `/dev/worker/*` route triggers one evaluation-worker pass on demand. The mock and all `/dev/*` routes must never be active in production (doc 10/15/08; ADR-24).
+The concrete Daily.co network adapter (`daily.js`) is now wired and selected via `VIDEO_PROVIDER=daily` (ADR-33; live-delivery gated by doc 07); `VIDEO_PROVIDER=stub` (the default) still throws `NOT_IMPLEMENTED`. For dev/CI, a `daily.mock` adapter (`server/src/integrations/video/daily.mock.js`) implements the same `VideoProvider` typedef (ADR-10): `createRoom` returns a deterministic `appt_<id>` room name; `issueToken` returns an HMAC-signed (keyed on `VIDEO_MOCK_SECRET`) opaque dev token bounded by the slot window. A dev-only, env-guarded simulator (`/dev/video/*`, mounted only when `VIDEO_PROVIDER=mock`) emits the documented Daily participant payload above through the **same** real `POST /api/webhooks/daily` handler, so the join-recording and no-show resolution paths are exercised offline and in CI. The `/dev/worker/*` route triggers one evaluation-worker pass on demand. The mock and all `/dev/*` routes must never be active in production (doc 10/15/08; ADR-24).
 
 ---
 
@@ -279,3 +300,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-11 | Added `queryPaymentStatus` to PaymentProvider contract + `QueryPaymentStatusArgs`/`Result` typedefs + mock/stub notes (§1-2); real Resend HTTP adapter + boot-time selection + production caveat (§4); `refund_delayed` merge-var row + Asia/Karachi timezone note (§5) | Slice E (reconciliation adapter + real Resend); new external integration cascade |
 | 2026-06-12 | Updated the `prescription_ready` trigger (§5) to fire on every prescription submit incl. corrections, with `dedupeKey` = prescription id (vars unchanged) | Slice F (F08): per-prescription enqueue via outbox `dedupe_key` |
 | 2026-06-13 | Added `verifyReturn` to the `PaymentProvider` typedef (§1); added `'manual_required'` to `RefundResult.status` + nullable `refundRef` (§2); rewrote the PayFast IPN-specifics subsection from the South-Africa passphrase model to the **PayFast Pakistan** IPG contract (GetAccessToken→PostTransaction, `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` signature, rupees-decimal wire amounts, dual-channel CHECKOUT_URL + SUCCESS/FAILURE return, ipguat/ipg1 hosts, no refund/status API) marked researched-not-vendor-confirmed and gated by doc 07 §3 (§2) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
+| 2026-06-14 | Added `verifyWebhook` to the `VideoProvider` typedef + optional `createRoom({ notAfterIso })` + the `NormalizedVideoEvent` typedef (§1); replaced the simplified dev participant shape with Daily's versioned envelope (`payload.owner`, `room`=name, `user_id` role anchor) + documented the raw-body HMAC verification (`X-Webhook-Timestamp`/`X-Webhook-Signature`, base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time) and the live-delivery launch gate → doc 07 (§3); corrected the `daily.mock` note's "not yet wired" opening (the concrete `daily.js` is now wired) | Slice H · S2 (Daily.co video adapter; ADR-33) |

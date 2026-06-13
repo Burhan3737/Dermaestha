@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.7                                                                                                     |
-| Last updated     | 2026-06-13                                                                                              |
+| Version          | 1.8                                                                                                     |
+| Last updated     | 2026-06-14                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
 
@@ -116,6 +116,8 @@ Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_l
 ### A08 — Software and data integrity failures
 
 **PayFast webhook signature verification:** every inbound `payment.success` or `payment.failed` webhook is signature-verified before any state change is applied. Payloads with a missing, invalid, or expired signature are rejected with a `401` and logged to the admin alert feed (PRD §3.4; PRD §3.6; ARCH §11).
+
+**Daily webhook signature verification:** every inbound `POST /api/webhooks/daily` participant event is HMAC-SHA256 verified — signed string `timestamp + "." + rawBody` (the exact received bytes), keyed on the base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time compared — before any join is recorded. A missing or invalid signature is rejected `401` and written to the audit log as `video.webhook_rejected` (doc 14 §3; ADR-33).
 
 **Refund idempotency:** each appointment carries a single `refund_idempotency_key` (UNIQUE constraint). An automatic retry, the hourly reconciliation path, or an admin's out-of-band gateway action can never produce a second refund settlement for the same appointment (PRD §3.3 #10; ARCH §8). For PayFast **Pakistan** (no refund API), that admin out-of-band action — recorded via `POST /api/admin/payments/:appointmentId/record-refund` — is the primary refund path, and the same key keeps it single-settlement (ADR-32).
 
@@ -282,3 +284,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | 2026-06-11 | Added G4 forgot-password timing equalization (§A07); notification outbox data-handling row (§2.1); dev worker trigger routes conditional-mount note (§A05) | Slice E hardening + outbox data-handling; schema/config cascade |
 | 2026-06-13 | Relaxed A01/§3.1 RBAC wording to allow supplemental param-level authz (`includeInactive`); corrected A09 A3-exception source to `system.unhandled_exception` audit rows (not the DSN); added Admin-writes rate-limit row (§A07); expanded photo-upload control (§2.2 magic-byte sniff/SVG/server-named/unlink/2MB); added DA5 session-revocation known gap (§A07) | Slice G as-built sweep |
 | 2026-06-13 | A08: noted PayFast **Pakistan** has no refund/status-query API → admin out-of-band record-refund is the primary refund path (idempotency-key-safe) and reconciliation surfaces stuck payments for manual review (`payment.manual_review_required`; ADR-32) | Slice H · S1 (PayFast Pakistan adapter) |
+| 2026-06-14 | A08: added Daily webhook signature-verification control — `POST /api/webhooks/daily` is HMAC-SHA256 verified over the raw body (base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time); bad signature → `401` + `video.webhook_rejected` audit (doc 14 §3; ADR-33) | Slice H · S2 (Daily.co video adapter) |
