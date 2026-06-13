@@ -51,6 +51,9 @@ export const payfastMock = {
       gatewayFee: b.gatewayFee == null ? null : Number(b.gatewayFee),
     };
   },
+  verifyReturn(req) {
+    return payfastMock.verifyWebhook(req);
+  },
   async refund({ idempotencyKey }) {
     return { refundRef: `refund_${idempotencyKey}`, status: 'settled' };
   },

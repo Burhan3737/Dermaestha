@@ -358,6 +358,24 @@ export async function initiateRefund({ appointmentId }) {
     }
     throw e;
   }
+  if (result.status === 'manual_required') {
+    // Gateway exposes no refund API (PayFast PK). Record once, no retry-spin, notify the patient.
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { refundIdempotencyKey: key, refundStatus: 'manual_required', nextRefundRetryAt: null },
+    });
+    await audit
+      .record({
+        eventType: 'payment.refund_manual_required',
+        actorType: 'system',
+        targetRef: appointmentId,
+        reason: 'gateway exposes no refund API; awaiting manual admin settlement',
+        meta: { providerRef: payment.providerRef ?? null },
+      })
+      .catch(() => {});
+    await enqueueRefundDelayed(appointmentId).catch(() => {});
+    return result;
+  }
   await prisma.payment.update({
     where: { id: payment.id },
     data: {

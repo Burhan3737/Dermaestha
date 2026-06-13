@@ -56,3 +56,18 @@ export async function putSettings(req, res, next) {
     next(e);
   }
 }
+
+export async function recordRefund(req, res, next) {
+  try {
+    res.json(
+      await adminService.recordManualRefund({
+        appointmentId: req.params.appointmentId,
+        refundRef: req.body.refundRef,
+        amount: req.body.amount,
+        actorId: req.session.userId,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}

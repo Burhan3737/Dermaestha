@@ -29,3 +29,28 @@ export async function payfast(req, res, next) {
     next(e);
   }
 }
+
+export async function verifyReturn(req, res, next) {
+  let result;
+  try {
+    result = paymentProvider.verifyReturn(req); // throws AppError(INVALID_SIGNATURE, 401) on bad sig
+  } catch (e) {
+    logger.warn('payfast return signature rejected');
+    await audit
+      .record({
+        eventType: 'payment.webhook_rejected',
+        actorType: 'system',
+        reason: 'bad signature (return)',
+      })
+      .catch(() => {});
+    return next(
+      e instanceof AppError ? e : new AppError('INVALID_SIGNATURE', 'Return rejected.', 401),
+    );
+  }
+  try {
+    await paymentService.processWebhook(result);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+}
