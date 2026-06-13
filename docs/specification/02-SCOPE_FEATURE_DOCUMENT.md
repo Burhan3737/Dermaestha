@@ -4,8 +4,8 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.0                                           |
-| Last updated     | 2026-06-01                                    |
+| Version          | 1.1                                           |
+| Last updated     | 2026-06-13                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
 
@@ -238,10 +238,12 @@ One-line: admin adds doctors with an initial password, edits most fields, and de
   - **Consultation fee** (number PKR, required, admin input)
   - **Weekly availability template** (schedule, optional, admin input)
   - **Initial password** (password, required, admin input) — set by admin and shared with the doctor out-of-band per DA1.
-  - **Pending-State Rule**: a new doctor is created in `pending` state until admin manually toggles to `active`; active doctors appear in the public listing immediately.
+  - **Pending-State Rule**: a new doctor is created with two orthogonal fields — `Doctor.status` (`pending` → `active` on first activation) and `Doctor.isActive` (listing visibility only). The doctor starts in `pending` status until admin manually activates; once active the doctor appears in the public listing immediately. Deactivate/reactivate (F10.03) flips `isActive` without changing `status`.
+  - **Initial-Credentials Rule (DA1)**: creation atomically sets the linked `User.mustChangePassword = true`, forcing the first-login password change (F15.03).
 - **F10.02 - Edit doctor (A4)**
   - Editable fields: **full name**, **phone**, **profile photo** (same JPEG/PNG/WebP ≤2MB constraints), **bio**, **specialization**, **consultation fee**, **weekly availability template**.
-  - **PMC/Email Immutability (#8)**: PMC number and email are immutable post-creation — neither can be updated through any API (§3.3 #8).
+  - **PMC/Email Immutability (#8)**: PMC number and email are immutable post-creation — neither can be updated through any API (§3.3 #8). Their presence in a PATCH body is rejected with `409 IMMUTABLE_FIELD` (not silently stripped).
+  - **Availability Route Rule**: a doctor's weekly availability is set by the admin via the separate route `PUT /api/doctors/:id/availability`, which reuses the `BLOCK_HAS_BOOKINGS` guard from F09 — it is not bundled into the doctor PATCH body.
   - **feeAtBooking Snapshot (#6)**: consultation-fee changes never affect existing appointments; the edit page shows a one-line note confirming this (§3.3 #6).
   - **Rename Durability Rule (#3)**: renaming a doctor never alters historical appointments or prescriptions (§3.3 #3).
 - **F10.03 - Deactivate / reactivate (A4, #9)**
@@ -257,15 +259,16 @@ Uses the shared `Button`, `Card`, confirmation `Modal`, file-upload `Input`, and
 
 One-line: admin manages the priced medicine catalogue that powers the prescription builder (and the deferred ordering module).
 
-- **F11.01 - Medicine list (A2)**: a searchable list on the admin "Medicines" page.
+- **F11.01 - Medicine list (A2)**: a searchable list on the admin "Medicines" page. `GET /api/medicines?includeInactive=true` is restricted to the admin role (a non-admin request carrying the flag → `403`); the A-02 view passes this flag to list deactivated medicines alongside active ones.
 - **F11.02 - Add medicine**
   - **Name** (text, required, admin input)
   - **Generic name** (text, optional, admin input)
   - **Common dosage forms** (multi-select: tablet, cream, syrup, etc., required, admin input)
   - **Unit price in PKR** (number, required, admin input) — used to compute the prescription total (F08) and the order total (Medicine Ordering Module, §5/§6).
-- **F11.03 - Edit / deactivate**
+- **F11.03 - Edit / deactivate / reactivate**
   - **Propagation Rule**: edits (including renames and price changes) propagate to the doctor's prescription-builder view but do not affect existing prescriptions, which are immutable and store a snapshot of medicine name, dosage, and price at issue-time (§3.3 #5).
   - **Deactivate Rule**: deactivating a medicine removes it from the prescription-builder dropdown but does not affect existing prescriptions.
+  - **Reactivate Rule**: reactivating sets `isActive=true` and the medicine reappears in the prescription-builder dropdown. The A-02 admin catalogue view lists deactivated medicines too (so an admin can reactivate them).
 
 Uses the shared `Button`, `Card`, and form `Input` components (doc 06).
 
@@ -277,11 +280,11 @@ One-line: an admin alert feed surfaces payment, refund, email, prescription-SLA,
   - Payment-webhook reconciliation mismatches.
   - Refund API failures.
   - Transactional-email send failures (after retry exhaustion).
-  - Appointments in `awaiting_prescription` state >12 hours.
-  - Unhandled application exceptions (sourced from the error-tracking tool named in §3.6).
+  - Appointments in `completed` state with no linked prescription whose `slotEnd ≤ now − 12h` (slot-end is the reference point, not completion-time; see §3).
+  - Unhandled application exceptions — written to the audit log directly by the Express error-handler bridge as `system.unhandled_exception` (route path + message only; NO stack trace, NO PII). No external error-tracking SDK feeds this alert.
   - Each alert links to the relevant appointment/payment record.
 - **F12.02 - Remediation**
-  - **Email-Only Re-Trigger Rule**: the admin can manually re-trigger emails only.
+  - **Email-Only Re-Trigger Rule**: the admin can manually re-trigger emails only — and only a `failed` job may be re-triggered (its status is set atomically back to `pending`). A non-failed or already-queued job returns `409 INVALID_STATE`. Each successful re-trigger writes an `admin.email_resend` audit entry. Refunds are never re-triggered.
   - **No-Manual-Refund Rule**: refunds are not re-triggered from the app; on a refund-API failure the platform auto-retries with exponential backoff and, after exhaustion, raises this alert. The admin then resolves the refund out-of-band in the aggregator's dashboard and the platform reconciles the final status; idempotency (§3.3 #10) makes out-of-band resolution safe.
 
 Uses the shared alert `Card` / feed and `Button` components (doc 06).
@@ -292,12 +295,13 @@ One-line: a single read-only admin page to look up appointments, payments, and t
 
 - **F13.01 - Unified Records & Audit Log page (A5)**
   - **Single-Surface Rule**: this page replaces the separate appointment/payment-search and audit-log views; overlapping information lives in one place with a superset of filters.
-  - Filters: patient email or phone, doctor name, appointment ID, payment reference number, user (patient or doctor) ID or email, event type, actor type (`patient` | `doctor` | `admin` | `system`), and date range.
+  - Filters: patient email or phone, doctor name, appointment ID, payment reference number, user (patient or doctor) ID or email, event type, actor type (`patient` | `doctor` | `admin` | `system`), appointment `state` (the `AppointmentState` enum), and a date range whose `from`/`to` are interpreted as `Asia/Karachi` day boundaries. Results are paginated, newest-first.
+  - **Intentional UI gap**: the server supports the audit-tab filters (`eventType` / `actorType` / `userId` / `email`) and this records `state` filter, but the corresponding admin-UI filter controls are deferred to a later slice — A-03/A-04 currently expose pagination only for the audit tab.
   - Record row columns: **appointment ID**, **slot date/time**, **patient name** (and **"for: [actual patient]"** if applicable), **doctor name**, **current state**, **amount paid**, **payment reference**, **refund reference** (if any).
   - Audit entry columns: **timestamp** in `Asia/Karachi`, **event type**, **actor type**, **actor identity**, **target record reference**, **optional reason**. Event coverage matches §3.6 (appointment state transitions, auth events, payment events, refund events).
 - **F13.02 - Detail view**
-  - Clicking a row opens an appointment detail view showing the full state-transition history (from the §3.6 audit log) and any linked prescriptions.
-  - Action buttons: **Re-trigger email** (emails only, per F12) and **Mark `disputed`** (per §4.4 #10 / §3.6).
+  - Clicking a row opens an appointment detail view showing the full state-transition history (from the §3.6 audit log), any linked prescriptions, and the linked **email jobs** (`notification_jobs` for that appointment, each with its status + attempt count).
+  - Action buttons: **Re-trigger email** (emails only, per F12) and **Set / clear `disputed` flag** (per §4.4 #10 / §3.6) — the flag is both set AND cleared as explicit admin actions, each audited (`appointment.disputed` / `appointment.dispute_cleared`).
 - **F13.03 - Read-only & access**
   - **Read-Only Rule**: the view is read-only with respect to records (append-only convention, §3.6); no update or delete UI is exposed. The mutations it does allow (email re-trigger, mark disputed) are themselves recorded as admin-actor audit entries. Refunds are never re-triggered in-app (§3.3 #10).
   - **Admin-Only Route Rule**: the route is reachable only by the admin role per DA6; no patient or doctor surface exposes this view.
@@ -309,12 +313,12 @@ Uses the shared table/list, filter bar, `Card`, `Button`, and confirmation `Moda
 One-line: admin tunes booking parameters and the fallback fee model without a code change; every change is audit-logged.
 
 - **F14.01 - Minimum booking lead time (A6)**
-  - **Minimum booking lead time** (duration, required, admin input) — default 1 hour, allowed range down to 30 minutes (per §4.1 #3 and the glossary entry "Minimum booking lead time").
+  - **Minimum booking lead time** (duration, required, admin input) — default 1 hour, allowed range 30–1440 minutes (floor 30 min per §4.1 #3 and the glossary entry "Minimum booking lead time"; ceiling 1440 min / 24h).
   - **Future-Only Rule**: changes apply to future booking attempts only; existing `confirmed` appointments are unaffected.
 - **F14.02 - Fallback transaction-fee model**
-  - **Fallback fee percentage** (number %, configurable, admin input) **and/or** **fixed PKR amount** (number, configurable, admin input) — with a documented default and validated bounds.
+  - **Fallback fee percentage** (stored in basis points — integer 0–10000 = 0–100%, admin input) **and/or** **fixed fallback amount** (integer ≥ 0, PKR paisa, admin input) — with a documented default and validated bounds.
   - **Fallback-Fee Rule (policy #5)**: used only when the aggregator does not report a per-transaction fee for a payment; when the aggregator does report a fee, that reported figure always wins. This figure feeds the refund amount, the cancellation-modal estimate, and the dashboard refund breakdown (F06) identically.
-- **F14.03 - Audit**: each settings change is recorded in the audit log as an admin-actor entry (§3.6).
+- **F14.03 - Audit**: each settings change is recorded in the audit log as an admin-actor `settings.updated` entry (§3.6), whose metadata includes `before` and `after` snapshots of the three tunables (minimum lead time, fallback fee percentage, fixed fallback amount).
 
 Uses the shared form `Input`, `Button`, and `Card` components (doc 06).
 
@@ -391,7 +395,9 @@ in_progress  (video room active; grace window = slot-start + 15min)
 
 **`disputed` flag (orthogonal).** A `disputed` boolean flag (set via F13/A5) is orthogonal to this state machine — it can attach to any terminal state and does not alter transitions (see the Disputed-marker bullet in §3.6).
 
-**`awaiting_prescription` (derived condition, not a state).** `awaiting_prescription` is **not** a distinct appointment state — it is a derived condition: an appointment in `completed` with no linked prescription and more than 12 hours elapsed since completion. It drives the F12/A3 alert and dashboard reminder but does not appear as a state transition in the audit log; the appointment remains `completed` until a prescription is submitted (`prescription_issued`).
+**`awaiting_prescription` (derived condition, not a state).** `awaiting_prescription` is **not** a distinct appointment state — it is a derived condition: an appointment in `completed` with no linked prescription whose `slotEnd ≤ now − 12h` (the 12-hour clock runs from slot-end, not completion-time). It drives the F12/A3 alert and dashboard reminder but does not appear as a state transition in the audit log; the appointment remains `completed` until a prescription is submitted (`prescription_issued`).
+
+**Slice G audit event types.** The admin panel (F10–F14) introduces twelve new audit event types recorded through the append-only audit log (§3.6): `doctor.created`, `doctor.updated`, `doctor.deactivated`, `doctor.reactivated`, `doctor.password_reset`, `doctor.availability_updated`, `doctor.photo_updated`, `appointment.disputed`, `appointment.dispute_cleared`, `admin.email_resend`, `settings.updated`, and `system.unhandled_exception`.
 
 ---
 
@@ -549,3 +555,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | Date       | Change           | Why                                                     |
 | ---------- | ---------------- | ------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §2.2/§3.3–§3.6/§4/§6 |
+| 2026-06-13 | F10–F14 admin as-built: status/isActive split + mustChangePassword, 409 IMMUTABLE_FIELD, availability route, medicine reactivate + includeInactive (admin), exception→audit bridge, slot-end+12h predicate, email-resend status guard, F13 state/Karachi filters + email jobs + dispute set/clear, lead-time 30–1440, basis-points fees, settings.updated snapshots, 12 new audit event types | Slice G as-built sweep |

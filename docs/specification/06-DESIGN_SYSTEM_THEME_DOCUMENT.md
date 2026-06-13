@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.1                                                                                       |
-| Last updated     | 2026-06-01                                                                                |
+| Version          | 1.3                                                                                       |
+| Last updated     | 2026-06-13                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -78,6 +78,7 @@ flowchart LR
 - **Status badge** — squared (3 px), dot-less, semantic tint+text; appears in dashboards, listings, and admin tables.
 - **Empty state** — centered icon + short message + primary CTA; used in P-08 ("No upcoming appointments — Browse doctors"), empty listing, and empty search.
 - **Confirmation modal** — centered card on dimmed backdrop; used for cancellations (P-10), doctor cancel (D-06), admin deactivation (A-01).
+- **Pagination** — shared page-envelope navigator (Previous / "Page X of Y" / Next, disabled at bounds) over the `{ number, size, total }` envelope; used under the A-04 records & audit tables. See §7.
 
 ---
 
@@ -104,7 +105,9 @@ Today — Availability (weekly grid) — History
 
 ### Admin sidebar links
 
-Doctors — Medicines — Alerts — Records & Audit — Settings
+Doctors — Medicines — Records & audit — System health — Settings
+
+`/admin` redirects to `/admin/doctors` — the Doctors list is the admin landing page.
 
 ### Screen-to-route inventory
 
@@ -129,11 +132,13 @@ Doctors — Medicines — Alerts — Records & Audit — Settings
 | D-04      | Video consultation (doctor)              | Doctor                   | D3           |
 | D-05      | Prescription builder                     | Doctor                   | D4           |
 | D-06      | Cancel appointment modal                 | Doctor                   | D5           |
-| A-01      | Doctors — list / add / edit / deactivate | Admin                    | A1, A4       |
+| A-01      | Doctors — list / add / edit / deactivate (incl. weekly-template editor + profile-photo upload) | Admin                    | A1, A4       |
 | A-02      | Medicine catalogue                       | Admin                    | A2           |
 | A-03      | Alert feed / system health               | Admin                    | A3           |
 | A-04      | Records & Audit Log                      | Admin                    | A5           |
 | A-05      | Settings                                 | Admin                    | A6           |
+
+> **Note (canonical screen-ID registry).** The 24 rows above are the authoritative screen-ID registry — cite these IDs verbatim across the suite. The patient bottom-nav **Profile** destination (§2 navigation, below) is intentionally not a dedicated v1 screen: in v1 it routes to a minimal account view (logout + basic details); richer account management (account deletion / data-export → v1.1; family profiles → v1.2+) is deferred, so it carries no `P-NN` ID.
 
 ---
 
@@ -165,6 +170,8 @@ Minimum tap target: ≥ 44 px tall. Time labels use tabular numerics.
 
 Centered on a dimmed backdrop (`rgba(15,33,24,.45)`). A 4 px accent bar at the top is colored by intent: spruce for confirmations, danger red for cancellations and deactivation. Actions are right-aligned: ghost "cancel" + filled "confirm". Never left-aligned in a content column.
 
+Confirm-gated actions include: cancellations (P-10), doctor cancel (D-06), admin deactivation (A-01), and the **A-05 platform-settings save** — gated because it alters money-math defaults (fallback fee + minimum booking lead).
+
 ### Payment flow states (P-07)
 
 Returned as finished centered cards (~520 px, icon circle + title + body + single action):
@@ -185,6 +192,10 @@ A slot timer is visible throughout the call. A soft "5 minutes remaining" warnin
 ### Prescription immutability (D-05)
 
 "Submit" makes the prescription immutable. Corrections require a new prescription; all prescriptions are shown chronologically, each downloadable.
+
+### Doctor profile-photo upload (A-01)
+
+The A-01 add/edit form includes a weekly-template editor and a profile-photo upload. The photo is sent as a multipart upload: JPEG / PNG / WebP, ≤ 2 MB, magic-byte validated server-side (the declared MIME is not trusted), stored under a server-generated filename, and served back from `UPLOADS_DIR` via `express.static` with `X-Content-Type-Options: nosniff`.
 
 ### Appointment cancellation modals
 
@@ -470,6 +481,7 @@ Radius `var(--r-sm)` (3 px), no dot, `var(--fs-label)` (11 px), Archivo 700, `4 
 - Accent bar (`.modal__accent`): 4 px height, default spruce (`var(--color-primary)`). `.modal__accent--danger` overrides to `var(--color-danger)`.
 - Body padding: `var(--sp-5)` (20 px).
 - Actions: right-aligned, gap `var(--sp-2)`, margin-top `var(--sp-4)`.
+- ARIA: every modal renders `role="dialog"` and `aria-modal="true"` on the backdrop. **No focus trap is implemented** — a deliberate house-wide v1 gap, consistent with the no-WCAG-target assumption recorded in doc 07.
 
 ### Inline alert (`.alert`)
 
@@ -494,6 +506,14 @@ Width `var(--sidebar-w)` (240 px), white background, 1 px right border, `var(--s
 ### Table / data row (`.table`) — admin
 
 Full-width, `border-collapse: collapse`, white background, `var(--border-1)`, radius `var(--r-md)`. Header: Archivo label-case, 11 px, uppercase, `letter-spacing: .6px`, muted text, `12 px 14 px` padding. Cells: 13 px, `12 px 14 px` padding, bottom border; last row has no bottom border. Row hover: `background: var(--color-bg)`. Numeric cells: right-aligned tabular. Filter bar above table using `.filters` (flex-wrap, gap `var(--sp-2)`).
+
+### Datetime formatting — `formatKarachiTable(iso)`
+
+A dense table-cell datetime formatter: Asia/Karachi, medium-date + short-time, with no weekday. It is distinct from `formatKarachi` (which includes the weekday) and is used in the A-03 / A-04 table cells where horizontal space is tight. Lives in `client/src/lib/format/format.js`.
+
+### Pagination (`shared/Pagination/`)
+
+Shared page-envelope navigator: a **Previous** control, a "Page X of Y" indicator, and a **Next** control, each disabled at its bound (Previous on the first page, Next on the last). It reads the house `{ number, size, total }` page envelope and is used beneath the A-04 records & audit tables. Lives at `client/src/shared/Pagination/`.
 
 ### Form section card (`.section-card`)
 
@@ -543,3 +563,5 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | ---------- | ---------------- | ------------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of DESIGN.md + tokens.css + components.css |
 | 2026-06-11 | Repointed the type-scale `DESIGN.md §2.2` ref into this document (DESIGN.md deprecated-by-policy) | Deprecated-doc hygiene |
+| 2026-06-13 | Corrected admin sidebar order/labels (Records & audit before System health; A-03 = "System health"); added `/admin`→`/admin/doctors` default route, Pagination component + building block, `formatKarachiTable` utility, A-05 settings-save confirm gate, A-01 photo-upload interaction + inventory note, and the modal `role="dialog"`/no-focus-trap convention | Slice G as-built sweep |
+| 2026-06-13 | Added a canonical screen-ID registry note under the §2 inventory: the 24 rows are authoritative, and the patient bottom-nav Profile destination is intentionally not a dedicated v1 screen (no `P-NN` ID; account management deferred to v1.1+) | doc-06/doc-13 screen-ID reconciliation |

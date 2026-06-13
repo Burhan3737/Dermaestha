@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.5                                                                                                     |
-| Last updated     | 2026-06-11                                                                                              |
+| Version          | 1.6                                                                                                     |
+| Last updated     | 2026-06-13                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
 
@@ -32,7 +32,7 @@ This document maps the v1 platform's existing, documented security controls onto
 
 ### A01 — Broken access control
 
-Authorization is enforced by a **single `requireRole(...)` middleware** (DA6) that gates every authenticated server route. It is not duplicated in route handler bodies and is never enforced only on the frontend; the server is the sole enforcement boundary.
+Route-level authorization is enforced exclusively by the **`requireRole(...)` middleware** (DA6), which gates every authenticated server route. Supplemental **parameter-level** authorization (e.g. an admin-only `includeInactive` query param on an otherwise role-shared route) may be performed in the handler body, where the parameter itself — not the route — is the protected surface. Authorization is never enforced only on the frontend; the server is the sole enforcement boundary.
 
 Scoping rules by role (PRD §3.6):
 
@@ -81,7 +81,7 @@ Scoping rules by role (PRD §3.6):
 - **Dev provider switches must stay at production-safe defaults:** `PAYMENT_PROVIDER` and `EMAIL_PROVIDER` default to the non-simulating `stub` adapters; the dev mock payment gateway (`mock`) and its `/dev/checkout` routes activate only on explicit opt-in and **must never be set in production** (ADR-22; doc 10 deploy checklist). The mock-IPN HMAC uses `PAYFAST_PASSPHRASE` (or a dev-only fallback constant when unset) — this signing secret is for the dev simulator only; production uses the real PayFast passphrase for genuine IPN verification (doc 15).
 - **Dev video switch must stay at production-safe default:** `VIDEO_PROVIDER` defaults to `stub`; the dev mock video provider (`mock`), the `/dev/video/*` participant-join simulator routes, and the `/dev/worker/*` evaluation trigger route must never be active in production (ADR-24; doc 10 deploy checklist; doc 15). `VIDEO_MOCK_SECRET` is a dev-only signing key for mock meeting tokens and must not be set in production.
 - **Dev worker trigger routes mount only in development:** the on-demand worker trigger routes (`POST /dev/worker/*`) are conditionally mounted at startup only when `NODE_ENV === 'development'` and are never registered in production — same discipline as the existing dev payment and video simulators (ADR-24; doc 10 deploy checklist; doc 15).
-- **Error-tracking DSN:** the DSN for the error-tracking tool is an env secret; unhandled exceptions are surfaced to the admin alert feed (A3) via the integration rather than leaked in error responses (PRD §3.6 A3; ARCH §14.5).
+- **Error-tracking DSN:** the DSN for the error-tracking tool is an env secret; the external integration is a separate sink and does not feed A3 — A3 exception alerts come from `system.unhandled_exception` audit rows (see §A09). Unhandled exceptions are never leaked in error responses (PRD §3.6 A3; ARCH §14.5).
 - **Single-instance worker assumption:** in-process `node-cron` workers and the memory-backed `express-rate-limit` store assume a single running instance. If the app ever scales horizontally, workers must be gated behind a Postgres advisory lock or moved to scheduled tasks, and the rate-limit store must move to a shared backend. This is a documented known limitation (CONFIG §3), not a silent assumption.
 
 ---
@@ -97,12 +97,15 @@ Scoping rules by role (PRD §3.6):
 | Sign-up         | 5 / IP / hour                           | `429 RATE_LIMITED`                                                    |
 | Forgot-password | 5 / account / hour                      | Enumeration-safe `200`; counted silently                              |
 | Payment-intent  | 10 / patient / hour                     | `429 RATE_LIMITED` (protects PayFast API quota beyond idempotency #7) |
+| Admin writes    | 60 / 15 min (keyed by `session.userId`) | `429 RATE_LIMITED` (applied to admin doctor writes, settings PUT, email resend, dispute) |
 
 Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_log` (`event_type=login_lockout`); sustained abuse is surfaced to the admin alert feed (A3).
 
 **Enumeration safety:** `POST /api/auth/forgot-password` and `POST /api/auth/login` return an identical response shape for known and unknown email addresses, preventing account enumeration (PRD §2.2 P2; ARCH §7). On an unknown email, the forgot-password path performs a dummy token-generate + hash operation (mirroring the login dummy-hash discipline) before returning the uniform response, so response timing does not betray whether an account exists. The reset-email send is fire-and-forget; the HTTP response never reflects whether a send occurred (G4 timing equalization).
 
 **Forced first-login password change (DA3):** when a doctor account is created by admin, `must_change_password = true` is set on the record. A middleware gate blocks all non-auth routes for that session until the password is changed. The same flag is set when admin resets a doctor's password (DA5), so the exposure window is limited to the doctor's first post-reset session (PRD DA3; ARCH §7; ARCH §5 module 1).
+
+**Known gap (DA5):** an admin password reset sets the DB `mustChangePassword = true` flag but does **not** invalidate the doctor's existing sessions. A concurrently-active doctor session retains its old in-session `mustChangePassword = false` value for up to `SESSION_TTL_DAYS` (default 7 days), so the forced-change gate only takes effect on that session's next re-authentication. Session revocation on admin reset is deferred to v1.1.
 
 **Admin bootstrap (DA4):** a single admin account is created via a one-off bootstrap script run on first deploy. No admin self-signup and no admin-creates-admin UI exist in v1. The admin account has no email-based password reset path; the admin password is rotated immediately after the bootstrap run (PRD DA4; PRD §5.2 risk row).
 
@@ -135,7 +138,7 @@ Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_l
 
 The audit log is **append-only** — no update or delete path is exposed at the application or API layer. Access is admin-only via the filtered query API (A5) (PRD §3.6; ARCH §11).
 
-**Admin alert feed (A3):** the admin dashboard surfaces alert entries for payment-webhook reconciliation mismatches, refund API failures after retry exhaustion, email-send failures after retry exhaustion, appointments in `awaiting_prescription` state for over 12 hours, and unhandled application exceptions sourced from the error-tracking integration (PRD A3).
+**Admin alert feed (A3):** the admin dashboard surfaces alert entries for payment-webhook reconciliation mismatches, refund API failures after retry exhaustion, email-send failures after retry exhaustion, appointments in `awaiting_prescription` state for over 12 hours, and unhandled application exceptions. The A3 exception alerts are sourced from `system.unhandled_exception` audit rows written by the global error handler (no PII, no stack, message truncated to ≤500 chars; written fire-and-forget so an audit-write failure can never block the 500 response). The `captureException(...)` → error-tracking DSN call is a separate parallel path and does **not** feed A3 (PRD A3).
 
 **Threshold-breach escalation:** sustained failed-login volume (beyond the per-account/per-IP rate-limit triggers) is surfaced to the A3 alert feed (PRD §3.6; ARCH §7; CONFIG §2).
 
@@ -162,7 +165,9 @@ The audit log is **append-only** — no update or delete path is exposed at the 
 
 ### 2.2 Data minimization
 
-The platform collects only what the PRD requires for its stated functions. Profile photo uploads are constrained to JPEG/PNG/WebP, max 2 MB; SVG and other formats are rejected. Free-text fields in prescriptions are bounded to clinical purpose. No card or wallet data is collected or stored.
+The platform collects only what the PRD requires for its stated functions. Free-text fields in prescriptions are bounded to clinical purpose. No card or wallet data is collected or stored.
+
+**Profile photo uploads** are constrained to JPEG/PNG/WebP enforced by a **magic-byte sniff** of the file buffer — the client-supplied MIME type and filename extension are not trusted. SVG is explicitly rejected as an XSS vector. Filenames are **server-generated** as `<doctorId>.<ext>` (no client-controlled path segment, so no traversal); a stale photo stored under a previous extension is `unlink`ed when the extension changes, so no orphaned file remains publicly served. The 2 MB `multer` size cap returns `400 INVALID_FILE` on breach.
 
 ### 2.3 Retention
 
@@ -208,7 +213,7 @@ The platform uses role-based access control (RBAC) with three user-facing roles 
 | `admin`   | Internal Dermestha staff; single bootstrap account (DA4)                                                                                              |
 | `system`  | The three in-process background workers (reconciliation, notification, appointment-evaluation); no session, identified in audit entries by actor type |
 
-Roles are stored on the `users.role` enum column. A single `requireRole(...)` middleware reads the session's role and rejects any request outside the allowed roles for the route. This is the **only authorization mechanism** — it is not duplicated in route handler bodies and not enforced only on the frontend (PRD DA6; ARCH §7; ARCH §11).
+Roles are stored on the `users.role` enum column. A single `requireRole(...)` middleware reads the session's role and rejects any request outside the allowed roles for the route. This is the **exclusive route-level authorization mechanism** and is never enforced only on the frontend. Supplemental **parameter-level** authorization may additionally be performed in a handler body where the protected surface is a specific query param rather than the route itself — for example, the admin-only `includeInactive` flag on the otherwise-shared doctor/medicine list routes gates the param with an in-handler `req.session.role !== 'admin'` check (PRD DA6; ARCH §7; ARCH §11).
 
 ### 3.2 Endpoint authorization by route group
 
@@ -275,3 +280,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | 2026-06-05 | Added dev video switch (`VIDEO_PROVIDER=mock`) + `/dev/video/*`/`/dev/worker/*` + `VIDEO_MOCK_SECRET` must-not-be-prod note (§A05) | Slice D (F05 video & lifecycle) |
 | 2026-06-11 | Re-pointed the state-machine single-authority ref to the `transition()` writer in `modules/appointment/service.js` (merged) | Folder-structure restructure (ADR-26); behavior unchanged |
 | 2026-06-11 | Added G4 forgot-password timing equalization (§A07); notification outbox data-handling row (§2.1); dev worker trigger routes conditional-mount note (§A05) | Slice E hardening + outbox data-handling; schema/config cascade |
+| 2026-06-13 | Relaxed A01/§3.1 RBAC wording to allow supplemental param-level authz (`includeInactive`); corrected A09 A3-exception source to `system.unhandled_exception` audit rows (not the DSN); added Admin-writes rate-limit row (§A07); expanded photo-upload control (§2.2 magic-byte sniff/SVG/server-named/unlink/2MB); added DA5 session-revocation known gap (§A07) | Slice G as-built sweep |

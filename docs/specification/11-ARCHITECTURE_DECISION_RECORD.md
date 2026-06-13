@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.9                                                                                                |
-| Last updated     | 2026-06-12                                                                                         |
+| Version          | 1.10                                                                                               |
+| Last updated     | 2026-06-13                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -42,6 +42,9 @@
 27. [ADR-26 — Feature-first client modules + domain-based server modules](#adr-26--feature-first-client-modules--domain-based-server-modules)
 28. [ADR-27 — Notification outbox + in-process dispatch/retry/reconciliation workers](#adr-27--notification-outbox--in-process-dispatchretryreconciliation-workers)
 29. [ADR-28 — State-guarded transition write + per-prescription outbox dedupe key](#adr-28--state-guarded-transition-write--per-prescription-outbox-dedupe-key)
+30. [ADR-29 — Doctor photos on a local Docker volume, not object storage](#adr-29--doctor-photos-on-a-local-docker-volume-not-object-storage)
+31. [ADR-30 — F12 system alerts as a live query over audit rows, no dedicated alerts table](#adr-30--f12-system-alerts-as-a-live-query-over-audit-rows-no-dedicated-alerts-table)
+32. [ADR-31 — Admin email re-trigger via outbox failed→pending reset, no parallel send path](#adr-31--admin-email-re-trigger-via-outbox-failedpending-reset-no-parallel-send-path)
 
 ---
 
@@ -411,6 +414,48 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-29 — Doctor photos on a local Docker volume, not object storage
+
+**Date:** 2026-06-13
+
+**Status:** Accepted
+
+**Context:** F10 (admin doctor management) needs doctor profile photos. The options were object storage (S3 / GCS / Railway's Volumes API) versus local disk. Object storage is the eventual multi-node answer but is speculative infrastructure at v1's single-service scale (ADR-14), and adds a vendor SDK, credentials, and a signed-URL surface the v1 admin flow does not need. (Slice G admin-panel design)
+
+**Decision:** Store doctor photos on local disk under `UPLOADS_DIR` (default `./uploads`) inside the named Docker volume `dermestha_uploads` mounted at `/app/uploads`. Uploads are magic-byte validated before write; filenames are **server-generated** as `<doctorId>.<ext>` (never user input); files are served via `express.static` with `X-Content-Type-Options: nosniff` and `index: false`. Object storage is explicitly deferred — `UPLOADS_DIR` is the single migration seam (swap the read/write/serve behind it for an S3 adapter later, mirroring the ADR-10 integration-seam discipline).
+
+**Consequences:** Photos survive container rebuilds because the named volume outlives the container. The design is single-node only — there is no multi-instance shared storage in v1 (consistent with the single-instance assumption of ADR-08/ADR-25/ADR-27). Hard operational constraint: a fresh production deploy MUST mount a persistent volume at `/app/uploads`, or photos are lost on redeploy (captured as a deploy-runbook requirement). Server-generated filenames and `nosniff`/`index:false` close path-traversal and content-type-confusion vectors at the static boundary.
+
+---
+
+## ADR-30 — F12 system alerts as a live query over audit rows, no dedicated alerts table
+
+**Date:** 2026-06-13
+
+**Status:** Accepted
+
+**Context:** F12 needs a system-health feed of five alert sources for the admin panel. ADR-27 already established that alert representation is audit rows the Slice G admin feed would read, and deferred a dedicated alert store. Slice G now realizes that reader (A-03). A dedicated `alerts` table would add a schema, a write on every alertable event (write-amplification on the hot payment/email paths), and a second source of truth to keep consistent with `audit_log`. (Slice G admin-panel design; ADR-27)
+
+**Decision:** Implement A-03 as a **live query over `audit_log`** filtered by an alertable-event predicate (`payment.reconciliation_mismatch`, `payment.refund_exhausted`, `email.send_failed_final`, `system.unhandled_exception`) UNION a derived `awaiting_prescription` predicate (appointment `completed`, no prescription, `slotEnd ≤ now − 12h`); there is **no `alerts` table**. The unhandled-exception → audit bridge added in `errorHandler` is alert source #5: it writes a `system.unhandled_exception` row (route + message only — no stack, no PII) fire-and-forget, so an audit-write failure can never block the 500 response.
+
+**Consequences:** Zero schema cost and no write-amplification — alerts reuse rows the system already writes. A per-source cap of 100 bounds the query. Trade-off: there is no per-source sampling, so a hot-failing route can flood `audit_log` and the feed (accepted at v1 scale; recorded as a risk in doc 07). The errorHandler bridge being fire-and-forget keeps the error path's existing failure semantics unchanged.
+
+---
+
+## ADR-31 — Admin email re-trigger via outbox failed→pending reset, no parallel send path
+
+**Date:** 2026-06-13
+
+**Status:** Accepted
+
+**Context:** F12.02 requires admins to re-trigger a failed email from the alert feed. The ADR-27 outbox already owns the single send path (the `dispatchDueNotifications` worker); a second admin-initiated `emailProvider.send()` would create a parallel codepath with its own duplicate-send and dedupe risks, defeating the outbox's idempotency guarantee. (Slice G admin-panel design; ADR-27)
+
+**Decision:** `POST /api/admin/emails/:jobId/resend` atomically resets a `failed` notification job back to `pending` (`attempts = 0`, `nextAttemptAt = null`, `lastError = null`), guarded by `WHERE status = 'failed'`, so the **existing dispatch worker** re-sends it on its next tick — there is no second send codepath. A job not in `failed` returns `409 INVALID_STATE` (idempotency / race guard). Refunds are NEVER re-triggered through this mechanism — the `payment.refund_exhausted` alert is informational only (refund retry stays owned by `retryDueRefunds`, ADR-27). The admin action is audited as `admin.email_resend`.
+
+**Consequences:** A single send path is preserved (no duplicate-send risk) and the outbox dedupe is reused unchanged. The `WHERE status = 'failed'` guard makes a double-click or concurrent admin action a no-op → 409. Keeping refunds out of this path prevents an admin from accidentally re-issuing money through what looks like a generic "resend" control. Every re-trigger is attributable via the `admin.email_resend` audit row.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -425,3 +470,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-11 | Repointed deprecated `CONFIG.md §7` refs (ADR-07 partial-index caveat -> doc 04 §4b; ADR-17 Prisma pin/upgrade -> doc 15 §7) | Deprecated-doc hygiene (design §8.1) |
 | 2026-06-11 | Added ADR-27 (notification outbox + in-process dispatch/retry/reconciliation workers; rejected sent-flags) | Slice E (F07 outbox + F04.03/F06.03 workers); new architectural decision |
 | 2026-06-12 | Added ADR-28 (state-guarded transition write closing the double-apply race; per-prescription outbox `dedupe_key` relaxation actioning ADR-27's YAGNI deferral) | Slice F (F08 prescriptions); new architectural decision |
+| 2026-06-13 | Added ADR-29 (doctor photos on local Docker volume), ADR-30 (F12 alerts as live audit-row query, no alerts table), ADR-31 (admin email re-trigger via outbox failed→pending reset) | Slice G as-built sweep |

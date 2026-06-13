@@ -512,6 +512,26 @@ async function enqueueCancellationEmail(appt, type) {
   }
 }
 
+/** F13.02: support-workflow flag, orthogonal to the state machine — never a transition. */
+export async function setDisputed({ appointmentId, disputed, actorId }) {
+  const appt = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: { id: true },
+  });
+  if (!appt) throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
+  const updated = await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { disputed },
+  });
+  await audit.record({
+    eventType: disputed ? 'appointment.disputed' : 'appointment.dispute_cleared',
+    actorType: 'admin',
+    actorId,
+    targetRef: appointmentId,
+  });
+  return updated;
+}
+
 /** Pure-ish, clock-injected, catch-up-safe. The ONLY transitions are via state.transition. */
 export async function evaluateDueAppointments(now = new Date()) {
   await activateDue(now);

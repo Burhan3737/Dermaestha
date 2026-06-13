@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.4                                    |
-| Last updated     | 2026-06-12                             |
+| Version          | 1.5                                    |
+| Last updated     | 2026-06-13                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -199,6 +199,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F10-003 | F10.02 PMC/Email Immutability (#8)                             | Doctor `D` exists                                          | 1. `A` attempts to change `D`'s PMC number and email via the edit page / API. | Both fields are immutable post-creation; the change is rejected through any API.                                                                                                                                           | Critical |
 | TC-F10-004 | F10.03 Deactivation-Preserves-Appointments Rule (#9, Edge #39) | `D` active with an existing `confirmed` future appointment | 1. `A` deactivates `D`.                                                       | `active=false`; `D` removed from public listing; new bookings blocked; the existing confirmed appointment is kept and honoured (no cancel/refund cascade); `D` can still log in, view it, join, and submit a prescription. | Critical |
 | TC-F10-005 | F10.03 Deactivation-Warning Rule                               | `D` active with N upcoming confirmed appointments          | 1. `A` clicks deactivate.                                                     | The confirmation modal shows the count of upcoming `confirmed` appointments that will remain on the calendar.                                                                                                              | Medium   |
+| TC-F10-006 | F10.01 Admin weekly-template editor                            | Admin `A` logged in; patient `P` for booking                | 1. `A` creates a doctor with availability blocks. 2. `A` activates the doctor. 3. `P` opens the new doctor's public slot picker. 4. `A` edits a block on the doctor's edit form and saves. | The doctor's availability blocks generate back-to-back 30-minute slots in the public picker; after `A` edits a block on the edit form, the changed blocks persist and the regenerated slots reflect the edit. | High     |
 
 ### F11 — Admin: medicine catalogue
 
@@ -218,6 +219,8 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F12-001 | F12.01 Alert feed (happy path)    | An appointment `completed` >12h with no prescription | 1. Let 12h elapse post-completion. 2. `A` opens the alert feed. | An `awaiting_prescription` alert is shown, linking to the relevant appointment record.                                                           | Medium   |
 | TC-F12-002 | F12.02 Email-Only Re-Trigger Rule | An alert with a failed email                         | 1. `A` uses the remediation action.                             | The admin can re-trigger emails only; the action is permitted.                                                                                   | Medium   |
 | TC-F12-003 | F12.02 No-Manual-Refund Rule      | A refund-API failure alert present                   | 1. `A` inspects the refund alert.                               | No in-app refund re-trigger is offered; the platform auto-retries then alerts, and the admin resolves out-of-band (idempotency keeps this safe). | Medium   |
+| TC-F12-004 | F12.02 Second-resend idempotency  | A notification job that has been resent and is no longer in `failed` state | 1. `A` re-triggers the outbox job again while it is not `failed`. | The re-trigger is rejected `409 INVALID_STATE`; the job row (`attempts`, `nextAttemptAt`, `lastError`, `status`) is unchanged — no duplicate send. | Medium   |
+| TC-F12-005 | F12.01 Unhandled-exception alert source | A request that triggers a non-`AppError`/non-`ZodError` 500 | 1. Force an unhandled exception on a route. 2. `A` opens the A-03 alert feed. | The error handler writes a `system.unhandled_exception` audit row (`targetRef` = route path); it surfaces in the A-03 alert feed alongside the email and refund alerts. | Medium   |
 
 ### F13 — Admin: records & audit log (unified)
 
@@ -226,6 +229,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F13-001 | F13.01 Single-Surface Rule (happy path) | Records exist; `A` logged in | 1. `A` opens the Records & Audit Log page. 2. Filter by appointment ID / event type / actor type / date range. | One unified surface returns matching records and audit entries with the documented columns.                                                                                   | Medium   |
 | TC-F13-002 | F13.02 Detail view + Mark disputed      | A terminal-state appointment | 1. `A` opens a record. 2. Click "Mark disputed".                                                               | The state-transition history and linked prescriptions are shown; the `disputed` flag is set without altering the state machine; the action is audit-logged as an admin entry. | Medium   |
 | TC-F13-003 | F13.03 Read-Only Rule                   | `A` on the records page      | 1. Look for any record update/delete UI.                                                                       | The view is read-only on records (append-only); only email re-trigger and mark-disputed mutations exist and are themselves audited; no refund re-trigger is offered.          | Medium   |
+| TC-F13-004 | F13.02 Email resend audit trail         | A record with a `failed` notification job | 1. `A` re-triggers the failed email from the record detail. 2. `A` re-triggers the same job a second time after the reset. | The first re-trigger writes an `admin.email_resend` audit entry and resets the job; the second re-trigger (job no longer `failed`) returns `409 INVALID_STATE` rather than duplicating the send. | Medium   |
 
 ### F14 — Admin: platform settings
 
@@ -234,6 +238,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F14-001 | F14.01 Minimum lead time / Future-Only Rule | `CA` confirmed; `A` logged in             | 1. `A` changes the minimum booking lead time.                                                 | The change applies to future booking attempts only; the existing `confirmed` appointment `CA` is unaffected.                                                                             | Medium   |
 | TC-F14-002 | F14.02 Fallback-Fee Rule                    | Aggregator reports no per-transaction fee | 1. Set the fallback fee %/fixed PKR. 2. Process a refund where no aggregator fee is reported. | The admin-configured fallback fee feeds the refund amount, cancel-modal estimate, and dashboard breakdown identically; when the aggregator does report a fee, that reported figure wins. | Medium   |
 | TC-F14-003 | F14.03 Audit                                | `A` logged in                             | 1. `A` changes a platform setting.                                                            | The change is recorded in the audit log as an admin-actor entry.                                                                                                                         | Medium   |
+| TC-F14-004 | F14.01 Settings floor + confirm gate        | `A` logged in                             | 1. `A` saves a tunable below its floor (e.g. lead time < 30). 2. `A` makes a valid change but cancels the A-05 confirm modal. 3. `A` makes a valid change and accepts the confirm modal. | A below-floor value is rejected with a validation error and the stored row is unchanged; the A-05 confirm modal must be accepted before any change applies — cancelling leaves the row unchanged. | Medium   |
 
 ### F15 — Doctor & admin authentication & roles
 
@@ -301,3 +306,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-11 | Re-pointed the TC-F05-011 transition-via ref to the `transition()` writer in `modules/appointment/service.js` | Folder-structure restructure (ADR-26); test expectation unchanged |
 | 2026-06-11 | Added TC-F01-006 (G4 timing equalization), TC-F03-009 (G2 active-doctor booking), TC-F04-008 (F04.03 lost-IPN confirm), TC-F05-016 (G3 doctor today-scope), TC-F06-007 (F06.03 refund-retry/exhaustion, G1), TC-F07-005 (F07 outbox atomicity) | Slice E (F04.03/F06.03/F07 + G2/G3/G4 fixes); feature → test cases |
 | 2026-06-12 | Added TC-F08-008…014 (immutable submit + snapshots, correction = new row + email, wrong-state 409, unknown-medicine 400, double-submit race, owner gates, history `hasPrescription`) and TC-F11-004…006 (active-only name+genericName search, admin CRUD + audit rows, admin-only authz) | Slice F (F08 prescriptions + F11 backend); feature → test cases |
+| 2026-06-13 | Added TC-F10-006 (admin weekly-template editor), TC-F12-004 (second-resend idempotency 409), TC-F12-005 (`system.unhandled_exception` alert source), TC-F13-004 (email-resend audit trail + 409), TC-F14-004 (settings floor + A-05 confirm gate) | Slice G as-built sweep |

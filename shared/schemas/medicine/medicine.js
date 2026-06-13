@@ -1,9 +1,10 @@
 // @ts-check
 import { z } from 'zod';
 
-/** GET /api/medicines?search= */
+/** GET /api/medicines?search=&includeInactive=true (includeInactive: admin only). */
 export const medicineSearchQuerySchema = z.object({
   search: z.string().trim().max(120).optional(),
+  includeInactive: z.literal('true').optional(),
 });
 
 /** POST /api/admin/medicines (F11.02). unitPrice is PKR paisa. */

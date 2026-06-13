@@ -70,6 +70,20 @@ export async function cancel(req, res, next) {
   }
 }
 
+export async function dispute(req, res, next) {
+  try {
+    res.json(
+      await appointmentService.setDisputed({
+        appointmentId: req.params.id,
+        disputed: req.body.disputed,
+        actorId: req.session.userId,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function videoToken(req, res, next) {
   try {
     res.json(

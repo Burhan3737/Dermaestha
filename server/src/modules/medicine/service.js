@@ -4,11 +4,12 @@ import { AppError } from '../../http/AppError.js';
 import * as audit from '../../services/audit/audit.service.js';
 
 /** Builder dropdown source (F11.01): active catalogue only; deactivated medicines vanish
- *  from here but never from existing prescriptions (snapshot rule #5). */
-export async function list({ search } = {}) {
+ *  from here but never from existing prescriptions (snapshot rule #5).
+ *  includeInactive (admin catalogue view only) lifts the isActive filter so A-02 can reactivate. */
+export async function list({ search, includeInactive = false } = {}) {
   return prisma.medicine.findMany({
     where: {
-      isActive: true,
+      ...(includeInactive ? {} : { isActive: true }),
       ...(search
         ? {
             OR: [
