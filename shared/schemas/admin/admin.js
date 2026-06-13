@@ -40,3 +40,10 @@ export const settingsUpdateSchema = z.object({
   /** PKR paisa, non-negative. */
   fallbackFeeFixed: z.number().int().min(0),
 });
+
+/** POST /api/admin/payments/:appointmentId/record-refund (Slice H S1; manual out-of-band refund). */
+export const recordRefundSchema = z.object({
+  refundRef: z.string().trim().min(1).max(128),
+  /** PKR paisa, positive; optional (the settled payment row already holds the amount). */
+  amount: z.number().int().positive().optional(),
+});

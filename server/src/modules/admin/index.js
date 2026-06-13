@@ -3,7 +3,7 @@ import { Router } from 'express';
 import * as c from './controller.js';
 import { requireRole } from '../../middleware/requireRole/requireRole.js';
 import { makeRateLimiter } from '../../middleware/rateLimit/rateLimit.js';
-import { recordsQuerySchema, auditQuerySchema, settingsUpdateSchema } from '../../../../shared/schemas/index.js';
+import { recordsQuerySchema, auditQuerySchema, settingsUpdateSchema, recordRefundSchema } from '../../../../shared/schemas/index.js';
 import { validate } from '../../middleware/validate/validate.js';
 
 // Validate req.query into req.query (Zod) without a body. Small inline middleware.
@@ -37,3 +37,5 @@ adminRouter.post('/emails/:jobId/resend', requireRole('admin'), adminWriteLimite
 // GET/PUT /api/admin/settings  (A-05, F14; lead-time floor 30 enforced by the DTO)
 adminRouter.get('/settings', requireRole('admin'), c.getSettings);
 adminRouter.put('/settings', requireRole('admin'), adminWriteLimiter, validate(settingsUpdateSchema), c.putSettings);
+// POST /api/admin/payments/:appointmentId/record-refund  (Slice H S1; manual out-of-band refund)
+adminRouter.post('/payments/:appointmentId/record-refund', requireRole('admin'), adminWriteLimiter, validate(recordRefundSchema), c.recordRefund);

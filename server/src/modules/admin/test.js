@@ -8,16 +8,20 @@ vi.mock('../../lib/prisma/prisma.js', () => ({
     notificationJob: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     user: { findUnique: vi.fn() },
     settings: { findUnique: vi.fn(), update: vi.fn() },
+    payment: { findFirst: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
 vi.mock('../../services/audit/audit.service.js', () => ({
   record: vi.fn().mockResolvedValue({}),
 }));
+vi.mock('../notification/service.js', () => ({ enqueue: vi.fn().mockResolvedValue({}) }));
 
 import { prisma } from '../../lib/prisma/prisma.js';
 import * as audit from '../../services/audit/audit.service.js';
+import * as notification from '../notification/service.js';
 import { listRecords, getRecordDetail, listAuditEntries, resendEmail, listAlerts, getSettings, updateSettings } from './service.js';
+import { recordManualRefund } from './service.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -251,6 +255,53 @@ describe('admin settings (F14)', () => {
         },
       }),
     );
+  });
+});
+
+describe('admin.recordManualRefund (Slice H S1)', () => {
+  const paid = {
+    id: 'p1', appointmentId: 'a1', status: 'success', amount: 250000,
+    refundIdempotencyKey: null, refundStatus: 'manual_required', refundRef: null,
+  };
+
+  it('records the refund, reuses rf_<id>, audits, and enqueues refund_confirmation', async () => {
+    prisma.payment.findFirst.mockResolvedValue(paid);
+    prisma.payment.update.mockResolvedValue({ ...paid, refundStatus: 'settled', refundRef: 'PORTAL-1' });
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', patientUserId: 'u1' });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
+    const out = await recordManualRefund({ appointmentId: 'a1', refundRef: 'PORTAL-1', amount: 244000, actorId: 'admin1' });
+    expect(out).toMatchObject({ refundStatus: 'settled', refundRef: 'PORTAL-1' });
+    expect(prisma.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'p1' },
+        data: expect.objectContaining({ refundRef: 'PORTAL-1', refundStatus: 'settled', refundIdempotencyKey: 'rf_a1' }),
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'payment.manual_refund_recorded', actorId: 'admin1', targetRef: 'a1',
+        meta: { refundRef: 'PORTAL-1', amount: 244000 },
+      }),
+    );
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'refund_confirmation', appointmentId: 'a1' }),
+    );
+  });
+
+  it('is idempotent: a re-POST on an already-settled payment is a no-op', async () => {
+    prisma.payment.findFirst.mockResolvedValue({ ...paid, refundStatus: 'settled', refundRef: 'PORTAL-1', refundIdempotencyKey: 'rf_a1' });
+    const out = await recordManualRefund({ appointmentId: 'a1', refundRef: 'PORTAL-1', actorId: 'admin1' });
+    expect(out).toMatchObject({ refundStatus: 'settled', refundRef: 'PORTAL-1' });
+    expect(prisma.payment.update).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(notification.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('no settled payment for the appointment → 404', async () => {
+    prisma.payment.findFirst.mockResolvedValue(null);
+    await expect(
+      recordManualRefund({ appointmentId: 'nope', refundRef: 'x', actorId: 'admin1' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 });
 

@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import * as audit from '../../services/audit/audit.service.js';
 import { karachiWallTimeToUtc } from '../../lib/tz/tz.js';
+import * as notification from '../notification/service.js';
 
 /** Doc-02 F13.01 record row. The settled money figures come from the SUCCESS payment row
  *  (PaymentStatus enum: pending|success|failed — there is no "paid"). */
@@ -263,4 +264,47 @@ export async function getRecordDetail(appointmentId) {
   });
   const { prescriptions, notificationJobs, ...appointment } = a;
   return { appointment: { ...appointment, ...toRecordRow(a) }, history, prescriptions, notificationJobs };
+}
+
+/** Slice H S1: record an out-of-band (portal) manual refund. Idempotent on rf_<appointmentId>.
+ *  This is the glossary "admin out-of-band gateway action" the idempotency key was designed for. */
+export async function recordManualRefund({ appointmentId, refundRef, amount, actorId }) {
+  const payment = await prisma.payment.findFirst({
+    where: { appointmentId, status: 'success' },
+  });
+  if (!payment) throw new AppError('NOT_FOUND', 'No settled payment to record a refund against.', 404);
+  // Idempotent re-POST: already settled → no-op (no double audit / double email).
+  if (payment.refundStatus === 'settled') {
+    return { appointmentId, refundRef: payment.refundRef, refundStatus: 'settled' };
+  }
+  const key = payment.refundIdempotencyKey ?? `rf_${appointmentId}`;
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: { refundRef, refundStatus: 'settled', refundIdempotencyKey: key, nextRefundRetryAt: null },
+  });
+  await audit.record({
+    eventType: 'payment.manual_refund_recorded',
+    actorType: 'admin',
+    actorId,
+    targetRef: appointmentId,
+    meta: { refundRef, amount: amount ?? null },
+  });
+  // refund_confirmation merge-vars (doc 14 §5): patientName, amount, refundRef, appointmentRef.
+  const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+  const patient = appt
+    ? await prisma.user.findUnique({
+        where: { id: appt.patientUserId },
+        select: { email: true, fullName: true },
+      })
+    : null;
+  if (patient) {
+    await notification.enqueue({
+      type: 'refund_confirmation',
+      appointmentId,
+      recipientEmail: patient.email,
+      scheduledFor: new Date(),
+      vars: { patientName: patient.fullName, amount: amount ?? payment.amount, refundRef, appointmentRef: appointmentId },
+    });
+  }
+  return { appointmentId, refundRef, refundStatus: 'settled' };
 }
