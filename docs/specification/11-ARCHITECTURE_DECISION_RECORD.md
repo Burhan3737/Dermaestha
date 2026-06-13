@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.10                                                                                               |
+| Version          | 1.11                                                                                               |
 | Last updated     | 2026-06-13                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -45,6 +45,7 @@
 30. [ADR-29 — Doctor photos on a local Docker volume, not object storage](#adr-29--doctor-photos-on-a-local-docker-volume-not-object-storage)
 31. [ADR-30 — F12 system alerts as a live query over audit rows, no dedicated alerts table](#adr-30--f12-system-alerts-as-a-live-query-over-audit-rows-no-dedicated-alerts-table)
 32. [ADR-31 — Admin email re-trigger via outbox failed→pending reset, no parallel send path](#adr-31--admin-email-re-trigger-via-outbox-failedpending-reset-no-parallel-send-path)
+33. [ADR-32 — PayFast Pakistan adapter: dual-channel confirmation + manual refund/reconcile fallback + researched-API risk](#adr-32--payfast-pakistan-adapter-dual-channel-confirmation--manual-refundreconcile-fallback--researched-api-risk)
 
 ---
 
@@ -456,6 +457,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-32 — PayFast Pakistan adapter: dual-channel confirmation + manual refund/reconcile fallback + researched-API risk
+
+**Date:** 2026-06-13
+
+**Status:** Accepted
+
+**Context:** Slice H · S1 wires the first concrete `PaymentProvider` network adapter (`server/src/integrations/payment/payfast.js`), the production target replacing the throwing stub. The vendor is PayFast **Pakistan** (payfast.pk / APPS IPG), whose public documentation is thin: the init flow (`GetAccessToken`→`PostTransaction`), the signature field list/order, the `CHECKOUT_URL` callback contract, and even the amount unit are inferred from community SDKs, not an official spec. PayFast PK also appears to expose **no** refund API and **no** payment-status-query API — unlike the South-Africa PayFast that earlier contract drafts (doc 14, doc 15 `PAYFAST_MERCHANT_KEY`) assumed. Two confirmation channels exist — a server callback (`CHECKOUT_URL`) and the browser return (`SUCCESS_URL` / `FAILURE_URL`) — and either may arrive first.
+
+**Decision:** (1) **Dual-channel confirmation** — add `verifyReturn(req)` to the `PaymentProvider` contract (doc 14 §1) alongside `verifyWebhook`; both run identical signature-verify + parse and feed the same idempotent `processWebhook` atomic commit, so whichever channel arrives first confirms the appointment and the other is a no-op. A new patient route `POST /api/payments/verify-return` backs the browser channel. (2) **Manual degradation, not fake success** — with no refund API, `refund` returns `{ status: 'manual_required', refundRef: null }`; the caller records it once, raises a single `payment.refund_manual_required` alert, schedules NO retry, and emails the patient. With no status API, `queryPaymentStatus` returns `unknown` and reconciliation raises a single `payment.manual_review_required` alert per stuck payment. An admin settles out-of-band and records it via `POST /api/admin/payments/:appointmentId/record-refund` (idempotent on `rf_<appointmentId>`, audited `payment.manual_refund_recorded`), reusing the §3.3 #10 refund-idempotency key the glossary always intended for out-of-band actions. `RefundStatus` gains `manual_required` (doc 04; migration `20260613181905_slice_h_refund_manual_required`). (3) **Researched-not-confirmed, gated** — every external detail lives behind a named constant/helper, the adapter is opt-in only via `PAYMENT_PROVIDER=payfast`, and go-live is gated by the doc 07 §3 merchant-verification checklist. Amounts are rupees-decimal on the wire; the adapter converts paisa↔rupees so internal money stays integer paisa.
+
+**Consequences:** The booking-confirm path no longer depends on a single fragile channel — a lost IPN is recoverable from the browser return (and vice-versa) without creating a second appointment. Refund and reconciliation failures degrade to a bounded, alert-once manual workflow instead of retry-spin or silent loss; the admin remains the system of record for money movement, protected by the existing idempotency key. The cost is real operational toil (manual refunds) and a standing risk that the researched contract is wrong — contained by the opt-in switch (`stub` stays the default) and the launch-gate checklist, so a single correction lands in one file once PayFast confirms the spec. ADR-22's dev `payfast.mock` (HMAC-signed IPN over `PAYFAST_PASSPHRASE`) is unchanged and remains the offline/CI path; `PAYFAST_MERCHANT_KEY` (South-Africa-only) is dropped in favour of `PAYFAST_SECURED_KEY` + `PAYFAST_MERCHANT_NAME` + `PAYFAST_STORE_ID` (doc 15).
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -471,3 +486,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-11 | Added ADR-27 (notification outbox + in-process dispatch/retry/reconciliation workers; rejected sent-flags) | Slice E (F07 outbox + F04.03/F06.03 workers); new architectural decision |
 | 2026-06-12 | Added ADR-28 (state-guarded transition write closing the double-apply race; per-prescription outbox `dedupe_key` relaxation actioning ADR-27's YAGNI deferral) | Slice F (F08 prescriptions); new architectural decision |
 | 2026-06-13 | Added ADR-29 (doctor photos on local Docker volume), ADR-30 (F12 alerts as live audit-row query, no alerts table), ADR-31 (admin email re-trigger via outbox failed→pending reset) | Slice G as-built sweep |
+| 2026-06-13 | Added ADR-32 (PayFast Pakistan adapter: dual-channel `verifyWebhook`/`verifyReturn` confirmation, manual refund/reconcile fallback with `manual_required`/`manual_review_required`/`manual_refund_recorded`, researched-not-confirmed gated by doc 07 §3) | Slice H · S1 (PayFast Pakistan adapter); new architectural decision |

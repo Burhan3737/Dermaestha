@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.6                                                           |
+| Version          | 1.7                                                           |
 | Last updated     | 2026-06-13                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
@@ -83,6 +83,7 @@ enum RefundStatus {
   retrying
   settled
   failed
+  manual_required
 }
 
 enum AuditActorType {
@@ -302,6 +303,8 @@ model Payment {
 `patientUserId` and `slotStart` are denormalized scalars (not a separate FK relation) specifically to form the `intent_key` composite unique. `gatewayFee` (paisa) drives refund math and cancellation fee estimates under policy #5. When the gateway does not report a fee, the Settings fallback model applies.
 
 `refundAttempts` and `nextRefundRetryAt` (Slice E, migration `20260610231617_slice_e_notification_outbox`) back the refund-retry worker (F06.03 / edge #30): on a provider failure `refundStatus` becomes `retrying`, `refundAttempts` increments, and `nextRefundRetryAt` is set to an exponential-backoff time; the minute-cron worker polls `refundStatus = retrying AND nextRefundRetryAt ≤ now`. At `REFUND_MAX_ATTEMPTS` the row flips to `refundStatus = failed`, `nextRefundRetryAt = null`, an audit alert (`payment.refund_exhausted`) is written, and a `refund_delayed` notification is enqueued.
+
+Against the real PayFast **Pakistan** adapter (which exposes no refund API), a refund instead degrades immediately to `refundStatus = manual_required` — one `payment.refund_manual_required` alert, **no** retry — and an admin later records the out-of-band settlement, flipping it to `settled` and reusing the `refundIdempotencyKey` (doc 11 ADR-32; `RefundStatus` gained `manual_required` via migration `20260613181905_slice_h_refund_manual_required`).
 
 ---
 
@@ -680,3 +683,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-11 | Added `NotificationType`/`NotificationStatus` enums (§2a), `NotificationJob` model (§2n), `Appointment.notificationJobs` relation (§2e), `Payment.refund_attempts`/`next_refund_retry_at` (§2f), relationship + index + F07 scope entries; migration `20260610231617_slice_e_notification_outbox` | Slice E (F07 outbox + F06.03 refund-retry); schema change per change-impact matrix |
 | 2026-06-12 | Added `NotificationJob.dedupe_key` (default `''`) and widened the `@@unique` to `(appointment_id, type, dedupe_key)` (§2n, §4a); migration `20260612003907_slice_f_outbox_dedupe_key`; aligned `doctorSnapshot` shape to drop the non-existent `signature` field (§2g, §3) | Slice F (F08 prescriptions): per-prescription `prescription_ready` enqueue; doctor model has no signature in v1 |
 | 2026-06-13 | Corrected `AuditLog.targetRef` example to bare id / route-path (not `type:id`) (§2j); documented `Doctor.photoUrl` `/uploads/doctors/<id>.<ext>` static-serve format (§2c); added §4d deferred-index note (`audit_log.targetRef`, `appointments.slotStart`) | Slice G as-built sweep |
+| 2026-06-13 | Added `manual_required` to the `RefundStatus` enum (§2a) + a `Payment` prose note on the PayFast-PK manual-refund degradation (§2f); migration `20260613181905_slice_h_refund_manual_required` | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |

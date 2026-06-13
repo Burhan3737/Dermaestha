@@ -4,8 +4,8 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.6                                |
-| Last updated     | 2026-06-12                         |
+| Version          | 1.7                                |
+| Last updated     | 2026-06-13                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
 
@@ -40,7 +40,10 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
  * @property {(args: CheckoutArgs) => Promise<CheckoutResult>} createCheckout
  *   Build a hosted-checkout handoff for a slot_locked appointment.
  * @property {(req: import('express').Request) => WebhookResult} verifyWebhook
- *   Verify signature + parse an inbound IPN. THROWS on invalid signature (→ 401 + alert).
+ *   Verify signature + parse an inbound IPN (the CHECKOUT_URL server callback). THROWS on invalid signature (→ 401 + alert).
+ * @property {(req: import('express').Request) => WebhookResult} verifyReturn
+ *   Verify + parse the browser SUCCESS_URL/FAILURE_URL return params; same verification as
+ *   verifyWebhook (dual-channel confirmation). THROWS on invalid signature (→ 401 + alert).
  * @property {(args: RefundArgs) => Promise<RefundResult>} refund
  *   Idempotent refund keyed by refundIdempotencyKey.
  * @property {(sinceIso: string) => Promise<UnconfirmedPayment[]>} listUnconfirmed
@@ -108,7 +111,10 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
 /** @typedef {Object} RefundArgs
  *  @property {string} providerRef @property {number} amount @property {string} idempotencyKey */
 /** @typedef {Object} RefundResult
- *  @property {string} refundRef @property {'settled'|'initiated'|'failed'} status */
+ *  @property {string|null} refundRef
+ *  @property {'settled'|'initiated'|'failed'|'manual_required'} status
+ *    // 'manual_required': PayFast PK exposes no confirmed refund API → manual admin settlement
+ *    //                    (refundRef null until an admin records the out-of-band refund; ADR-32). */
 ```
 
 ### UnconfirmedPayment (reconciliation query)
@@ -130,11 +136,17 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
  *  @property {number|null} [gatewayFee] // paisa; null → use Settings fallback (policy #5) */
 ```
 
-### Webhook (IPN) specifics
+### PayFast Pakistan IPG specifics (researched — NOT vendor-confirmed)
 
-- PayFast posts `application/x-www-form-urlencoded`. **Signature verification:** recompute the MD5 (or vendor-current) signature over the posted params in PayFast's prescribed order using the merchant passphrase; reject on mismatch → `401` + admin alert (§3.4). Also (recommended) validate the source IP / server-confirmation callback per PayFast docs.
-- On verified `payment.success`: the webhook handler runs the **single `$transaction`** that moves the appointment `slot_locked→confirmed`, snapshots `feeAtBooking` (#6), and writes the `payments` row (#2). `gatewayFee` from the IPN is stored and drives refund math; if absent, the `settings` fallback applies (policy #5).
-- `notifyUrl` = `${APP_BASE_URL}/api/webhooks/payfast`.
+> **The entire external contract below is researched, NOT vendor-confirmed.** Every detail — base URLs, the `GetAccessToken`→`PostTransaction` init flow, the signature field list/order, the callback field names, and the amount unit — is gated behind doc 07 §3's PayFast-Pakistan merchant-verification checklist before go-live. The adapter (`server/src/integrations/payment/payfast.js`) keeps each detail behind a named constant/helper so a single correction lands once PayFast confirms the official spec.
+
+- **Init flow (two-step):** `createCheckout` first POSTs `GetAccessToken` (auth: `MERCHANT_ID` + `SECURED_KEY`) to obtain an access token, then builds the signed `PostTransaction` handoff field set (`MERCHANT_ID`, `MERCHANT_NAME`, `TOKEN`, `PROCCODE`, `TXNAMT`, `CURRENCY_CODE=PKR`, `BASKET_ID`, `TXNDESC`, `SUCCESS_URL`, `FAILURE_URL`, `CHECKOUT_URL`, `SIGNATURE`). `BASKET_ID` = `appointmentId` and doubles as the provider ref / intent key (PayFast PK echoes it; there is no separate intent key on the wire).
+- **Signature:** `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)`; reject on mismatch → `401` + admin alert (§3.4). [LOW confidence — doc 07 §3 #1.]
+- **Amounts are rupees-decimal on the wire** (e.g. `"2500.00"`), not paisa. The adapter converts paisa↔rupees at the boundary (`paisaToRupees` / `rupeesToPaisa`); all internal money stays integer paisa (doc 15 §6).
+- **Dual-channel confirmation:** PayFast PK confirms through (1) a server-to-server callback to `CHECKOUT_URL` (= `notifyUrl` = `${APP_BASE_URL}/api/webhooks/payfast`), parsed by `verifyWebhook`, AND (2) the browser return to `SUCCESS_URL` / `FAILURE_URL`, parsed by `verifyReturn` (§1). Both run the identical signature-verify + parse and feed the same atomic-commit path; either channel can be the one that confirms (whichever arrives first — the commit is idempotent on replay).
+- **On verified `payment.success`** (either channel): the handler runs the **single `$transaction`** that moves the appointment `slot_locked→confirmed`, snapshots `feeAtBooking` (#6), and writes the `payments` row (#2). PayFast PK reports **no** gateway fee, so `gatewayFee` is `null` and the `settings` fallback fee model always applies (policy #5).
+- **Hosts:** sandbox `ipguat.apps.net.pk`, live `ipg1.apps.net.pk` (selected by `PAYFAST_MODE`); base path `/Ecommerce/api/Transaction/`.
+- **No confirmed refund or status-query API:** `refund` returns `{ status: 'manual_required', refundRef: null }` (manual admin settlement, doc 11 ADR-32 / doc 07 §3 #3); `queryPaymentStatus` returns `{ status: 'unknown' }` (reconciliation surfaces these for manual review, doc 07 §3 #4).
 
 ### Dev simulation: `payfast.mock` (ADR-22)
 
@@ -266,3 +278,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-11 | Repointed deprecated `CONFIG.md §3` -> doc 15 and `API.md §1.1` -> doc 05 | Deprecated-doc hygiene |
 | 2026-06-11 | Added `queryPaymentStatus` to PaymentProvider contract + `QueryPaymentStatusArgs`/`Result` typedefs + mock/stub notes (§1-2); real Resend HTTP adapter + boot-time selection + production caveat (§4); `refund_delayed` merge-var row + Asia/Karachi timezone note (§5) | Slice E (reconciliation adapter + real Resend); new external integration cascade |
 | 2026-06-12 | Updated the `prescription_ready` trigger (§5) to fire on every prescription submit incl. corrections, with `dedupeKey` = prescription id (vars unchanged) | Slice F (F08): per-prescription enqueue via outbox `dedupe_key` |
+| 2026-06-13 | Added `verifyReturn` to the `PaymentProvider` typedef (§1); added `'manual_required'` to `RefundResult.status` + nullable `refundRef` (§2); rewrote the PayFast IPN-specifics subsection from the South-Africa passphrase model to the **PayFast Pakistan** IPG contract (GetAccessToken→PostTransaction, `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` signature, rupees-decimal wire amounts, dual-channel CHECKOUT_URL + SUCCESS/FAILURE return, ipguat/ipg1 hosts, no refund/status API) marked researched-not-vendor-confirmed and gated by doc 07 §3 (§2) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |

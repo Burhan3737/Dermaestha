@@ -3,7 +3,7 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.6                                          |
+| Version          | 1.7                                          |
 | Last updated     | 2026-06-13                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
@@ -192,12 +192,14 @@ Source: `.env.example`. Copy to `.env` for local dev; set real values in Railway
 
 ### PayFast (Payment Adapter)
 
-| Variable               | Purpose                             | Example / Default       |
-| ---------------------- | ----------------------------------- | ----------------------- |
-| `PAYFAST_MERCHANT_ID`  | PayFast merchant ID                 | _(set per environment)_ |
-| `PAYFAST_MERCHANT_KEY` | PayFast merchant key                | _(set per environment)_ |
-| `PAYFAST_PASSPHRASE`   | IPN signature secret. In production verifies real PayFast IPNs; in dev (`PAYMENT_PROVIDER=mock`) it also keys the mock gateway's HMAC-signed IPN (ADR-22). Falls back to a dev-only constant if unset. | _(set per environment)_ |
-| `PAYFAST_MODE`         | Gateway mode                        | `sandbox` \| `live`     |
+| Variable                | Purpose                             | Example / Default       |
+| ----------------------- | ----------------------------------- | ----------------------- |
+| `PAYFAST_MERCHANT_ID`   | PayFast Pakistan merchant ID        | _(set per environment)_ |
+| `PAYFAST_SECURED_KEY`   | PayFast Pakistan secured key — auth for the real adapter's `GetAccessToken` step (doc 14 §2) | _(set per environment)_ |
+| `PAYFAST_MERCHANT_NAME` | PayFast Pakistan merchant name — part of the signature payload `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` | _(set per environment)_ |
+| `PAYFAST_STORE_ID`      | PayFast Pakistan store / merchant identifier (provisioned at KYC) | _(set per environment)_ |
+| `PAYFAST_PASSPHRASE`    | **Dev-mock-only** HMAC key for the `payfast.mock` gateway's signed IPN (ADR-22); falls back to a dev-only constant if unset. NOT used by the real PayFast Pakistan adapter. | _(dev only)_ |
+| `PAYFAST_MODE`          | Real-adapter gateway mode — selects the sandbox `ipguat.apps.net.pk` vs live `ipg1.apps.net.pk` host | `sandbox` \| `live` (default `sandbox`) |
 
 ### Provider Selection (dev vs production)
 
@@ -205,7 +207,7 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 
 | Variable           | Purpose                                                                                          | Example / Default          |
 | ------------------ | ------------------------------------------------------------------------------------------------ | -------------------------- |
-| `PAYMENT_PROVIDER` | Selects the `PaymentProvider`: `stub` (prod, throws until the real adapter is wired) or `mock` (dev simulated gateway, mounts `/dev/checkout`) | `stub` (prod) \| `mock` (dev) |
+| `PAYMENT_PROVIDER` | Selects the `PaymentProvider`: `stub` (throwing placeholder, default), `mock` (dev simulated gateway, mounts `/dev/checkout`), or `payfast` (the real PayFast **Pakistan** adapter — researched-not-vendor-confirmed, doc 14 §2; do not enable for live until the doc 07 §3 merchant-verification checklist passes) | `stub` \| `mock` \| `payfast` |
 | `EMAIL_PROVIDER`   | Selects the `EmailProvider`: `stub` \| `console` \| `resend`. Boot-time selection: `EMAIL_PROVIDER=console` forces the console logger; else a present `RESEND_API_KEY` selects the real Resend adapter; else fallback to console with a loud warning. | `stub` |
 | `VIDEO_PROVIDER`   | Selects the `VideoProvider`: `stub` (prod, throws until concrete adapter wired), `mock` (dev — real webhook path + `/dev/video/*` + `/dev/worker/*` simulator), or `daily` (resolves to stub until the concrete `daily.js` adapter is wired). Mock and `/dev/*` routes **must never be active in production** (ADR-24; doc 08; doc 10). | `stub` |
 | `VIDEO_MOCK_SECRET` | Dev-only mock meeting-token signing key (HMAC). Optional; for use only when `VIDEO_PROVIDER=mock`. Never set in production. | _(optional, dev-only)_ |
@@ -294,3 +296,4 @@ All **three** `settings` tunables are editable at runtime via `PUT /api/admin/se
 | 2026-06-11 | Dropped deprecated `CONFIG.md`/`ARCHITECTURE.md §14.5` live pointers (this doc is the config canon; deployment topology -> doc 10) | Deprecated-doc hygiene |
 | 2026-06-11 | Added `EMAIL_MAX_ATTEMPTS`, `EMAIL_BACKOFF_BASE_SEC`, `RECONCILIATION_LOOKBACK_H`, `RECONCILIATION_MIN_AGE_MIN`; updated `EMAIL_PROVIDER` enum to `stub \| console \| resend`; updated `RESEND_FROM` semantics; added Refund-retry worker cadence (§3); noted Slice E first consumers of refund retry constants (§4) | Slice E (worker constants, Resend fallback, worker cadences); new tunable/config |
 | 2026-06-13 | Added `UPLOADS_DIR` File-Storage env var (§8); added `minBookingLeadMinutes` ceiling 1440 + `fallbackFeePctBps`/`fallbackFeeFixed` bounds (§1, §6); expanded Tunable-Defaults note to all three settings tunables (§8); added Dual-Zod known-inconsistency migration caveat (§7) | Slice G as-built sweep |
+| 2026-06-13 | PayFast env section (§8): added `PAYFAST_SECURED_KEY`, `PAYFAST_MERCHANT_NAME`, `PAYFAST_STORE_ID`; redefined `PAYFAST_PASSPHRASE` as dev-mock-only; removed `PAYFAST_MERCHANT_KEY` (South-Africa-only, dropped); noted `PAYFAST_MODE` default `sandbox`; changed `PAYMENT_PROVIDER` enum to `stub\|mock\|payfast` | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |

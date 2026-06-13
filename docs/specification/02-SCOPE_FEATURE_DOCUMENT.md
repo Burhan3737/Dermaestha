@@ -4,7 +4,7 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.1                                           |
+| Version          | 1.2                                           |
 | Last updated     | 2026-06-13                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
@@ -279,6 +279,8 @@ One-line: an admin alert feed surfaces payment, refund, email, prescription-SLA,
 - **F12.01 - Alert feed (A3)**: shows alerts for —
   - Payment-webhook reconciliation mismatches.
   - Refund API failures.
+  - Payments stuck in reconciliation when the gateway exposes no status-query API (`payment.manual_review_required`) — PayFast Pakistan; surfaced once for manual review.
+  - Refunds that require manual out-of-band settlement when the gateway exposes no refund API (`payment.refund_manual_required`) — PayFast Pakistan.
   - Transactional-email send failures (after retry exhaustion).
   - Appointments in `completed` state with no linked prescription whose `slotEnd ≤ now − 12h` (slot-end is the reference point, not completion-time; see §3).
   - Unhandled application exceptions — written to the audit log directly by the Express error-handler bridge as `system.unhandled_exception` (route path + message only; NO stack trace, NO PII). No external error-tracking SDK feeds this alert.
@@ -556,3 +558,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | ---------- | ---------------- | ------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §2.2/§3.3–§3.6/§4/§6 |
 | 2026-06-13 | F10–F14 admin as-built: status/isActive split + mustChangePassword, 409 IMMUTABLE_FIELD, availability route, medicine reactivate + includeInactive (admin), exception→audit bridge, slot-end+12h predicate, email-resend status guard, F13 state/Karachi filters + email jobs + dispute set/clear, lead-time 30–1440, basis-points fees, settings.updated snapshots, 12 new audit event types | Slice G as-built sweep |
+| 2026-06-13 | Added two PayFast-Pakistan alert sources to the F12.01 alert-feed enumeration: `payment.manual_review_required` (no gateway status-query API) + `payment.refund_manual_required` (no gateway refund API) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |

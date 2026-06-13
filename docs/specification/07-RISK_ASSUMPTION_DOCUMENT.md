@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------- |
 | Document ID      | `07-RISK_ASSUMPTION_DOCUMENT`                                     |
 | Status           | Canonical                                                         |
-| Version          | 1.1                                                               |
+| Version          | 1.2                                                               |
 | Last updated     | 2026-06-13                                                        |
 | Sources absorbed | `docs/product/PRD.md §5.2, §2.3, §3; server/ + client/ TODO scan` |
 | Related docs     | 01, 02, 08                                                        |
@@ -117,6 +117,16 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
 
 8. **Audit-tab filter UI deferred (Slice G).** The server `/api/admin/audit` endpoint accepts filters (`eventType` / `actorType` / `userId` / `email` / date) and the records endpoint accepts a state filter, but the A-03 / A-04 admin UI renders pagination only for the audit tab and no state-filter control. Decide: build the filter UI in a follow-up, or accept the filter-less feed as a v1 limitation.
 
+9. **PayFast Pakistan merchant-verification checklist (launch gate).** The entire PayFast-PK external contract in the real `payfast` adapter (doc 14 §2) is **researched, not vendor-confirmed**. The adapter must NOT go live (`PAYMENT_PROVIDER=payfast` against the live host) until the merchant/KYC owner confirms each item against PayFast's official integration spec:
+   1. **Signature algorithm + exact field list & order** — currently assumed `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` (LOW confidence).
+   2. **`CHECKOUT_URL` IPN contract** — is it a server-to-server callback? exact payload, content-type, source IP range to allowlist, and the success/failure status field name + values.
+   3. **Refund-API existence** — if none, manual out-of-band settlement (`refundStatus='manual_required'`, recorded via the admin route) is the permanent path (ADR-32).
+   4. **Status-query-API existence** — if none, reconciliation can only surface stuck payments for manual review (`payment.manual_review_required`).
+   5. **Sandbox + production credentials** — `MERCHANT_ID`, `SECURED_KEY`, `MERCHANT_NAME`, `STORE_ID` for both environments.
+   6. **Confirmed base URLs / paths** — assumed `ipguat.apps.net.pk` (sandbox) / `ipg1.apps.net.pk` (live), base path `/Ecommerce/api/Transaction/`.
+   7. **Amount unit & precision on the wire** — assumed rupees-decimal (e.g. `"2500.00"`); the adapter converts paisa↔rupees at the boundary.
+   8. **Browser handoff mechanism** — GET redirect vs an app-served auto-submit form-POST page.
+
 ---
 
 ## Revision footer
@@ -125,3 +135,4 @@ The following items are unresolved decisions or ambiguities that affect v1 risk 
 | ---------- | ---------------- | ------------------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §5.2/§2.3 + code TODO scan |
 | 2026-06-13 | Added §2.3 Slice G as-built risks (Zod skew, DA5 session invalidation, unsampled exception audit, unindexed audit/slot columns) + open questions 7–8 (settings bootstrap gap, audit-tab filter UI deferral) | Slice G as-built sweep |
+| 2026-06-13 | Added open question 9 — the PayFast Pakistan merchant-verification checklist as a launch gate (signature, CHECKOUT_URL IPN, refund/status APIs, credentials, base URLs, amount unit, browser handoff) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |

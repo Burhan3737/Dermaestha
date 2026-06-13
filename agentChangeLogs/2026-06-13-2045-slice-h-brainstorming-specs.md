@@ -6,7 +6,7 @@
 **Ticket / issue:** None
 **Branch:** main
 **Commits / PR:** (in progress)
-**Last updated:** 2026-06-13-2045
+**Last updated:** 2026-06-13-2110
 **Tags:** #feature #infra #spec
 
 ## Summary
@@ -53,8 +53,39 @@ Not verified (design/spec phase — no code changes yet).
 ## Risk / rollback
 None yet (docs only). Spec-doc (00–15) updates are tracked and will be applied only at task end with user approval per governance.
 
+## Execution phase (started 2026-06-13-2110)
+All six design specs (S1–S6) written, committed, and user-approved. User set the execution workflow:
+- **Standing-rule overrides (user-authorized for this work):** controller MAY create branches, commit, push, merge to main, and commit/edit the canonical 00–15 spec docs — all WITHOUT per-step approval. Constraint: every decision backed by credible sources.
+- **Per-task loop, sequential S1→S6:** one Opus lead subagent per task writes its plan then implements via its OWN subagents on a dedicated branch, commits code + its plan (NOT changelog, NOT design specs, NOT 00–15). It reports changelog entries + required 00–15 edits to the controller. Controller records the changelog, reviews + commits the 00–15 edits, verifies suites green, pushes + merges to main, then re-reviews remaining plans (update only if learnings require).
+- **STOP after S6 merged** — S7 (E2E QA + launch gate) is brainstormed collaboratively with the user, NOT auto-executed.
+- Cross-slice build-order: S3 lands `lib/analytics/track.js` (reused by S4); S6 owns `/api/analytics/events` + writer + server-side `booking_confirmed`.
+
+## S1 — PayFast Pakistan adapter (IMPLEMENTED + MERGED to main, merge `b987472`, 2026-06-13)
+
+Lead Opus subagent wrote the plan (`docs/superpowers/plans/2026-06-13-slice-h-s1-payfast-adapter.md`) + implemented via its own TDD subagents on branch `feature/slice-h-s1-payfast` (9 commits `019d216`→`ee38355`). Controller verified + merged.
+
+**Code files changed (subagent's report, captured here):**
+- `prisma/schema.prisma` (M) — `RefundStatus` enum +`manual_required`; `prisma/migrations/20260613181905_slice_h_refund_manual_required/migration.sql` (C) — `ALTER TYPE ... ADD VALUE`.
+- `server/src/config/env/env.js` (+`.test.js`) (M) — +`PAYFAST_SECURED_KEY`/`MERCHANT_NAME`/`STORE_ID`, `PAYFAST_MODE` (enum, default sandbox); `PAYMENT_PROVIDER` +`payfast`. `.env.example` (M) — PayFast block SA→PK, dropped `PAYFAST_MERCHANT_KEY`.
+- `server/src/integrations/payment/payfast.js` (C) + `payfast.test.js` (C) — real PK adapter (token handshake checkout, verifyWebhook+verifyReturn, manual-degrade refund/queryPaymentStatus); `index.js` (M, typedef +verifyReturn/manual_required + 3-way selection); `payfast.mock.js`/`payfast.stub.js` (M, +verifyReturn).
+- `server/src/modules/payment/{controller.js,index.js,service.js}` (M) + `controller.test.js` (C) + `test.js` (M) — verify-return route `POST /api/payments/verify-return`; `reconcileOne` unknown→one-time `payment.manual_review_required` audit; `refundInFull` manual note. `server/src/routes.js` (M) — mount paymentReturnRouter.
+- `server/src/modules/appointment/{service.js,test.js}` (M) — `initiateRefund` manual_required branch (no retry, `payment.refund_manual_required` audit, `refund_delayed` once).
+- `shared/schemas/admin/admin.js` (M) +`recordRefundSchema`; `server/src/modules/admin/{service.js,controller.js,index.js,test.js}` (M) — `recordManualRefund` (idempotent, audit `payment.manual_refund_recorded`, enqueue `refund_confirmation`), `POST /api/admin/payments/:appointmentId/record-refund`, +2 manual-intervention events in the F12 alert feed.
+- `docs/superpowers/plans/2026-06-13-slice-h-s1-payfast-adapter.md` (C) — the plan.
+
+**Decisions / findings:**
+- `RefundStatus` is a Prisma enum → real schema change + migration (design §9 open item resolved). Prisma 6 runs `ADD VALUE` non-transactionally; `migrate status` clean.
+- **Ratified judgment call:** subagent added `payment.refund_manual_required` to the F12 alert feed (beyond the spec's explicit `payment.manual_review_required`). Controller APPROVES — a refund needing manual settlement must be discoverable or the §5 record-refund hook has no trigger.
+- `reconcileOne` "once" idempotency via an existing-audit-row check (no `Payment.meta` column) — avoids a 2nd migration; confirm/refund/fail paths unchanged.
+- createCheckout browser handoff (GET vs auto-submit form-POST) unresolved → §8 #6 gate; current GET handoff is the single correction seam.
+- **Constraint catch:** a Task-5 sub-subagent created a stray `agentChangeLogs/` file + edited `index.md` despite instructions; the lead reverted both (uncommitted, never in any branch commit). Controller confirmed no `agentChangeLogs/`/`docs/specification/`/`docs/superpowers/specs/` path is in any branch commit.
+- Pre-existing (not introduced): `npm run lint` broken repo-wide (ESLint 9 vs legacy `.eslintrc.json`).
+
+**Verification (controller-independent):** `npm test` → 36 files / **267 passed** (248→+19); `npm --workspace client test` → 30 files / **97 passed**; `prisma migrate status` → "up to date"; branch diff carries no forbidden paths. Merged `--no-ff` (`b987472`).
+
+**Canon-doc sweep (controller-reviewed + committed):** a doc-sweep subagent applied surgical edits to **8 docs** (02 F12 alerts, 04 `RefundStatus`+`manual_required`, 05 two routes + 7 alert kinds, 07 §3 #9 merchant checklist, 11 **ADR-32**, 13 adapter→Built(PK), 14 PayFast SA→PK rewrite + `verifyReturn`/`manual_required`, 15 env rework); controller then hand-edited **03 + 08** (the flagged contradiction — PayFast PK has no refund/status API → manual path + manual-review surfacing). All version-bumped + footnoted. Reviewed in full and committed by the controller (per the authorized workflow; doc 00 change protocol followed).
+
 ## Open items / next session
-- Write + commit S1 spec; user review.
-- Brainstorm S2–S6 specs (one each), then dispatch parallel `writing-plans` agents.
-- S7 (E2E QA + launch gate) brainstormed/executed last.
-- Tracked spec-doc impact for S1: docs 04, 05, 07, 11 (new ADR), 13, 14, 15.
+- Then S2 → S3 → S4 → S5 → S6 via the same loop.
+- Tracked spec-doc impact per slice lives in each spec's §"Spec-doc impact" table (applied at each slice's merge, by the controller).
+- After S6 merged: STOP, brainstorm S7 with user.

@@ -4,7 +4,7 @@
 | -------------------- | ---------------------------------- |
 | **Document ID**      | 03-ARCHITECTURE_DOCUMENT           |
 | **Status**           | Canonical                          |
-| **Version**          | 1.5                                |
+| **Version**          | 1.6                                |
 | **Last updated**     | 2026-06-13                         |
 | **Sources absorbed** | `docs/engineering/ARCHITECTURE.md` |
 | **Related docs**     | 02, 04, 05, 10, 14, 15             |
@@ -37,10 +37,10 @@ Dermestha v1 is a **single-deployable, same-origin monolith**: one JavaScript Ex
 - **Web client** — All three surfaces (patient / doctor / admin); discovery, booking, payment handoff, video, dashboards, prescription render. React + Vite (JavaScript + JSDoc), token-based CSS.
 - **API + app core** — JSON API, service-layer business logic, state machine, invariants, authorization. Node + Express (JavaScript + JSDoc), Prisma.
 - **Database** — Durable store for all domain data and server sessions. PostgreSQL (managed).
-- **Reconciliation worker** — Hourly query of PayFast for unconfirmed payments; reconcile missed webhooks. `node-cron` (in-process).
+- **Reconciliation worker** — Hourly query of PayFast for unconfirmed payments; reconcile missed webhooks. `node-cron` (in-process). (PayFast Pakistan exposes no status-query API → the query returns `unknown` and the worker surfaces stuck payments once for manual review; ADR-32.)
 - **Notification worker** — Schedule and dispatch the 6 email triggers; retry/backoff; reminder invalidation. `node-cron` (in-process).
 - **Appointment-evaluation worker** — Advance `confirmed→in_progress`, resolve `completed`/no-show within the grace window. `node-cron` (in-process). **Now implemented** (`server/src/workers/`; `evaluateDueAppointments` in `server/src/modules/appointment/service.js`; ADR-25): owns all non-payment §4.3 transitions (`confirmed→in_progress` at slot-start; `in_progress→completed` at slot-end+5m; no-show resolution at slot+15m with doctor-absence precedence per ADR-12).
-- **Payment adapter** — Hosted checkout, signed webhook verify, refund API, reconciliation query. PayFast.
+- **Payment adapter** — Hosted checkout; dual-channel confirmation (signed `CHECKOUT_URL` callback + browser return) verify; refund + status-query degrade to a manual admin path for PayFast Pakistan (no vendor API; ADR-32). PayFast Pakistan.
 - **Video adapter** — Per-appointment rooms, time-bound participant tokens. Daily.co.
 - **Email adapter** — Transactional sends + bounce/failure signal. Resend.
 
@@ -59,7 +59,7 @@ Dermestha v1 is a **single-deployable, same-origin monolith**: one JavaScript Ex
 | **Hosting**           | Railway all-in-one (app + Postgres), Mumbai/Singapore region                                                         | Simplest managed setup; private app↔DB networking; always-on for webhooks/cron; under ~USD 50/mo budget.                                                                                                                                                                                                                |
 | **Email**             | Resend (free tier)                                                                                                   | Free at ~2–3k/mo; bounce/complaint webhooks satisfy notification requirements.                                                                                                                                                                                                                                          |
 | **Video**             | Daily.co (behind adapter)                                                                                            | Least development; room + time-bound token primitives map 1:1 to requirements; cost scales with paid consults.                                                                                                                                                                                                          |
-| **Payments**          | PayFast (behind adapter)                                                                                             | Most established PK aggregator (first SBP commercial license, APPS-backed, PCI-DSS); one integration + KYC covers cards + JazzCash + Easypaisa + bank; hosted checkout, signed webhooks/IPN, refund API, reconciliation query.                                                                                          |
+| **Payments**          | PayFast (behind adapter)                                                                                             | Most established PK aggregator (first SBP commercial license, APPS-backed, PCI-DSS); one integration + KYC covers cards + JazzCash + Easypaisa + bank; hosted checkout, signed callback/return IPN. PayFast **Pakistan** exposes no programmatic refund or status-query API → those degrade to a manual admin path (ADR-32).                                                                                          |
 | **Scaffold**          | Lean scaffold, no third-party boilerplate                                                                            | No maintained boilerplate matches Express + React-SPA + Prisma + cookie-session RBAC; official Vite `react` + a clean Express/Prisma backend is lower-effort and better-fit. Borrow only config (Dockerfile, ESLint/Prettier/Husky/Zod).                                                                                |
 | **File-upload middleware** | `multer` `^2.1.1` (`memoryStorage`, 2 MB hard cap)                                                              | Multipart parsing for the doctor profile-photo pipeline (Slice G F10). In-memory buffer lets the service magic-byte validate before persisting to the uploads volume; the 2 MB cap bounds request size.                                                                                                                |
 
@@ -158,7 +158,7 @@ flowchart TD
 
 Three external services, each behind a thin adapter interface:
 
-- **PayFast (payment adapter)** — Hosted checkout handoff; signed webhook verification on success/failure; refund API keyed by `refund_idempotency_key`; reconciliation query for unconfirmed payments. Accessed only through the `PaymentProvider` adapter interface (`server/src/integrations/payment/`). Detailed payload contracts and field descriptions live in doc 14.
+- **PayFast (payment adapter)** — Hosted checkout handoff; dual-channel confirmation (signed `CHECKOUT_URL` callback + browser `SUCCESS_URL`/`FAILURE_URL` return) verified on success/failure. PayFast **Pakistan** exposes no refund or status-query API → refunds settle via an admin out-of-band action keyed by `refund_idempotency_key` and reconciliation surfaces stuck payments for manual review (ADR-32). Accessed only through the `PaymentProvider` adapter interface (`server/src/integrations/payment/`). Detailed payload contracts and field descriptions live in doc 14.
 - **Daily.co (video adapter)** — One room per appointment; time-bound meeting tokens scoped to the slot window; browser-only join; participant join/leave events feed the appointment-evaluation worker. Accessed only through the `VideoProvider` adapter interface (`server/src/integrations/video/`). Detailed contracts live in doc 14.
 - **Resend (email adapter)** — The 6 transactional email triggers; bounce/complaint webhooks; retry/backoff managed by the notification worker. No PDF attachments in v1. Accessed only through the `EmailProvider` adapter interface (`server/src/integrations/email/`). The 6-email merge-variable catalog and trigger conditions live in doc 14.
 
@@ -199,3 +199,4 @@ There are no message queues or other third-party infrastructure services. The th
 | 2026-06-05 | Noted appointment-evaluation worker as implemented (§1 components) | Slice D (F05 video & lifecycle; ADR-25) |
 | 2026-06-11 | Added §3a.1 "Code organization & folder conventions" (feature-first layout, view→hook rule, Prisma-vs-Zod note); re-pointed the evaluation-worker ref to `modules/appointment/service.js` | Folder-structure restructure (ADR-26); behavior unchanged |
 | 2026-06-13 | Added multer file-upload row (§2), `admin` server module (§3a.1), and the `dermestha_uploads` volume + static `/uploads` serving (§5) | Slice G as-built sweep |
+| 2026-06-13 | Corrected §1/§2/§4 PayFast references SA→Pakistan reality: dual-channel confirmation (CHECKOUT_URL callback + browser return); PayFast PK has no programmatic refund/status API → manual admin path + manual-review surfacing (ADR-32) | Slice H · S1 (PayFast Pakistan adapter) |
