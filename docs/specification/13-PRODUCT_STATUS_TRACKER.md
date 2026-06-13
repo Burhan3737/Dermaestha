@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Document ID      | `13-PRODUCT_STATUS_TRACKER`                                                                                                                           |
 | Status           | Canonical                                                                                                                                             |
-| Version          | 1.10                                                                                                                                                   |
+| Version          | 1.11                                                                                                                                                   |
 | Last updated     | 2026-06-13                                                                                                                                            |
 | Sources absorbed | `server/src + client/src inspection; agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md; ARCHITECTURE.md §5b; docs/specification/02; PRD §5.1` |
 | Related docs     | 02, 03, 05                                                                                                                                            |
@@ -269,8 +269,8 @@ This section is the v1 build backlog (baseline 2026-06-01), reconciled as each s
 - [ ] Landing page (public-facing patient acquisition surface)
 - [ ] Legal content: `/legal/terms` and `/legal/privacy` pages
 - [x] Admin views (client): A-01 Doctors (list / add / edit / deactivate — add-doctor and doctor-detail/edit are sub-views of A-01), A-02 Medicines, A-03 System health, A-04 Records & audit, A-05 Settings — Slice G (no A-06/A-07)
-- [ ] Doctor views (client): D-05 past appointments / history, D-06 cancellation flow
-- [ ] Patient views (client): P-12 refund status, P-13 profile / account settings
+- [ ] Doctor views (client): D-02 today's-appointments base view (incl. History; partial — only the Slice F write-action + awaiting badge exist so far), D-04 video consultation, D-06 cancel appointment modal
+- [ ] Patient views (client): P-11 pre-call waiting room, P-12 video consultation, patient Profile tab (doc 06 §2 nav destination; no dedicated screen-inventory ID). Refund status shows within the P-08/P-09 dashboards (doc 02 §F04), not a standalone screen
 - [ ] Full E2E QA pass
 
 ---
@@ -290,3 +290,4 @@ This section is the v1 build backlog (baseline 2026-06-01), reconciled as each s
 | 2026-06-12 | Status sweep after Slice F (M3 → In progress ~85–90%; modules 10/11 → Built; F08 → Built, F11 → Built backend; frontend views 13/24 + P-09/P-13/D-05/D-02; client PDF renderer → Built; Zod seam; M3 checklist ticked with stale screen IDs P-10/P-11→P-09/P-13 and D-04→D-05 corrected; M4 email line `prescription_ready` built). Also corrected the stale "Video chrome (Daily SDK wrapper): Not started" row → Built in Slice D | Reflect built F08 prescriptions + F11 backend + client PDF (Slice F); video-chrome correction (v1.8) |
 | 2026-06-13 | Status sweep after Slice G (M3 → Done 100%, M4 → In progress ~60%; modules 3/11/14/15/16/17 → Built; F10/F11/F12/F14/F15 → Built, F13 → Built with intentional UI gaps; cross-cutting error-tracking/Zod/route-config rows; views 18/24 + A-01..A-05; §5 M4 → In progress; M4 admin checklist ticked + settings route PATCH→PUT + admin screen-ID list corrected to A-01..A-05; M3 A-02 note) | Reflect built F10–F14 admin panel + A-01..A-05 views + DA5 reset (Slice G as-built sweep) (v1.9) |
 | 2026-06-13 | Post-sweep status sync: §5 roadmap M1/M2 → In progress (match §2); §6 backlog reconciled to as-built — M1 Auth items + typed API client + session context + route config ticked (Slice A–C, missed in prior sweeps), M2 video service [~]/video-token route + audit-query API ticked, P-07/P-08/P-09 + D-02/D-03 view rows corrected to §3 canonical screen IDs; §6 intro reframed; F01 Resend note (Slice E live) | Keep the tracker synced to reality after Slice G (v1.10) |
+| 2026-06-13 | Screen-ID reconciliation vs doc 06 canon: §6 M4 doctor-views row (D-05 was the built builder; history is part of D-02) and patient-views row (P-12=video, P-13=prescription per doc 06; refund status is a P-08/P-09 dashboard element, Profile tab has no inventory ID) corrected to the doc-06 registry | Align doc 13 screen IDs to the doc-06 canonical inventory (v1.11) |

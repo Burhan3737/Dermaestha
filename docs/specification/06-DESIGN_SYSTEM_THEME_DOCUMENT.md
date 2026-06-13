@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.2                                                                                       |
+| Version          | 1.3                                                                                       |
 | Last updated     | 2026-06-13                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -137,6 +137,8 @@ Doctors — Medicines — Records & audit — System health — Settings
 | A-03      | Alert feed / system health               | Admin                    | A3           |
 | A-04      | Records & Audit Log                      | Admin                    | A5           |
 | A-05      | Settings                                 | Admin                    | A6           |
+
+> **Note (canonical screen-ID registry).** The 24 rows above are the authoritative screen-ID registry — cite these IDs verbatim across the suite. The patient bottom-nav **Profile** destination (§2 navigation, below) is intentionally not a dedicated v1 screen: in v1 it routes to a minimal account view (logout + basic details); richer account management (account deletion / data-export → v1.1; family profiles → v1.2+) is deferred, so it carries no `P-NN` ID.
 
 ---
 
@@ -562,3 +564,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-01 | Initial creation | Faithful re-presentation of DESIGN.md + tokens.css + components.css |
 | 2026-06-11 | Repointed the type-scale `DESIGN.md §2.2` ref into this document (DESIGN.md deprecated-by-policy) | Deprecated-doc hygiene |
 | 2026-06-13 | Corrected admin sidebar order/labels (Records & audit before System health; A-03 = "System health"); added `/admin`→`/admin/doctors` default route, Pagination component + building block, `formatKarachiTable` utility, A-05 settings-save confirm gate, A-01 photo-upload interaction + inventory note, and the modal `role="dialog"`/no-focus-trap convention | Slice G as-built sweep |
+| 2026-06-13 | Added a canonical screen-ID registry note under the §2 inventory: the 24 rows are authoritative, and the patient bottom-nav Profile destination is intentionally not a dedicated v1 screen (no `P-NN` ID; account management deferred to v1.1+) | doc-06/doc-13 screen-ID reconciliation |
