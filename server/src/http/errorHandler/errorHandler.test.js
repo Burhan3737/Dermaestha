@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { AppError } from '../AppError.js';
 import { errorHandler } from './errorHandler.js';
+import { medicineCreateSchema } from '../../../../shared/schemas/index.js';
 
 vi.mock('../../services/audit/audit.service.js', () => ({
   record: vi.fn().mockResolvedValue({}),
@@ -50,16 +51,16 @@ describe('errorHandler', () => {
     expect(res.body.error.code).toBe('INTERNAL');
     expect(res.body.error.message).not.toMatch(/db exploded/);
   });
-  it('maps a ZodError from a different zod instance (shared/ resolves root zod@4) to 400', () => {
+  it('a shared-schema ZodError is an instanceof the server zod ZodError (single-copy proof)', () => {
+    const err = medicineCreateSchema.safeParse({}).error;
+    expect(err).toBeInstanceOf(ZodError);
+  });
+  it('maps a shared-schema ZodError to 400 VALIDATION_FAILED via instanceof', () => {
     const res = mockRes();
-    const foreign = Object.assign(new Error('validation'), {
-      name: 'ZodError',
-      issues: [{ path: ['minBookingLeadMinutes'], message: 'Too small' }],
-    });
-    errorHandler(foreign, { path: '/api/admin/settings', method: 'PUT' }, res, () => {});
+    const err = medicineCreateSchema.safeParse({ name: '', dosageForms: [] }).error;
+    errorHandler(err, { path: '/api/admin/medicines', method: 'POST' }, res, () => {});
     expect(res.statusCode).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_FAILED');
-    expect(res.body.error.details).toEqual({ minBookingLeadMinutes: 'Too small' });
     expect(audit.record).not.toHaveBeenCalled();
   });
   it('writes a system.unhandled_exception audit row for non-AppError 500s (F12.01 bridge)', () => {
