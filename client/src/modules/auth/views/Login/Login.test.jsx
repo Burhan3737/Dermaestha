@@ -15,7 +15,7 @@ function setup() {
       <SessionProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<div>patient-home</div>} />
+          <Route path="/browse" element={<div>patient-home</div>} />
           <Route path="/doctor" element={<div>doctor-home</div>} />
           <Route path="/doctor/change-password" element={<div>change-pw</div>} />
         </Routes>
@@ -27,7 +27,7 @@ function setup() {
 beforeEach(() => vi.clearAllMocks());
 
 describe('P-05 Login', () => {
-  it('routes a patient to / on success', async () => {
+  it('routes a patient to /browse on success', async () => {
     api.post.mockResolvedValue({
       id: 'u1',
       role: 'patient',

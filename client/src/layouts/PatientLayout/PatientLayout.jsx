@@ -13,7 +13,7 @@ export function PatientLayout({ children }) {
             <span className="brand__word">Dermestha</span>
           </Link>
           <nav className="topnav__links">
-            <NavLink to="/">Browse</NavLink>
+            <NavLink to="/browse">Browse</NavLink>
             {session ? (
               <NavLink to="/appointments">Appointments</NavLink>
             ) : (
@@ -29,7 +29,7 @@ export function PatientLayout({ children }) {
       </main>
       {session && (
         <nav className="tabbar only-mobile">
-          <NavLink to="/" className="tabbar__item">
+          <NavLink to="/browse" className="tabbar__item">
             Browse
           </NavLink>
           <NavLink to="/appointments" className="tabbar__item">

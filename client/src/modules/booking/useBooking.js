@@ -1,6 +1,7 @@
 // @ts-check
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/apiClient/apiClient.js';
+import { track } from '../../lib/analytics/track.js';
 
 /**
  * Booking module data/actions (D2). Behavior identical to the prior Booking/PaymentReturn views.
@@ -29,6 +30,7 @@ export function useBooking(opts = {}) {
     if (!forSelf)
       body.subject = { name: subject.name, age: Number(subject.age), relation: subject.relation };
     const appt = await api.post('/appointments/lock', body);
+    track('booking_started', { doctorId });
     const { redirectUrl } = await api.post(`/appointments/${appt.id}/pay`);
     return redirectUrl;
   };

@@ -10,7 +10,7 @@ import { AvailabilityGrid } from './views/AvailabilityGrid/AvailabilityGrid.jsx'
  * exposed as a factory the aggregator calls with `session` (mirrors the prior App.jsx hardcoding).
  */
 export const doctorRoutes = (session) => [
-  { path: '/', element: <DoctorListing /> },
+  { path: '/browse', element: <DoctorListing /> },
   { path: '/doctors/:id', element: <DoctorProfile /> },
   {
     path: '/doctor',
