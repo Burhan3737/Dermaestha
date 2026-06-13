@@ -7,6 +7,7 @@ import { sessionMiddleware } from './middleware/session/session.js';
 import { errorHandler } from './http/errorHandler/errorHandler.js';
 import { registerRoutes } from './routes.js';
 import { initErrorTracking } from './lib/errorTracking/errorTracking.js';
+import { ensureSettings } from './lib/settings/ensureSettings.js';
 import { logger } from './lib/logger/logger.js';
 import { startWorkers } from './workers/index.js';
 
@@ -51,6 +52,7 @@ export function createApp() {
 // Start the server only when executed directly (not when imported by tests).
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   initErrorTracking();
+  await ensureSettings();
   startWorkers();
   createApp().listen(env.PORT, () => logger.info(`Dermestha listening on :${env.PORT}`));
 }

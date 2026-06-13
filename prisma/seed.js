@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../server/src/lib/password/password.js';
+import { ensureSettings } from '../server/src/lib/settings/ensureSettings.js';
 
 const prisma = new PrismaClient();
 
@@ -28,7 +29,7 @@ const DOCTORS = [
 const BLOCKS = [1, 3, 5].map((weekday) => ({ weekday, startTime: '18:00', endTime: '21:00' }));
 
 async function main() {
-  await prisma.settings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  await ensureSettings(prisma);
 
   await prisma.medicine.createMany({
     data: [

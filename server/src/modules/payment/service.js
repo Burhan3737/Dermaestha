@@ -5,6 +5,7 @@ import { env } from '../../config/env/env.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
 import * as appointmentState from '../appointment/service.js';
 import * as notification from '../notification/service.js';
+import * as analytics from '../analytics/service.js';
 import * as self from './service.js';
 import { logger } from '../../lib/logger/logger.js';
 import * as audit from '../../services/audit/audit.service.js';
@@ -108,6 +109,12 @@ export async function confirmPaidAppointment({ payment, appointment, amount, gat
       fee: amount,
       client: tx,
     });
+  });
+  // KPI #1 conversion event (doc 14 §6). Best-effort, fires for both the webhook and
+  // reconciliation confirm paths; analytics.record never throws.
+  await analytics.record({
+    type: 'booking_confirmed',
+    meta: { doctorId: appointment.doctorId, fee: amount },
   });
 }
 

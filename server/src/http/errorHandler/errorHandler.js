@@ -12,8 +12,9 @@ export function errorHandler(err, req, res, _next) {
       .status(err.status)
       .json({ error: { code: err.code, message: err.message, details: err.details } });
   }
-  // instanceof alone misses ZodErrors from shared/ (root zod@4) — the server pins zod@3; duck-type as fallback.
-  if (err instanceof ZodError || (err?.name === 'ZodError' && Array.isArray(err?.issues))) {
+  // shared/ and server now resolve a single zod@3 copy (shared is a workspace; root override),
+  // so instanceof is reliable across the boundary — no duck-typing needed.
+  if (err instanceof ZodError) {
     const details = err.issues.reduce(
       (acc, i) => ({ ...acc, [(i.path ?? []).join('.')]: i.message ?? 'Invalid' }),
       {},
