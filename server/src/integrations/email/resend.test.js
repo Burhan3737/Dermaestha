@@ -19,12 +19,18 @@ describe('resendEmail.send', () => {
     vi.restoreAllMocks();
   });
 
-  it('POSTs to the Resend API with auth header and returns the provider id', async () => {
+  it('POSTs to the Resend API with auth header and the rendered subject + body', async () => {
     fetch.mockResolvedValue({ ok: true, json: async () => ({ id: 're_123' }) });
     const out = await resendEmail.send({
       template: 'booking_confirmation',
       to: 'p@t.test',
-      vars: { patientName: 'P' },
+      vars: {
+        patientName: 'P',
+        doctorName: 'Dr. K',
+        slotStartLocal: 'Mon 14:00',
+        fee: 250000,
+        dashboardUrl: 'https://app',
+      },
     });
     expect(out).toEqual({ providerId: 're_123' });
     const [url, init] = fetch.mock.calls[0];
@@ -34,6 +40,9 @@ describe('resendEmail.send', () => {
     expect(body.from).toBe('no-reply@dermestha.example');
     expect(body.to).toEqual(['p@t.test']);
     expect(body.subject).toMatch(/confirmed/i);
+    expect(body.text).toContain('Hi P,');
+    expect(body.text).toContain('PKR 2,500');
+    expect(body.text).toContain('— Dermestha');
   });
 
   it('maps a non-2xx response to EMAIL_SEND_FAILED so the outbox retry machinery engages', async () => {
