@@ -94,9 +94,10 @@ describe('recordJoinFromDailyEvent', () => {
     prisma.appointment.findUnique.mockResolvedValue({ ...baseAppt, patientJoinedAt: null });
     await recordJoinFromDailyEvent({
       type: 'participant.joined',
-      room: 'appt_a1',
-      user_name: 'patient',
+      appointmentId: 'a1',
+      role: 'patient',
       timestamp: '2026-06-04T10:01:00.000Z',
+      eventId: 'evt_1',
     });
     expect(prisma.appointment.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -106,15 +107,31 @@ describe('recordJoinFromDailyEvent', () => {
     );
   });
 
-  it('does not overwrite an existing join timestamp', async () => {
+  it('sets doctorJoinedAt from a doctor-role normalized event', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ ...baseAppt, doctorJoinedAt: null });
+    await recordJoinFromDailyEvent({
+      type: 'participant.joined', appointmentId: 'a1', role: 'doctor',
+      timestamp: '2026-06-04T10:00:00.000Z', eventId: 'e',
+    });
+    expect(prisma.appointment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { doctorJoinedAt: new Date('2026-06-04T10:00:00.000Z') } }),
+    );
+  });
+
+  it('does not overwrite an existing join timestamp (first-join wins)', async () => {
     prisma.appointment.findUnique.mockResolvedValue({ ...baseAppt, patientJoinedAt: SLOT_START });
     await recordJoinFromDailyEvent({
-      type: 'participant.joined',
-      room: 'appt_a1',
-      user_name: 'patient',
-      timestamp: '2026-06-04T10:05:00.000Z',
+      type: 'participant.joined', appointmentId: 'a1', role: 'patient',
+      timestamp: '2026-06-04T10:05:00.000Z', eventId: 'e',
     });
     expect(prisma.appointment.update).not.toHaveBeenCalled();
+  });
+
+  it('ignores participant.left (no join column write)', async () => {
+    await recordJoinFromDailyEvent({
+      type: 'participant.left', appointmentId: 'a1', role: 'doctor', timestamp: 't', eventId: 'e',
+    });
+    expect(prisma.appointment.findUnique).not.toHaveBeenCalled();
   });
 });
 
