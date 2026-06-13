@@ -38,4 +38,22 @@ describe('parseEnv', () => {
     expect(parseEnv(base).VIDEO_PROVIDER).toBe('stub');
     expect(parseEnv({ ...base, VIDEO_PROVIDER: 'mock' }).VIDEO_PROVIDER).toBe('mock');
   });
+  it('accepts payfast as a PAYMENT_PROVIDER and defaults PAYFAST_MODE to sandbox', () => {
+    const env = parseEnv({ ...base, PAYMENT_PROVIDER: 'payfast' });
+    expect(env.PAYMENT_PROVIDER).toBe('payfast');
+    expect(env.PAYFAST_MODE).toBe('sandbox');
+  });
+  it('accepts the new PayFast vars and a live mode override', () => {
+    const env = parseEnv({
+      ...base,
+      PAYFAST_SECURED_KEY: 'sk_x',
+      PAYFAST_MERCHANT_NAME: 'Dermestha',
+      PAYFAST_STORE_ID: 'store_1',
+      PAYFAST_MODE: 'live',
+    });
+    expect(env.PAYFAST_SECURED_KEY).toBe('sk_x');
+    expect(env.PAYFAST_MERCHANT_NAME).toBe('Dermestha');
+    expect(env.PAYFAST_STORE_ID).toBe('store_1');
+    expect(env.PAYFAST_MODE).toBe('live');
+  });
 });
