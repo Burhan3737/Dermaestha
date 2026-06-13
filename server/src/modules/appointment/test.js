@@ -702,6 +702,27 @@ describe('refund retry (F06.03 / edge #30)', () => {
     expect(success.refundStatus).toBe('settled');
     expect(success.nextRefundRetryAt).toBeNull();
   });
+
+  it('manual_required → no retry, refundStatus set, one audit, one refund_delayed email', async () => {
+    prisma.payment.findFirst.mockResolvedValue(failedPayment);
+    prisma.settings.findUnique.mockResolvedValue(null);
+    prisma.appointment.findUnique.mockResolvedValue({
+      id: 'a1', patientUserId: 'u1', slotStart: new Date('2099-01-06T09:00:00Z'), doctorId: 'd1',
+    });
+    prisma.user.findUnique.mockResolvedValue({ email: 'p@t.test', fullName: 'P' });
+    paymentProvider.refund.mockResolvedValue({ status: 'manual_required', refundRef: null });
+    const out = await initiateRefund({ appointmentId: 'a1' });
+    expect(out).toEqual({ status: 'manual_required', refundRef: null });
+    const data = prisma.payment.update.mock.calls[0][0].data;
+    expect(data.refundStatus).toBe('manual_required');
+    expect(data.nextRefundRetryAt).toBeNull();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'payment.refund_manual_required', targetRef: 'a1' }),
+    );
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'refund_delayed', appointmentId: 'a1' }),
+    );
+  });
 });
 
 describe('transition: prescription issuance (F08.02)', () => {

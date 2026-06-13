@@ -147,7 +147,24 @@ export async function reconcileUnconfirmed(now = new Date()) {
 
 async function reconcileOne(p) {
   const q = await paymentProvider.queryPaymentStatus({ providerRef: p.providerRef });
-  if (q.status === 'unknown') return; // next hourly pass
+  if (q.status === 'unknown') {
+    // Real PayFast PK has no status-query API (always 'unknown'): surface this stuck payment
+    // ONCE for manual review (F12 alert feed), then leave it for the next pass. Idempotent via
+    // an existing-audit-row check (Payment has no meta column).
+    const already = await prisma.auditLog.findFirst({
+      where: { eventType: 'payment.manual_review_required', targetRef: p.appointmentId },
+    });
+    if (!already) {
+      await audit.record({
+        eventType: 'payment.manual_review_required',
+        actorType: 'system',
+        targetRef: p.appointmentId,
+        reason: 'no gateway status-query API; payment unconfirmed past the reconciliation window — manual review',
+        meta: { providerRef: p.providerRef },
+      });
+    }
+    return;
+  }
 
   const appt = await prisma.appointment.findUnique({ where: { id: p.appointmentId } });
 
@@ -204,7 +221,10 @@ async function refundInFull(p) {
     eventType: 'payment.reconciliation_refund',
     actorType: 'system',
     targetRef: p.appointmentId,
-    reason: 'paid at gateway; slot no longer available (edge #6a) — refunded in full',
+    reason:
+      result.status === 'manual_required'
+        ? 'paid at gateway; slot gone (edge #6a) — manual refund required (no gateway API)'
+        : 'paid at gateway; slot no longer available (edge #6a) — refunded in full',
     meta: { providerRef: p.providerRef, amount: p.amount },
   });
 }

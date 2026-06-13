@@ -5,6 +5,7 @@ vi.mock('../../lib/prisma/prisma.js', () => ({
     appointment: { findUnique: vi.fn(), deleteMany: vi.fn() },
     doctor: { findUnique: vi.fn() },
     payment: { upsert: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
+    auditLog: { findFirst: vi.fn(), count: vi.fn() },
     user: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -231,6 +232,25 @@ describe('payment.reconcileUnconfirmed (F04.03)', () => {
     expect(paymentProvider.refund).toHaveBeenCalled();
   });
 
+  it('edge #6a with manual_required refund: lock deleted, status set, manual audit note', async () => {
+    paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'paid', amount: 250000 });
+    prisma.appointment.findUnique.mockResolvedValue(null); // locked row already gone → refundInFull
+    paymentProvider.refund.mockResolvedValue({ status: 'manual_required', refundRef: null });
+    await reconcileUnconfirmed(NOW);
+    const data = prisma.payment.update.mock.calls.at(-1)[0].data;
+    expect(data.refundStatus).toBe('manual_required');
+    expect(data.status).toBe('success');
+    expect(prisma.appointment.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'a1', state: 'slot_locked' },
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'payment.reconciliation_refund',
+        reason: expect.stringContaining('manual'),
+      }),
+    );
+  });
+
   it('gateway-failed → same cleanup as the failed-IPN path', async () => {
     paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'failed' });
     prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'slot_locked' });
@@ -243,11 +263,24 @@ describe('payment.reconcileUnconfirmed (F04.03)', () => {
     );
   });
 
-  it('gateway-unknown → leaves the payment for the next pass', async () => {
+  it('gateway-unknown → surfaces a one-time manual-review alert, no confirm/refund', async () => {
     paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'unknown' });
+    prisma.auditLog.findFirst.mockResolvedValue(null); // not yet flagged
     await reconcileUnconfirmed(NOW);
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(paymentProvider.refund).not.toHaveBeenCalled();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'payment.manual_review_required', targetRef: 'a1' }),
+    );
+  });
+
+  it('gateway-unknown that was already flagged → no duplicate manual-review alert', async () => {
+    paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'unknown' });
+    prisma.auditLog.findFirst.mockResolvedValue({ id: 'prior' }); // already flagged
+    await reconcileUnconfirmed(NOW);
+    expect(audit.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'payment.manual_review_required' }),
+    );
   });
 
   it('a provider query error audits a reconciliation mismatch and continues', async () => {
