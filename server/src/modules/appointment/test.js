@@ -14,7 +14,7 @@ vi.mock('../../lib/prisma/prisma.js', () => ({
     },
     doctor: { findUnique: vi.fn(), findFirst: vi.fn() },
     user: { findUnique: vi.fn() },
-    payment: { findFirst: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+    payment: { findFirst: vi.fn(), update: vi.fn(), findMany: vi.fn(), deleteMany: vi.fn() },
     settings: { findUnique: vi.fn() },
   },
 }));
@@ -214,6 +214,8 @@ describe('booking.lockSlot', () => {
       .mockResolvedValueOnce({ id: 'expired1' });
     prisma.appointment.delete.mockResolvedValue({});
     const out = await lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true });
+    // The blocker's dead Payment intent is cleared first (FK is RESTRICT), then the row is reclaimed.
+    expect(prisma.payment.deleteMany).toHaveBeenCalledWith({ where: { appointmentId: 'expired1' } });
     expect(prisma.appointment.delete).toHaveBeenCalledWith({ where: { id: 'expired1' } });
     expect(out).toMatchObject({ id: 'a2' });
   });

@@ -34,13 +34,11 @@ test.describe('J1 book → pay → confirm', () => {
     await expect(page.getByText(/Dr E2E Primary/)).toBeVisible();
   });
 
-  // BUG-1 (product defect, High): the payment.failed webhook path 500s. processWebhook()
-  // (server/src/modules/payment/service.js) deletes the slot_locked appointment while its
-  // pending Payment row still FK-references it — Payment.appointment has no onDelete:Cascade
-  // (prisma/schema.prisma ~L211), so prisma.appointment.deleteMany throws P2003. The slot is
-  // not released until lock expiry, and the user sees a 500. (reconcileOne's failed branch,
-  // service.js ~L180, has the same defect.) Flip to `test(` once the controller fixes it.
-  test.fixme('Fail at checkout releases the lock (no confirmation)', async ({ page }) => {
+  // BUG-1 fixed (Option B): the payment.failed webhook path marks the Payment `failed` and
+  // force-expires the slot lock instead of deleting the appointment (Payment.appointment is
+  // ON DELETE RESTRICT — a delete P2003'd, 500'd, and never released the slot). The appointment
+  // row is kept (lock expired), so the slot is reclaimable via lazy-expiry / reclaim-on-conflict.
+  test('Fail at checkout releases the lock (no confirmation)', async ({ page }) => {
     await signupUi(page, { fullName: 'J1 Fail', email: uniqueEmail('j1fail'), phone: '03007770002' });
     await expect(page).toHaveURL(/\/browse/);
     await page.getByRole('link', { name: /Dr E2E Primary/ }).click();
@@ -48,9 +46,17 @@ test.describe('J1 book → pay → confirm', () => {
     await page.getByRole('button', { name: 'Confirm & Pay' }).click();
     await expect(page).toHaveURL(/\/dev\/checkout/);
 
-    // payment.failed deletes the slot_locked appt → detail 404 → "Payment did not complete".
+    // payment.failed → no confirmation (the booking is never confirmed). Option B keeps the
+    // slot_locked row with an expired lock, so the return page never reaches "Booking confirmed".
     await page.getByRole('button', { name: 'Fail' }).click();
     await expect(page).toHaveURL(/\/pay\/return/);
-    await expect(page.getByRole('heading', { name: 'Payment did not complete' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Booking confirmed' })).toHaveCount(0);
+
+    // The slot is freed: re-book the same earliest slot. This exercises reclaim-on-conflict over
+    // the expired, payment-attached blocker (the FK that P2003'd pre-fix) and lands on /book/.
+    await page.goto('/browse');
+    await page.getByRole('link', { name: /Dr E2E Primary/ }).click();
+    await page.locator('button.slot').first().click();
+    await expect(page).toHaveURL(/\/book\//);
   });
 });

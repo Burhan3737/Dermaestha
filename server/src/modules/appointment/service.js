@@ -234,6 +234,11 @@ async function createWithReclaim(data, doctorId, slotStartDate, now) {
       select: { id: true },
     });
     if (!blocker) throw new AppError('SLOT_TAKEN', 'That slot was just taken.', 409);
+    // The blocker is an expired, never-confirmed slot_locked hold. Any Payment it carries is a
+    // dead intent (only `pending`/`failed` is reachable — a successful pay would have moved it to
+    // `confirmed`, out of this branch). `Payment.appointment` is ON DELETE RESTRICT, so clear the
+    // intent first or the reclaim delete raises P2003 (ADR-23 lazy-reclaim must actually free it).
+    await prisma.payment.deleteMany({ where: { appointmentId: blocker.id } });
     await prisma.appointment.delete({ where: { id: blocker.id } });
     try {
       return await prisma.appointment.create({ data });
