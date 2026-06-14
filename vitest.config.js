@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import { loadEnv } from 'vite';
 
@@ -7,9 +8,15 @@ export default defineConfig(({ mode }) => {
   // DB integration tests (which need DATABASE_URL) work under the test runner.
   Object.assign(process.env, loadEnv(mode, process.cwd(), ''));
   return {
+    resolve: {
+      alias: {
+        '#src': fileURLToPath(new URL('./server/src', import.meta.url)),
+        '#shared': fileURLToPath(new URL('./shared', import.meta.url)),
+      },
+    },
     test: {
       environment: 'node',
-      include: ['server/src/**/*.test.js', 'server/src/**/test.js', 'shared/**/*.test.js'],
+      include: ['server/test/**/*.test.js', 'shared/test/**/*.test.js'],
       hookTimeout: 30000,
     },
   };
