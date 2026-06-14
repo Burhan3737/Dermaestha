@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.6                                    |
-| Last updated     | 2026-06-14                             |
+| Version          | 1.7                                    |
+| Last updated     | 2026-06-15                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -106,6 +106,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F03-007 | F03.03 Single-Lock Rule                                 | `P` holds one active slot lock                    | 1. With one lock held, `P` attempts to lock a second slot.                                          | `P` cannot hold multiple slot locks simultaneously; the second lock attempt is refused.                                                 | High     |
 | TC-F03-008 | F03.03 No-Overlap Rule                                  | `P` confirmed on a slot with `D`                  | 1. `P` attempts to book an overlapping slot with `D2`.                                              | `P` cannot book overlapping slots with the same or a different doctor; the overlapping attempt is rejected.                             | High     |
 | TC-F03-009 | F03.03 Active-Doctor Booking Rule (invariant #9, G2)   | `D` deactivated or unknown; `P` logged in         | 1. `P` attempts to lock a slot for a deactivated or non-existent doctor.                             | The lock is rejected with `404 NOT_FOUND` — the same answer as the public profile route, no existence leak; no `slot_locked` row is created; a deactivated/unknown doctor takes no new bookings (invariant #9). | High     |
+| TC-F03-010 | F03.01 Future-Day Picker (day tabs, P-03)              | `P` logged in; `D` available on a future weekday only | 1. Open `D`'s profile (P-03). 2. Note the "Today" tab has no slots. 3. Select a future day tab. 4. Pick a slot → book → pay. | The profile shows day tabs for upcoming days; selecting a future day fetches and shows that day's slots; a future-day slot books → pays → confirms. Booking is not locked to today (flow-audit ISSUE-1). | Critical |
 
 ### F04 — Payment
 
@@ -119,6 +120,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F04-006 | F04.01 feeAtBooking Snapshot (#6)           | `CA` confirmed at fee X; `D`'s fee later changed         | 1. Admin changes `D`'s consultation fee. 2. Inspect `CA`.                                            | `CA`'s billed amount, refund basis, and revenue accounting remain at the snapshotted fee X; the fee change does not affect the existing appointment.                                      | Critical |
 | TC-F04-007 | F04.03 Reconciliation safety net (Edge #6a) | `P` pays late; slot already confirmed to another patient | 1. A late webhook / reconciliation arrives for a slot already confirmed to someone else.             | No second appointment is created; the paying patient is auto-refunded in **full** (platform-caused, not net-of-fee); an admin alert is raised and the patient is emailed (Edge #6 / #6a). | Critical |
 | TC-F04-008 | F04.03 Reconciliation lost-IPN confirm      | `P` paid; the `payment.success` IPN was never delivered; slot still `slot_locked` | 1. Let the hourly reconciliation worker query the gateway and find the payment `paid`.               | The worker completes the SAME atomic confirm as the webhook (`slot_locked → confirmed` + `feeAtBooking` snapshot + payment success + outbox enqueue) in one `$transaction`; a `payment.reconciled_confirmed` audit row is written; a late duplicate IPN is an idempotent no-op. | Critical |
+| TC-F04-009 | F04.02 Payment-fail terminal UX (P-07)      | `P` locked a slot, reaches the hosted checkout | 1. Fail/abandon the payment. 2. Land on `/pay/return`. | P-07 shows a terminal **"Payment not completed"** card (slot hold released, pick another) and stops polling — never an indefinite "Awaiting payment confirmation…" spinner. Keys off `lockExpiresAt` vs `serverNow` (flow-audit ISSUE-3). | Critical |
 
 ### F05 — Appointment lifecycle & video consultation
 
@@ -181,6 +183,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F08-012 | F08.02 Double-Submit Race (state-guarded write)            | Two concurrent first-issue submits on the same `completed` appointment | 1. Fire two `POST .../prescriptions` concurrently.                              | Exactly one wins (`completed → prescription_issued`); the loser fails with `409 INVALID_TRANSITION` and its prescription row is rolled back atomically (no orphan row, no second transition). | Critical |
 | TC-F08-013 | F08.02 Owner Gates (no-leak)                                | `D2` (non-owner doctor), `P2` (non-owner patient)                      | 1. `D2` GETs / submits on `D`'s appointment. 2. `P` (role patient) POSTs a prescription. 3. `P2` GETs `P`'s prescriptions. | Non-owner reads return `404` (no existence leak); a patient POST is rejected `403 FORBIDDEN` (doctor-only); cross-patient prescription reads are denied. | Critical |
 | TC-F08-014 | F08.01 History `hasPrescription` flag                       | `P` with a terminal-state appointment that has a prescription          | 1. `P` calls `GET /api/appointments?scope=history`.                             | Terminal-state rows are returned newest-first, each carrying a `hasPrescription` boolean that is `true` for the appointment with a prescription. | Medium   |
+| TC-F08-015 | F08.01 Cross-tenant Rx view (UI no-leak)                    | `P2` logged in; a prescription appointment owned by `P`                | 1. `P2` opens `/appointments/{P's appt}/prescriptions`.                          | The API returns `404` (no existence leak, TC-SEC-007) and the **UI** shows "This prescription is not available." — not a blank page or another patient's data (flow-audit ISSUE-10). | Medium   |
 
 ### F09 — Doctor weekly availability
 
@@ -200,6 +203,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F10-004 | F10.03 Deactivation-Preserves-Appointments Rule (#9, Edge #39) | `D` active with an existing `confirmed` future appointment | 1. `A` deactivates `D`.                                                       | `active=false`; `D` removed from public listing; new bookings blocked; the existing confirmed appointment is kept and honoured (no cancel/refund cascade); `D` can still log in, view it, join, and submit a prescription. | Critical |
 | TC-F10-005 | F10.03 Deactivation-Warning Rule                               | `D` active with N upcoming confirmed appointments          | 1. `A` clicks deactivate.                                                     | The confirmation modal shows the count of upcoming `confirmed` appointments that will remain on the calendar.                                                                                                              | Medium   |
 | TC-F10-006 | F10.01 Admin weekly-template editor                            | Admin `A` logged in; patient `P` for booking                | 1. `A` creates a doctor with availability blocks. 2. `A` activates the doctor. 3. `P` opens the new doctor's public slot picker. 4. `A` edits a block on the doctor's edit form and saves. | The doctor's availability blocks generate back-to-back 30-minute slots in the public picker; after `A` edits a block on the edit form, the changed blocks persist and the regenerated slots reflect the edit. | High     |
+| TC-F10-007 | F10.01 Profile photo required on add                           | Admin `A` on the A-01 add-doctor form                       | 1. Fill every field except the photo. 2. Save. 3. Then attach a photo and save. | Save is blocked with "A profile photo is required." and no doctor is created until a photo is attached (F10.01 required); edit mode keeps the photo optional (flow-audit ISSUE-6). | High     |
 
 ### F11 — Admin: medicine catalogue
 
@@ -211,6 +215,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F11-004 | F11.02 Active-Only Search                  | Active and inactive medicines in the catalogue | 1. `D`/`A` calls `GET /api/medicines?search=<term>`.                            | Only active medicines are returned, name-sorted; the term matches both `name` and `genericName`; inactive entries never appear. | Medium   |
 | TC-F11-005 | F11.02 Admin CRUD + Audit                 | Admin `A` logged in                           | 1. `A` `POST /api/admin/medicines`. 2. `A` `PATCH /api/admin/medicines/:id`. 3. `A` PATCHes an unknown id. | Create returns `201` and writes a `medicine.created` audit row; update writes a `medicine.updated` row (`meta.fields`); an unknown id returns `404`. | Medium   |
 | TC-F11-006 | F11 Admin-Only Authz                       | Doctor `D` / patient `P` logged in            | 1. `D`/`P` calls `POST`/`PATCH /api/admin/medicines`.                           | Rejected by `requireRole` (`403 FORBIDDEN`); only `admin` may write the catalogue.                                  | Critical |
+| TC-F11-007 | F11.03 Edit via the A-02 UI                | Medicine `M` in the catalogue; admin `A` on A-02 | 1. `A` clicks **Edit** on `M`'s row. 2. The form pre-fills. 3. Change the price. 4. Save changes. | The A-02 row exposes an Edit affordance; the form pre-fills from the row and `PATCH`es the change; the new price shows in the catalogue (and propagates to the builder, not to existing prescriptions) (flow-audit ISSUE-7). | Medium   |
 
 ### F12 — Admin: system-health alerts
 
@@ -312,6 +317,20 @@ The Slice H · S7 launch-gate cycle executed the Critical paths end-to-end via t
 | FIX-B | High (latent) | `refundInFull` (edge #6a) | `deleteMany` → `updateMany` (force-expire lock); the refunded Payment + refund/audit records preserved (ADR-39). Re-verified by `reconcileRefund` integration |
 | BUG-2 | Low (dev-only) | mock `recordJoin` | Posted to `/dev/video/join` (was an `/api/…` 404); dev/CI mock path only — production unaffected |
 
+### Three-role flow-audit fix cycle — execution record (2026-06-15)
+
+The flow-audit (`docs/superpowers/reports/2026-06-15-three-role-flow-audit.md`) surfaced 13 flow issues; all were fixed test-first and verified in the running app on mock adapters. New enumerated cases above: **TC-F03-010** (future-day picker), **TC-F04-009** (payment-fail terminal UX), **TC-F08-015** (cross-tenant Rx UI no-leak), **TC-F10-007** (photo required on add), **TC-F11-007** (medicine edit via A-02). Realized E2E coverage (Playwright `e2e/`, mock adapters):
+
+| Spec | Covers |
+| --- | --- |
+| `j1` (strengthened) | TC-F03-010 (day-picker book) + TC-F04-009 (fail-path asserts the terminal "Payment not completed" card) |
+| `j6` (updated) | TC-F10-007 (onboarding now attaches a required photo) |
+| `j7` (new) | TC-F03-010 — future-only-availability doctor booked solely via the day picker |
+| `j8` (new) | Logout reachability — doctor/admin sidebar Log out → `/login`; patient logs out via the desktop Profile page (flow-audit ISSUE-2/11; no clean `F` id — chrome-level affordance) |
+| `j9` (new) | 404 page on an unknown route (ISSUE-8; general UI fallback) + TC-F08-015 cross-tenant Rx UI message |
+
+Cross-cutting behaviors without a dedicated feature ID (logout-reachability, 404 page) are covered by `j8`/`j9` and the component suites rather than a `TC-FNN-NNN` row, consistent with doc 09 §4 (the E2E harness is the realized assisted-automation layer and is extensible per journey).
+
 ---
 
 ## 7. Deferred — Medicine Ordering test cases (NOT in v1 build)
@@ -334,3 +353,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-12 | Added TC-F08-008…014 (immutable submit + snapshots, correction = new row + email, wrong-state 409, unknown-medicine 400, double-submit race, owner gates, history `hasPrescription`) and TC-F11-004…006 (active-only name+genericName search, admin CRUD + audit rows, admin-only authz) | Slice F (F08 prescriptions + F11 backend); feature → test cases |
 | 2026-06-13 | Added TC-F10-006 (admin weekly-template editor), TC-F12-004 (second-resend idempotency 409), TC-F12-005 (`system.unhandled_exception` alert source), TC-F13-004 (email-resend audit trail + 409), TC-F14-004 (settings floor + A-05 confirm gate) | Slice G as-built sweep |
 | 2026-06-14 | Added the §6 "S7 E2E QA cycle — execution record": Critical J1–J6 cases marked Verified (E2E + integration) + the assisted-manual UI cases (F02/F16/F10/F12/F13/F14) Verified; logged the 4 cycle defects (BUG-1 / FIX-A / FIX-B / BUG-2) as found-and-fixed with resolutions (ADR-39); pointed at the release recommendation | Slice H · S7 (E2E QA + launch gate) |
+| 2026-06-15 | Added TC-F03-010 (future-day picker), TC-F04-009 (payment-fail terminal UX), TC-F08-015 (cross-tenant Rx UI no-leak), TC-F10-007 (photo required on add), TC-F11-007 (medicine edit via A-02); added the §6 "Three-role flow-audit fix cycle" execution record (new j7/j8/j9 E2E specs; logout/404 covered there) | Three-role flow-audit fix session |

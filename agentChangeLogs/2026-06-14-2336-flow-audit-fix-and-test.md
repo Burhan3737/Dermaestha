@@ -1,12 +1,12 @@
 # 2026-06-14-2336 — flow-audit-fix-and-test
 
-**Status:** Partial — all 13 fixes complete + verified (322 server / 135 client / 17 e2e green); awaiting commit + spec-update approval
+**Status:** Completed — all 13 fixes done, verified in-app, committed (f6dbe8b on `fix/flow-audit-issues`); spec edits applied (docs 05/06/12/13). Not pushed (CLAUDE.md).
 **Goal:** Fix the 13 flow issues from the 2026-06-15 three-role visual audit, each locked test-first (red→green) with a committed Playwright/unit spec, without disrupting the green j1–j6 suite.
 **Skill(s) used:** `find-skills` (opted in, for recommendation), `superpowers:test-driven-development` (lead, opted in)
 **Ticket / issue:** docs/superpowers/reports/2026-06-15-three-role-flow-audit.md
 **Branch:** main (no new branch — awaiting approval per CLAUDE.md)
 **Commits / PR:** None yet
-**Last updated:** 2026-06-15-0042
+**Last updated:** 2026-06-15-0115
 **Tags:** #bugfix #qa #tdd #frontend
 
 ## Summary
@@ -62,6 +62,10 @@ Slice H · S7 complete; v1 gate Conditional-Go. The 2026-06-15 audit (find+repor
 | `client/src/modules/admin/views/AdminMedicines/AdminMedicines.test.jsx` | Modified | ISSUE-7: RED→GREEN — Edit prefills + PATCHes changed fields |
 | `server/src/test/auth.integration.test.js` | Modified | ISSUE-12: lock login ignores body `role`; ISSUE-13: anon `/auth/me` → 200 null |
 | `server/src/modules/auth/controller.js` | Modified | ISSUE-13: `me` returns 200 `null` for anonymous (no 401 console noise on public pages) |
+| `docs/specification/05-API_SPECIFICATION_DOCUMENT.md` | Modified | Spec edit (v1.16): login `role` ignored; `/auth/me` anon-200; appointment detail `lockExpiresAt` |
+| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified | Spec edit (v1.6): sidebar logout, P-03 day picker, photo-required, A-02 edit, P-07 terminal, 404/cross-tenant, display-only cards |
+| `docs/specification/12-SCOPE_FEATURE_TEST_CASES_DOCUMENT.md` | Modified | Spec edit (v1.7): TC-F03-010/F04-009/F08-015/F10-007/F11-007 + flow-audit fix-cycle §6 record |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | Spec edit (v1.20): M4 snapshot flow-audit fix cycle + suite counts 322/135/17 |
 
 ## Dependencies / config / schema
 None yet.
@@ -101,17 +105,23 @@ None yet.
 - e2e: **17/17 passed** — baseline 11 + j7 (future-day) + j8×3 (logout) + j9×2 (404, cross-tenant Rx); j1 strengthened/time-independent; j6 attaches a photo.
 - Verdict: no regressions; every audit issue fixed test-first (red→green) and locked.
 
+**In-app verify pass (`verify` skill), 2026-06-15 ~01:12 Asia/Karachi** — drove the running app (mock adapters, baseline accounts) in a real browser; all 13 confirmed: landing 0 console errors + 0 `/doctors/sample` links; anon `/auth/me`→200 null; P-03 7 day tabs + future-day slots; P-07 "Payment not completed" terminal (no poll); `/profile` details+logout→/login; doctor+admin sidebar logout→/login; `/doctor/history` resolves with friendly "Completed"; add-doctor "photo is required" blocks save; medicine Edit→Rs 350; 404 "Page not found"; cross-tenant Rx "not available" (0 leaked rows). Screenshots: `verify-issue1-day-tabs.png`, `verify-issue3-payment-fail.png`, `verify-issue10-cross-tenant-rx.png` (repo root).
+
+## Doc-impact verdict (CLAUDE.md — mandatory)
+Spec updates WERE required and have been applied (user-approved "apply all incl. confirm items"), AFTER code commit, per the doc-00 change protocol: docs **05, 06, 12, 13** edited surgically with version bumps + revision-footer rows. See the applied list above. Remaining specs (00–04, 07–11, 14, 15) unaffected.
+
 ## Risk / rollback
 Frontend-heavy changes; risk = regressing the green j1–j6 e2e suite. Mitigation: run `npm run test:e2e` + `npm test` green before/after; surgical edits only. No schema changes planned. Revert = git restore the touched files.
 
-## Running spec doc-impact list (apply only at END, after commit + approval — CLAUDE.md)
-- [ ] doc 05: appointment detail response (`GET /api/appointments/:id`) now includes `lockExpiresAt` (additive; powers P-07 terminal states). [ISSUE-3]
-- [ ] doc 05 §36 + auth endpoint table: clarify `POST /api/auth/login` body `role` is optional/accepted-but-non-authoritative (stored role decides; enumeration-safety). [ISSUE-12]
-- [ ] doc 05 auth endpoint table / §40: `GET /api/auth/me` returns **200 `null`** for an anonymous caller (was 401); authenticated returns the safe user shape. [ISSUE-13]
-- [ ] doc 06 §2: doctor/admin sidebar chrome includes a logout/account control. [ISSUE-2]
-- [ ] doc 06 A-02 (§2/§3): note the medicine Edit affordance. [ISSUE-7]
-- [ ] (confirm at end, may need none) doc 06: NotFound (404) screen [ISSUE-8]; cross-tenant Rx empty-state [ISSUE-10]; featured cards non-interactive [ISSUE-5]; doctor history friendly labels [ISSUE-9].
+## Spec doc-impact list — APPLIED 2026-06-15 (code committed f6dbe8b, user approved "apply all incl. confirm items")
+- [x] doc 05 (v1.15→1.16): `GET /api/appointments/:id` detail adds `lockExpiresAt` [ISSUE-3]; `POST /api/auth/login` body `role` documented accepted-but-ignored/non-authoritative [ISSUE-12]; `GET /api/auth/me` anon → 200 `null` not 401 [ISSUE-13].
+- [x] doc 06 (v1.5→1.6): §2 doctor/admin sidebar Log out + History-resolves note [ISSUE-2/4]; §3 day-tabbed picker on P-03 [ISSUE-1]; A-01 photo required on add [ISSUE-6]; new A-02 medicine Edit note [ISSUE-7]; P-07 single terminal "Payment not completed" + no-poll [ISSUE-3]; Not-found & cross-tenant states (404 + Rx message) [ISSUE-8/10]; Landing featured cards display-only [ISSUE-5].
+- [x] doc 12 (v1.6→1.7): added TC-F03-010, TC-F04-009, TC-F08-015, TC-F10-007, TC-F11-007 + §6 flow-audit fix-cycle execution record (j7/j8/j9; logout+404 covered there).
+- [x] doc 13 (v1.19→1.20): §2 M4 snapshot records the flow-audit fix cycle + updated suite counts (322/135/17).
+- No edit required (code caught up to a correct spec): ISSUE-1 core (F03.01), ISSUE-2 patient-desktop (doc 06 §2), ISSUE-4 route (doc 06 §2), ISSUE-9 (doc 06 §3 badge map), ISSUE-11 (doc 06 §2 registry note).
 
 ## Open items / next session
-- All 13 fixes complete + verified. Pending: (1) commit (branch decision needed — CLAUDE.md forbids branch/push without approval), (2) present consolidated spec doc-impact list for approval, (3) apply spec edits after approval, (4) optional manual verify-in-app pass (`verify` skill) on baseline accounts.
-- A background server may be left on :3000 from e2e webServer reuse — stop if not needed.
+- DONE: fixes + tests + in-app verify + spec edits, all committed on `fix/flow-audit-issues`.
+- **Awaiting user:** push `fix/flow-audit-issues` and/or open a PR (CLAUDE.md forbids push without approval); merge decision.
+- Untracked pre-existing artifacts left for the human to decide on (NOT part of this branch's commits): `CLAUDE.md` mod, the audit changelog/report/screenshots, `prisma/scripts/seed-baseline.js`, and a runtime `uploads/` dir (consider gitignoring).
+- The mock server on :3000 was stopped at the end of the verify pass.

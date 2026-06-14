@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.5                                                                                       |
-| Last updated     | 2026-06-14                                                                                |
+| Version          | 1.6                                                                                       |
+| Last updated     | 2026-06-15                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -111,6 +111,8 @@ Doctors — Medicines — Records & audit — System health — Settings
 
 `/admin` redirects to `/admin/doctors` — the Doctors list is the admin landing page.
 
+**Sidebar logout.** Both the doctor and admin sidebars render a **Log out** control at the foot of the sidebar (`POST /api/auth/logout` then a full reload to `/login`); it is the doctor/admin equivalent of the patient's Profile-hosted logout. The `History` doctor link resolves to the D-02 history view (the history tab), not a separate screen.
+
 ### Screen-to-route inventory
 
 | Screen ID | Screen name                              | Surface                  | PRD ref      |
@@ -155,7 +157,7 @@ Doctors — Medicines — Records & audit — System health — Settings
 
 ### Landing (P-01)
 
-P-01 is the public acquisition page served at `/` (Slice H · S4, **Built**). It carries its own brand topnav (Browse, "How it works", For doctors, Login) — the mockup's "How it works" call-to-action lives in the **topnav as an in-page anchor**, not as a hero button. The hero CTAs are **Browse** (`/browse`) and **Create your account / Sign up** (`/signup`). The "Featured specialists" grid uses **static placeholder data for v1** (no live query); the footer links to the legal pages (`/legal/terms`, `/legal/privacy`). The hero retains the single staggered reveal noted under Motion.
+P-01 is the public acquisition page served at `/` (Slice H · S4, **Built**). It carries its own brand topnav (Browse, "How it works", For doctors, Login) — the mockup's "How it works" call-to-action lives in the **topnav as an in-page anchor**, not as a hero button. The hero CTAs are **Browse** (`/browse`) and **Create your account / Sign up** (`/signup`). The "Featured specialists" grid uses **static placeholder data for v1** (no live query) and the cards are **display-only** — they are not links to a doctor profile (the real acquisition CTAs are the hero Browse / Sign-up buttons); the footer links to the legal pages (`/legal/terms`, `/legal/privacy`). The hero retains the single staggered reveal noted under Motion.
 
 ### Legal pages (F16)
 
@@ -166,6 +168,8 @@ P-01 is the public acquisition page served at `/` (Slice H · S4, **Built**). It
 Submit is blocked until the patient checks the ToS/Privacy consent checkbox. The checkbox uses spruce `accent-color`; the field copy includes inline links to `/legal/terms` and `/legal/privacy`.
 
 ### Slot selection (P-06)
+
+As-built, the day-tabbed slot grid renders on the **doctor profile (P-03)**: a row of upcoming-day tabs (next 7 Karachi days) lets the patient pick a future day, and selecting a slot carries it into the P-06 booking step (`/book/:id?slot=`). The day tabs are required — without them a patient could not book any day other than today (the v1.0 funnel bug, fixed in the flow-audit session).
 
 Slots are grouped under day tabs. States:
 
@@ -191,6 +195,13 @@ Returned as finished centered cards (~520 px, icon circle + title + body + singl
 - **Lock expired** — "slot released — please pick another".
 - **Platform couldn't secure slot** — full refund message.
 
+As-built, because a failed payment force-expires the lock (ADR-39), the Failure and Lock-expired cases converge into one terminal **"Payment not completed"** card (the slot hold was released → pick another time). The return page keys this off the appointment's `lockExpiresAt` vs. `serverNow` (doc 05) and **stops polling** on a terminal outcome — it never shows an indefinite "Awaiting payment confirmation…" spinner.
+
+### Not-found & cross-tenant states
+
+- **404 page.** An unknown SPA route renders a dedicated **"Page not found"** page (the §1 empty-state pattern + a "Back to Browse" CTA), not a placeholder. It is a fallback, not a `P-NN` registry screen.
+- **Cross-tenant prescription view (P-13).** Requesting a prescription the caller doesn't own returns `404` at the API (no existence leak); the UI renders a **"This prescription is not available."** message rather than a bare heading / blank page.
+
 ### Join Call activation (P-08 / D-02)
 
 "Join Call" button is disabled until 10 minutes before the appointment slot.
@@ -209,7 +220,11 @@ P-12 (patient) and D-04 (doctor) are served by **one shared, role-aware `VideoRo
 
 ### Doctor profile-photo upload (A-01)
 
-The A-01 add/edit form includes a weekly-template editor and a profile-photo upload. The photo is sent as a multipart upload: JPEG / PNG / WebP, ≤ 2 MB, magic-byte validated server-side (the declared MIME is not trusted), stored under a server-generated filename, and served back from `UPLOADS_DIR` via `express.static` with `X-Content-Type-Options: nosniff`.
+The A-01 add/edit form includes a weekly-template editor and a profile-photo upload. The photo is sent as a multipart upload: JPEG / PNG / WebP, ≤ 2 MB, magic-byte validated server-side (the declared MIME is not trusted), stored under a server-generated filename, and served back from `UPLOADS_DIR` via `express.static` with `X-Content-Type-Options: nosniff`. On **add**, a photo is **required** (F10.01) — the form blocks save until one is selected; on **edit** it is optional (omitting it keeps the existing photo).
+
+### Medicine catalogue (A-02)
+
+Each catalogue row exposes **Edit** (alongside Deactivate / Reactivate). Edit reuses the add-medicine form pre-filled with the row's values and saves via `PATCH /api/admin/medicines/:id`; edits (name / generic / forms / price) propagate to the prescription-builder view but never alter existing prescriptions' snapshots (F11.03 / §3.3 #5).
 
 ### Appointment cancellation modals
 
@@ -581,3 +596,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-13 | Added a canonical screen-ID registry note under the §2 inventory: the 24 rows are authoritative, and the patient bottom-nav Profile destination is intentionally not a dedicated v1 screen (no `P-NN` ID; account management deferred to v1.1+) | doc-06/doc-13 screen-ID reconciliation |
 | 2026-06-14 | Added a "Pre-call get-ready room (P-11)" note — P-11 has no app-managed camera-preview pane (Daily prejoin owns the device check; approved minor deviation from the mockup) — and noted that P-12 + D-04 are served by one shared role-aware `VideoRoom` (separate screen IDs retained) rendering a brand-themed Daily Prebuilt iframe | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | P-01 landing → Built: added the §2 public SPA route map (`/`→landing, listing P-02 relocated to `/browse`, logged-in-patient `/`→`/browse` redirect) and §3 "Landing (P-01)" (hero CTAs Browse + Sign-up, "How it works" anchor in the topnav, static featured-doctors grid) + "Legal pages (F16)" (reusable `LegalPage` DRAFT-banner pattern for `/legal/terms`,`/legal/privacy`) interaction notes | Slice H · S4 (public surface — landing + legal; ADR-35) |
+| 2026-06-15 | Flow-audit fixes: §2 sidebar **Log out** control (doctor/admin) + History-link-resolves note (ISSUE-2/4); §3 day-tabbed picker renders on P-03 (ISSUE-1); A-01 photo **required on add** (ISSUE-6); new "Medicine catalogue (A-02)" Edit note (ISSUE-7); P-07 as-built single "Payment not completed" terminal card + no-infinite-poll (ISSUE-3); "Not-found & cross-tenant states" (404 page ISSUE-8 + cross-tenant Rx message ISSUE-10); Landing featured cards display-only (ISSUE-5) | Three-role flow-audit fix session |
