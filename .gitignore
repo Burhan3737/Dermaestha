@@ -10,3 +10,10 @@ coverage/
 .claude/
 .superpowers/
 .playwright-mcp/
+
+# playwright e2e
+playwright-report/
+test-results/
+/playwright/.cache/
+e2e/.seed-ids.json
+e2e/.auth/
