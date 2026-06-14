@@ -6,7 +6,7 @@
 | Status | Draft — awaiting user review |
 | Scope | Relocate all server + shared test files into a single per-workspace `test/` tree. **No test logic, assertion, or coverage change.** |
 | Sources | This brainstorming session (user goal: "client and server both have their test suites in a single test folder, grouped and organized maintainably"). |
-| Governance | Spec edits (new ADR-39 + docs 03 / 09 / 13) are GATED on explicit human approval per `docs/specification/00-INDEX_AND_GOVERNANCE.md` §4–5, applied only after code is committed. |
+| Governance | Spec edits (new ADR-40 + docs 03 / 09 / 13) are GATED on explicit human approval per `docs/specification/00-INDEX_AND_GOVERNANCE.md` §4–5, applied only after code is committed. |
 
 ---
 
@@ -27,7 +27,7 @@
 
 | # | Decision | Rationale |
 | --- | --- | --- |
-| D1 | **Centralize, reversing ADR-26's co-location.** All tests move to a per-workspace `test/` tree. | User goal: one navigable home for the suite. This is a deliberate reversal of the test-location half of ADR-26 (→ new ADR-39). |
+| D1 | **Centralize, reversing ADR-26's co-location.** All tests move to a per-workspace `test/` tree. | User goal: one navigable home for the suite. This is a deliberate reversal of the test-location half of ADR-26 (→ new ADR-40). |
 | D2 | **Top level = layer, then domain.** `test/unit/<src-area>/…` and `test/integration/<flow>.test.js`. | Preserves the existing unit-vs-integration distinction the codebase already lives by; clear destination per test type. |
 | D3 | **Unit tree mirrors `src/`.** `test/unit/<src-area>/<unit>/<role>.test.js`. To find a test: same source path, under `unit/`. | Navigable shadow of the source tree. |
 | D4 | **Sub-folder per source unit.** Each source unit gets a folder; files named by role inside it (`payment/service.test.js`, `payment/controller.test.js`). | Cleanly handles units with multiple tests (payment, doctor, integrations) without flat-name collisions. |
@@ -167,7 +167,7 @@ The before/after full-suite comparison is the verification gate: a mock-resoluti
 
 | Doc | Change | Why |
 | --- | --- | --- |
-| 11 — ADR | **New ADR-39**: centralized `test/` structure + `#src`/`#shared` aliases, **superseding the test-location decision in ADR-26**; add a supersession pointer on ADR-26. | Reversing a recorded decision = new ADR, not a silent edit (doc 00 protocol). |
+| 11 — ADR | **New ADR-40**: centralized `test/` structure + `#src`/`#shared` aliases, **superseding the test-location decision in ADR-26**; add a supersession pointer on ADR-26. | Reversing a recorded decision = new ADR, not a silent edit (doc 00 protocol). |
 | 09 — Dev/QA Testing | §1 unit-vs-integration paragraph (co-located → `server/test/unit` + `server/test/integration`), the Vitest glob description, and `server/src/test/` integration-location references. | Describes the layout being changed. |
 | 03 — Architecture | §3a.1 "Code organization & folder conventions" — the `modules/<x>/test.js` co-location note. | Folder-convention section states the old rule. |
 | 13 — Product Status Tracker | File-inventory paths pointing at test files (e.g. `services/audit/audit.service.test.js`, `server/src/test/admin.integration.test.js`). | Inventory references must match new paths. |

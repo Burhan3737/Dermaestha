@@ -4,8 +4,8 @@
 **Goal:** Brainstorm + spec a single centralized `test/` folder for the server (and shared) test suites, replacing ADR-26 co-location.
 **Skill(s) used:** superpowers:brainstorming (user-invoked `/brainstorming`)
 **Ticket / issue:** None
-**Branch:** main (no code moved yet; design only)
-**Commits / PR:** Pending (design doc commit)
+**Branch:** main
+**Commits / PR:** `9983ec6` (server design doc), `23d09e3` (server+shared move, by subagent); client design doc commit pending. Not pushed.
 **Last updated:** 2026-06-15-0305
 **Tags:** #refactor #migration #testing #spec
 
@@ -18,15 +18,18 @@ User wants both client and server test suites grouped in a single, maintainable 
 ## Files changed
 | File | Action | What & why |
 |---|---|---|
-| `docs/superpowers/specs/2026-06-15-server-test-centralization-design.md` | Created | The approved design (structure, naming, aliases, migration, doc-impact). |
+| `docs/superpowers/specs/2026-06-15-server-test-centralization-design.md` | Created | The approved server+shared design (structure, naming, aliases, migration, doc-impact). |
+| `docs/superpowers/specs/2026-06-15-client-test-centralization-design.md` | Created | The approved client design (symmetric: `client/test/unit/` mirror, `#src` in client config; 40-file inventory verified clean of snapshots/mocks/setup). |
 | `agentChangeLogs/2026-06-15-0305-server-test-centralization-design.md` | Created | This session log. |
 | `agentChangeLogs/index.md` | Modified | Added this session's index line. |
+| `vitest.config.js` (root) | Modified | Added `resolve.alias` (`#src`, `#shared`) + new `include` globs (`server/test/**`, `shared/test/**`); removed old `server/src/**` globs. (subagent, `23d09e3`) |
+| `server/src/**` + `shared/schemas/**` test files (45) | Moved | `git mv` to `server/test/{unit,integration}/…` + `shared/test/unit/…`; import/`vi.mock`/dynamic-import specifiers rewritten to `#src/*`/`#shared/*`; module `test.js`→`service.test.js`; `.integration` infix dropped. `server/src/test/` removed. (subagent, `23d09e3`) |
 
 ## Dependencies / config / schema
-None yet. Planned (at build time): add `resolve.alias` (`#src`, `#shared`) + new `include` globs to root `vitest.config.js`. No deps, no schema.
+Root `vitest.config.js`: added `resolve.alias` (`#src`→`server/src`, `#shared`→`shared`) and replaced `include` globs. No deps added, no schema change.
 
 ## Decisions
-- Centralize tests, reversing ADR-26 co-location (→ new ADR-39).
+- Centralize tests, reversing ADR-26 co-location (→ new **ADR-40**; ADR-39 already taken = "Payment/appointment no-cascade release policy").
 - Layer-then-domain top split; `unit/` mirrors `src/`; sub-folder per source unit.
 - Module bare `test.js` → role-named `service.test.js`; integration files drop `.integration` infix.
 - Single-root path aliases (`#src/*`, `#shared/*`) via `resolve.alias` (not `package.json "imports"`).
@@ -38,13 +41,18 @@ None yet. Planned (at build time): add `resolve.alias` (`#src`, `#shared`) + new
 - One real risk: `vi.mock('#src/...')` must resolve to the same module a source file imports relatively, for the mock to intercept — verified by the before/after suite comparison.
 
 ## Verification
-Not verified (design phase only; no code changed). Verification gate at build time = full-suite green with identical passing count before vs after.
+Server+shared move verified by before/after full-suite comparison (`npm test` = `vitest run`), IDENTICAL both sides:
+- Test Files: 42 passed, 3 failed (45). Tests: 304 passed, 18 skipped (322).
+- The 3 failing integration files (`booking`, `notification`, `prescription`) fail at baseline AND after — pre-existing dirty-DB state (FK violations / null reads), NOT collection/import errors; unchanged by the move.
+- `vi.mock('#src/...')`-through-alias risk did NOT materialize — all 304 unit/integration passes unchanged; no `package.json "imports"` fallback needed.
+- Move verified independently by controller: commit `23d09e3` present (git-detected renames), `server/test/` tree matches spec, zero leftover tests under `src/`/`shared/schemas`, working tree clean except controller files.
+- Pre-existing (NOT introduced, out of scope): `eslint .` is broken repo-wide (ESLint v9 needs flat config; repo has legacy `.eslintrc.json`); one intentional unused-var in `env.test.js` (destructuring-rest). prettier re-wrapped some alias-lengthened lines (whitespace-only).
+Client move: NOT yet executed (design only).
 
 ## Risk / rollback
-Design-only so far — no runtime risk. Build-time blast radius is test files + `vitest.config.js` only; rollback via `git revert` (history preserved by `git mv`).
+Server move done + committed (not pushed). Blast radius = test files + root `vitest.config.js`; zero production source change. Rollback via `git revert 23d09e3` (history preserved by `git mv`).
 
 ## Open items / next session
-- User review of the design doc.
-- Then writing-plans → implementation plan (server).
-- Apply gated canonical doc updates (ADR-39 + docs 03/09/13) at end of build, after commit + approval.
-- Client-side centralization: separate later cycle.
+- **Client move:** design approved; not yet executed. Server proved `resolve.alias` works (no fallback), so client can proceed with the same approach. Decide: delegate now.
+- **Gated canonical doc-impact (awaiting approval), apply at task end after commits:** new **ADR-40** (test-centralization, supersedes test-location half of ADR-26; covers server + client) + supersession pointer on ADR-26; doc 03:102; doc 09:40/42/281/283; doc 11:390; doc 13:77/116. (Refs found by subagent + to be re-grepped during the pass.)
+- Pre-existing repo issues noted but out of scope: broken root ESLint flat-config; dirty-DB integration-test failures.
