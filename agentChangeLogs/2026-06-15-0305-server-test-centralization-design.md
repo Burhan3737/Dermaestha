@@ -1,6 +1,6 @@
 # 2026-06-15-0305 — server-test-centralization-design
 
-**Status:** Partial
+**Status:** Completed (not pushed — awaiting user per CLAUDE.md)
 **Goal:** Brainstorm + spec a single centralized `test/` folder for the server (and shared) test suites, replacing ADR-26 co-location.
 **Skill(s) used:** superpowers:brainstorming (user-invoked `/brainstorming`)
 **Ticket / issue:** None
@@ -26,6 +26,10 @@ User wants both client and server test suites grouped in a single, maintainable 
 | `server/src/**` + `shared/schemas/**` test files (45) | Moved | `git mv` to `server/test/{unit,integration}/…` + `shared/test/unit/…`; import/`vi.mock`/dynamic-import specifiers rewritten to `#src/*`/`#shared/*`; module `test.js`→`service.test.js`; `.integration` infix dropped. `server/src/test/` removed. (subagent, `23d09e3`) |
 | `client/vitest.config.js` | Modified | Added `resolve.alias` `#src`→`./src`; `include`→`['test/**/*.test.{js,jsx}']`; kept jsdom+globals+react plugin. (subagent, `6bd9869`) |
 | `client/src/**` test files (40) | Moved | `git mv` to `client/test/unit/<mirror-of-src>/`; relative import/`vi.mock` specifiers rewritten to `#src/*`. No `*.test.*` remain under `client/src/`. (subagent, `6bd9869`) |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | Added **ADR-40** (centralization) + index entry; supersession pointer on ADR-26 tests bullet; v1.16→1.17 + footer. |
+| `docs/specification/03-ARCHITECTURE_DOCUMENT.md` | Modified | §3a.1: server module drops co-located `test.js` (ADR-40); v1.6→1.7 + footer. |
+| `docs/specification/09-DEVTESTING_QATESTING_DOCUMENT.md` | Modified | §1: server/client/integration test locations + globs + `#src`/`#shared` aliases (ADR-40); v1.4→1.5 + footer. |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | Re-pointed 2 test-file inventory paths to the centralized tree (ADR-40); v1.20→1.21 + footer. |
 
 ## Dependencies / config / schema
 Root `vitest.config.js`: added `resolve.alias` (`#src`→`server/src`, `#shared`→`shared`) and replaced `include` globs. No deps added, no schema change.
@@ -56,6 +60,6 @@ Client move (commit `6bd9869`) — verified by controller: re-ran `npm --workspa
 Server move done + committed (not pushed). Blast radius = test files + root `vitest.config.js`; zero production source change. Rollback via `git revert 23d09e3` (history preserved by `git mv`).
 
 ## Open items / next session
-- **Client move:** design approved; not yet executed. Server proved `resolve.alias` works (no fallback), so client can proceed with the same approach. Decide: delegate now.
-- **Gated canonical doc-impact (awaiting approval), apply at task end after commits:** new **ADR-40** (test-centralization, supersedes test-location half of ADR-26; covers server + client) + supersession pointer on ADR-26; doc 03:102; doc 09:40/42/281/283; doc 11:390; doc 13:77/116. (Refs found by subagent + to be re-grepped during the pass.)
-- Pre-existing repo issues noted but out of scope: broken root ESLint flat-config; dirty-DB integration-test failures.
+- **Push decision:** 4 commits on `main` (`23d09e3`, `4c86ebb`, `6bd9869`, doc-impact + log) NOT pushed — awaiting user approval per CLAUDE.md.
+- **Pre-existing repo issues** (noted, out of scope, not introduced by this work): root ESLint broken (ESLint v9 needs flat config; legacy `.eslintrc.json`); 3 server integration tests fail on dirty-DB state; one intentional unused-var each in `env.test.js` / `DoctorToday.test.jsx`.
+- Doc-impact: APPLIED (docs 03/09/11/13) with user approval. Re-grep confirmed no live stale test-path claims remain (only ADR-26 historical text + footer rows, intentionally preserved).

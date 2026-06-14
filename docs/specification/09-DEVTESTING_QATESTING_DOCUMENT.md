@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------- |
 | Document ID      | `09-DEVTESTING_QATESTING_DOCUMENT`                |
 | Status           | Canonical                                         |
-| Version          | 1.4                                               |
-| Last updated     | 2026-06-14                                        |
+| Version          | 1.5                                               |
+| Last updated     | 2026-06-15                                        |
 | Sources absorbed | `docs/specification/02, 04, 08; vitest.config.js; playwright.config.js` |
 | Related docs     | 02, 04, 08, 12                                    |
 
@@ -37,9 +37,9 @@ This document defines the testing strategy, scope, environments, case structure,
 
 The v1 testing programme spans four layers.
 
-**Unit testing** covers isolated service-layer logic: the appointment state-machine transition table (now merged into `server/src/modules/appointment/service.js`), the ten data-integrity invariants from doc 04, password hashing, Zod schema validation, role middleware, and audit-service record emission. The runner is **Vitest** (root `vitest.config.js`, `environment: 'node'`, globs `server/src/**/*.test.js` + `server/src/**/test.js` — the co-located domain-module tests — plus `shared/**/*.test.js`). A separate client-side Vitest config (`client/vitest.config.js`, `environment: 'jsdom'`) runs the React component/view tests, co-located beside each unit (e.g. `client/src/modules/<feature>/views/<View>/<View>.test.jsx`, `client/src/shared/<Name>/<Name>.test.jsx`).
+**Unit testing** covers isolated service-layer logic: the appointment state-machine transition table (now merged into `server/src/modules/appointment/service.js`), the ten data-integrity invariants from doc 04, password hashing, Zod schema validation, role middleware, and audit-service record emission. The runner is **Vitest** (root `vitest.config.js`, `environment: 'node'`, globs `server/test/**/*.test.js` + `shared/test/**/*.test.js`, resolved via `#src`/`#shared` aliases — tests are centralized under `server/test/` (`unit/` mirroring `src/`, plus `integration/`) and `shared/test/unit/`, not co-located (ADR-40)). A separate client-side Vitest config (`client/vitest.config.js`, `environment: 'jsdom'`) runs the React component/view tests, centralized under `client/test/unit/` mirroring `src/` (e.g. `client/test/unit/modules/<feature>/views/<View>/<View>.test.jsx`, `client/test/unit/shared/<Name>/<Name>.test.jsx`), via a `#src` alias in `client/vitest.config.js` (ADR-40).
 
-**Integration testing** covers the live application stack: Express routes exercised against a real PostgreSQL instance (using the `DATABASE_URL` env var loaded via Vite's `loadEnv`). The same Vitest runner and config are used. Integration test files live under `server/src/test/`.
+**Integration testing** covers the live application stack: Express routes exercised against a real PostgreSQL instance (using the `DATABASE_URL` env var loaded via Vite's `loadEnv`). The same Vitest runner and config are used. Integration test files live under `server/test/integration/`.
 
 **QA functional testing** covers the complete user-facing flows for all 16 features (F01–F16) on the deployed staging environment. Tests are executed manually (or via assisted browser automation) against the 24 defined screens. Each test case maps to one or more acceptance criteria from doc 02. This layer was **executed in Slice H · S7** (the v1 launch-gate cycle): the assisted-browser-automation form is realized as the **Playwright E2E harness** (see §4); the non-Critical / UI surfaces (P-01 landing, `/legal/terms`, `/legal/privacy`, P-02 browse, login + role-routing, admin A-01/A-03/A-04/A-05) were covered by an assisted-manual pass; and the Daily.co REST adapter (`createRoom` + idempotent reuse + `issueToken` + room-URL/auth) was validated **live** against the real account. The consolidated point-in-time **release recommendation** for that cycle lives in `docs/superpowers/reports/` (not canon); source-of-truth statuses stay in doc 13 and enumerated cases in doc 12.
 
@@ -282,3 +282,4 @@ The release recommendation is a brief document (or structured comment) that stat
 | 2026-06-11 | Corrected the stale "no `.test.jsx` files exist yet" clause — the client suite exists and is co-located per unit | Reflect actual client test tree (pre-existing drift, fixed during the restructure pass) |
 | 2026-06-13 | Fixed §8 DoD ADR misreference (doc 13 → doc 11); no structural testing changes — the Slice G admin integration suite (`server/src/test/admin.integration.test.js`, 8 tests) lands in the already-documented `server/src/test/` location, taking final counts to 248 server / 97 client | Slice G as-built sweep |
 | 2026-06-14 | Recorded the QA-functional layer as executed (Slice H · S7 launch gate); added the **Playwright E2E harness** (`e2e/`, `npm run test:e2e`, 6 Critical journeys J1–J6 vs mock adapters; ADR-38) as the realized "assisted browser automation" layer (§1/§4); noted the assisted-manual UI pass + the live Daily REST validation; pointed at the release recommendation under `docs/superpowers/reports/` | Slice H · S7 (E2E QA + launch gate) |
+| 2026-06-15 | §1: tests centralized — server globs now `server/test/**/*.test.js` + `shared/test/**/*.test.js`; client tests under `client/test/unit/`; integration suite under `server/test/integration/`; `#src`/`#shared` aliases (ADR-40) | Test centralization (ADR-40); no count/behavior change |

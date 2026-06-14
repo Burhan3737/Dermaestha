@@ -4,8 +4,8 @@
 | -------------------- | ---------------------------------- |
 | **Document ID**      | 03-ARCHITECTURE_DOCUMENT           |
 | **Status**           | Canonical                          |
-| **Version**          | 1.6                                |
-| **Last updated**     | 2026-06-13                         |
+| **Version**          | 1.7                                |
+| **Last updated**     | 2026-06-15                         |
 | **Sources absorbed** | `docs/engineering/ARCHITECTURE.md` |
 | **Related docs**     | 02, 04, 05, 10, 14, 15             |
 
@@ -99,7 +99,7 @@ flowchart TB
 
 The three logical layers above (routes → controllers → services) are organized **feature-first**, not in top-level `routes/`/`controllers/`/`services/` directories (ADR-26). The physical layout:
 
-**Server (`server/src/`):** each domain is a self-contained module — `modules/<domain>/` with `index.js` (routes), `controller.js`, `service.js`, and a co-located `test.js` — for `auth`, `doctor` (incl. availability), `appointment` (the whole booking → cancellation → refund → evaluation lifecycle in one `service.js`), `payment`, `video`, and `admin` (records, audit, alerts, settings, and the doctor-management write paths; Slice G). A central `routes.js` (`registerRoutes`) mounts every module. Cross-cutting infrastructure stays top-level and folder-grouped: `config/` (flat `constants.js`), `http/` (flat `AppError.js`), `lib/<name>/<name>.js`, `middleware/<name>/<name>.js`, `integrations/`, `workers/`, plus shared cross-module services in `services/` (today: `audit/`). `health/` and `dev/` are standalone.
+**Server (`server/src/`):** each domain is a self-contained module — `modules/<domain>/` with `index.js` (routes), `controller.js`, and `service.js` (tests are centralized under `server/test/`, not co-located — ADR-40) — for `auth`, `doctor` (incl. availability), `appointment` (the whole booking → cancellation → refund → evaluation lifecycle in one `service.js`), `payment`, `video`, and `admin` (records, audit, alerts, settings, and the doctor-management write paths; Slice G). A central `routes.js` (`registerRoutes`) mounts every module. Cross-cutting infrastructure stays top-level and folder-grouped: `config/` (flat `constants.js`), `http/` (flat `AppError.js`), `lib/<name>/<name>.js`, `middleware/<name>/<name>.js`, `integrations/`, `workers/`, plus shared cross-module services in `services/` (today: `audit/`). `health/` and `dev/` are standalone.
 
 **Client (`client/src/`):** each feature is `modules/<feature>/` with `views/<View>/`, feature-local `components/`, **one `use<Feature>` hook** owning the feature's data/mutations (views keep render + pure UI state only), and a `*.routes.jsx`. Cross-feature UI primitives live in `shared/<Name>/`; cross-cutting React state in `context/` (`context/session/` for session state; `context/AppProviders.jsx` composing Query + Router + Session providers); pure utilities in `lib/<name>/<name>.js`; page shells in `layouts/<Name>/`. `routes.jsx` aggregates each module's routes via `buildRoutes(session)` and `App.jsx` renders only the route table. One-shot auth actions live in `modules/auth/useAuth.js`; the session **context holds cross-cutting state only**.
 
@@ -200,3 +200,4 @@ There are no message queues or other third-party infrastructure services. The th
 | 2026-06-11 | Added §3a.1 "Code organization & folder conventions" (feature-first layout, view→hook rule, Prisma-vs-Zod note); re-pointed the evaluation-worker ref to `modules/appointment/service.js` | Folder-structure restructure (ADR-26); behavior unchanged |
 | 2026-06-13 | Added multer file-upload row (§2), `admin` server module (§3a.1), and the `dermestha_uploads` volume + static `/uploads` serving (§5) | Slice G as-built sweep |
 | 2026-06-13 | Corrected §1/§2/§4 PayFast references SA→Pakistan reality: dual-channel confirmation (CHECKOUT_URL callback + browser return); PayFast PK has no programmatic refund/status API → manual admin path + manual-review surfacing (ADR-32) | Slice H · S1 (PayFast Pakistan adapter) |
+| 2026-06-15 | §3a.1: server module no longer lists a co-located `test.js` — tests centralized under `server/test/` (ADR-40) | Test centralization (ADR-40); behavior unchanged |

@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.16                                                                                               |
-| Last updated     | 2026-06-14                                                                                         |
+| Version          | 1.17                                                                                               |
+| Last updated     | 2026-06-15                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -53,6 +53,7 @@
 38. [ADR-37 — Single zod@3 copy via the `shared` workspace + root `overrides.zod`; ZodError duck-typing removed](#adr-37--single-zod3-copy-via-the-shared-workspace--root-overrideszod-zoderror-duck-typing-removed)
 39. [ADR-38 — Playwright E2E harness (root `e2e/`) against the mock adapters as the v1 launch gate](#adr-38--playwright-e2e-harness-root-e2e-against-the-mock-adapters-as-the-v1-launch-gate)
 40. [ADR-39 — Payment/appointment no-cascade release policy (refines ADR-23)](#adr-39--paymentappointment-no-cascade-release-policy-refines-adr-23)
+41. [ADR-40 — Centralized `test/` tree + `#src`/`#shared` aliases (supersedes ADR-26 test co-location)](#adr-40--centralized-test-tree--srcshared-aliases-supersedes-adr-26-test-co-location)
 
 ---
 
@@ -387,7 +388,7 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 - **Server:** domain `modules/<domain>/` each `index.js` + `controller.js` + `service.js` + `test.js` for `auth`, `doctor` (absorbs `availability`), `appointment`, `payment`, `video`. The seven appointment-domain services (`appointment`, `booking`, `appointmentState`, `cancellation`, `refund`, `refundSideEffects`, `evaluation`) merge into one `modules/appointment/service.js`; `doctor` + `availability` merge into one `modules/doctor/service.js`. `webhook.controller.js` and `routes/webhooks.js` are **deleted**, split by domain (payfast → `payment`, daily → `video`). `audit.service` → shared `services/audit/`. Cross-cutting infra stays top-level and folder-grouped (`config/`, `http/`, `lib/<name>/<name>.js`, `middleware/<name>/<name>.js`, `integrations/`, `workers/`); flat exceptions are `config/constants.js` and `http/AppError.js`. A central `server/src/routes.js` (`registerRoutes`) replaces the inline mount block in `index.js`; `health/` and `dev/` are standalone.
 - **Client:** feature `modules/<feature>/` each with `views/<View>/`, feature `components/`, one `use<Feature>` hook owning the module's data/mutations, and a `*.routes.jsx`. Views keep render + pure UI state only. Cross-feature primitives → `shared/<Name>/`; cross-cutting state → `context/` (`context/session/session.jsx` + `context/AppProviders.jsx`); pure utilities → `lib/<name>/<name>.js`; page shells → `layouts/<Name>/`. The session context is split: **state** (session/loading/refresh/setSession) stays in `context/session`, while the **one-shot auth actions** (login/signup/logout/forgot/reset/change) move to `modules/auth/useAuth.js`. Routing consolidates: each module exposes a `*.routes.jsx`, aggregated by `routes.jsx`'s `buildRoutes(session)`; `App.jsx` renders only the table + catch-alls.
 - **Shared:** Zod request schemas remain the client↔server contract in `shared/schemas/`, reorganized per-domain (`auth/`, `doctor/` [absorbs availability], `appointment/`) behind the `index.js` barrel.
-- **Tests** are co-located: server domain-module tests are `modules/<x>/test.js` (not `*.test.js`), so `vitest.config.js`'s include adds `server/src/**/test.js`. One sanctioned test-internals pattern: merged services `import * as self` and route test-stubbed intra-module calls through `self.` so `vi.spyOn` can intercept them under ESM (a bare local call cannot be spied).
+- **Tests** are co-located: server domain-module tests are `modules/<x>/test.js` (not `*.test.js`), so `vitest.config.js`'s include adds `server/src/**/test.js`. *(Superseded by ADR-40 — tests are now centralized under `server/test/`, `shared/test/`, and `client/test/`; the `self.`-spy pattern below is unaffected.)* One sanctioned test-internals pattern: merged services `import * as self` and route test-stubbed intra-module calls through `self.` so `vi.spyOn` can intercept them under ESM (a bare local call cannot be spied).
 - **Prisma schema stays centralized** (`prisma/schema.prisma`) — idiomatic single generated client.
 
 **Consequences:** One obvious home per concept; everything a feature needs is co-located; the view layer is separated from logic; client and server routing are symmetric. Trade-offs: deeper relative-import paths in client module views, and the `self.`-import test convention. Invalidates path references in earlier ADRs (ADR-21 `lib/tz.js` → `lib/tz/tz.js`; ADR-25 `evaluation.service.js`/`refundSideEffects.js`/`appointmentState.service` → merged `modules/appointment/service.js`) and doc 13's file inventory — corrected in the same pass. Extends the lean-scaffold intent (ADR-16) and the faithful-re-presentation discipline (ADR-19): no new behavior, only structure. Wiring the client to consume `shared/schemas` (replacing hand-rolled validation) remains a noted follow-up.
@@ -576,6 +577,25 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-40 — Centralized `test/` tree + `#src`/`#shared` aliases (supersedes ADR-26 test co-location)
+
+**Date:** 2026-06-15
+
+**Status:** Accepted
+
+**Context:** ADR-26 co-located tests beside their source — server domain-module tests as a bare `modules/<x>/test.js`, the rest as `*.test.js`/`*.test.jsx`, plus the integration suite under `server/src/test/`. This left tests scattered across the source tree with three different placement conventions, and forced brittle deep relative imports (client view tests reached `../../../../`). A single navigable home was wanted, applied symmetrically to server, shared, and client.
+
+**Decision:** Relocate every test out of `src/` into a per-workspace `test/` tree — a pure move with no test logic, assertion, or coverage change (the only in-file edits are import/`vi.mock` specifier strings):
+
+- **Server (`server/test/`):** `unit/` mirrors `src/` (`unit/<area>/<unit>/<role>.test.js`); the bare module `test.js` becomes role-named `service.test.js` (beside `controller.test.js`); the integration suite moves to `integration/<flow>.test.js`, dropping the now-redundant `.integration` infix.
+- **Shared (`shared/test/unit/schemas/<name>/`).**
+- **Client (`client/test/unit/`):** mirrors `src/`; unit layer only (E2E stays in root `e2e/`, ADR-38).
+- **Imports use `resolve.alias`:** `#src`→`server/src` and `#shared`→`shared` in the root `vitest.config.js`; `#src`→`client/src` in `client/vitest.config.js`. Per-workspace, so `#src` always means "this workspace's source". Source files keep their relative imports (test-only aliases). `resolve.alias` was chosen over `package.json "imports"` (one central place; Vite resolves it before `vi.mock` matching — verified that aliased `vi.mock` intercepts relatively-imported source modules).
+
+**Consequences:** One navigable home per workspace; the test tree is a shadow of `src/`; the ambiguous bare `test.js` is gone. Verified by before/after full-suite parity (server+shared 304 passing / 18 skipped unchanged; client 135 passing unchanged). **Supersedes the "Tests are co-located" bullet of ADR-26** — the `self.`-spy ESM pattern from ADR-26 is unaffected (it keys off module identity, not file location). No production-source, API, schema, or dependency change. Invalidates test-path references in docs 03 §3a.1, 09 §1, and 13's file inventory — corrected in the same pass.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -597,3 +617,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-14 | Added ADR-35 (landing at root + doctor listing relocated to `/browse`; logged-in-patient `/`→`/browse` redirect; legal pages as a review-gated structured DRAFT via reusable `LegalPage`; KPI #1 `landing_view`/`booking_started` client emits over the shared `track.js`) | Slice H · S4 (public surface — landing + legal); new architectural decision |
 | 2026-06-14 | Added ADR-36 (Sentry DSN-gated error tracking; `sendDefaultPii:false` + `beforeSend` PII scrub; parallel to the ADR-30 audit bridge, does not feed A3; `SENTRY_DSN` canonical) and ADR-37 (single zod@3 copy via `shared` workspace + root `overrides.zod`; transitive zod@4 collapsed; errorHandler ZodError duck-typing removed; override is a global constraint) | Slice H · S6 (launch foundation + hardening); two new architectural decisions |
 | 2026-06-14 | Added ADR-38 (Playwright E2E harness at root `e2e/` against the mock adapters; 6 Critical journeys J1–J6 as the v1 launch gate; living/extensible, one spec per journey + shared `support/`) and ADR-39 (payment/appointment no-cascade release policy — `Payment.appointment` is ON DELETE RESTRICT; `payment.failed`/reconcile-failed mark Payment failed + force-expire the lock, reclaim only `failed`/absent blockers, refundInFull force-expires; refines ADR-23) | Slice H · S7 (E2E QA + launch gate) + the four money-path fixes; two new architectural decisions |
+| 2026-06-15 | Added ADR-40 (centralized per-workspace `test/` tree — `unit/` mirrors `src/`, module `test.js`→`service.test.js`, integration `.integration` infix dropped; `#src`/`#shared` `resolve.alias`) superseding the test-co-location bullet of ADR-26 (pointer added); test move only, no behavior change | Server+shared+client test centralization; new architectural decision |
