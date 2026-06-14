@@ -7,6 +7,7 @@ import { AdminRecords } from './views/AdminRecords/AdminRecords.jsx';
 import { AdminRecordDetail } from './views/AdminRecordDetail/AdminRecordDetail.jsx';
 import { AdminAlerts } from './views/AdminAlerts/AdminAlerts.jsx';
 import { AdminSettings } from './views/AdminSettings/AdminSettings.jsx';
+import { AdminAppearance } from './views/AdminAppearance/AdminAppearance.jsx';
 
 /** Admin sidebar links (A-01…A-05). Entries are added as the views land. */
 export const ADMIN_LINKS = [
@@ -15,6 +16,7 @@ export const ADMIN_LINKS = [
   { to: '/admin/records', label: 'Records & audit' },
   { to: '/admin/alerts', label: 'System health' },
   { to: '/admin/settings', label: 'Settings' },
+  { to: '/admin/appearance', label: 'Appearance' },
 ];
 
 const guard = (session, el) => (
@@ -31,4 +33,5 @@ export const adminRoutes = (session) => [
   { path: '/admin/records/:id', element: guard(session, <AdminRecordDetail />) },
   { path: '/admin/alerts', element: guard(session, <AdminAlerts />) },
   { path: '/admin/settings', element: guard(session, <AdminSettings />) },
+  { path: '/admin/appearance', element: guard(session, <AdminAppearance />) },
 ];
