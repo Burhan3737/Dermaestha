@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../lib/prisma/prisma.js', () => ({
   prisma: {
-    appointment: { findUnique: vi.fn(), deleteMany: vi.fn() },
+    appointment: { findUnique: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
     doctor: { findUnique: vi.fn() },
     payment: { upsert: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
     auditLog: { findFirst: vi.fn(), count: vi.fn() },
@@ -145,6 +145,33 @@ describe('payment.processWebhook', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('on payment.failed (pending) marks the intent failed and force-expires the lock (no delete)', async () => {
+    prisma.payment.findFirst.mockResolvedValue({
+      id: 'p1',
+      appointmentId: 'a1',
+      providerRef: 'mock_1',
+      status: 'pending',
+    });
+    const before = Date.now();
+    const out = await processWebhook({
+      event: 'payment.failed',
+      providerRef: 'mock_1',
+      amount: 250000,
+      gatewayFee: null,
+    });
+    expect(out).toEqual({ ok: true });
+    // Option B: never delete (Payment FK is RESTRICT) — keep the Payment, mark it failed.
+    expect(prisma.appointment.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { status: 'failed' },
+    });
+    // Lock force-expired so the slot is reclaimable (ADR-23 lazy expiry).
+    const upd = prisma.appointment.updateMany.mock.calls.at(-1)[0];
+    expect(upd.where).toEqual({ id: 'a1', state: 'slot_locked' });
+    expect(upd.data.lockExpiresAt.getTime()).toBeGreaterThanOrEqual(before);
+  });
+
   it('ignores a payment.failed for an already-successful payment', async () => {
     prisma.payment.findFirst.mockResolvedValue({
       id: 'p1',
@@ -226,9 +253,12 @@ describe('payment.reconcileUnconfirmed (F04.03)', () => {
     expect(paymentProvider.refund).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 250000, idempotencyKey: 'rf_a1' }), // FULL amount
     );
-    expect(prisma.appointment.deleteMany).toHaveBeenCalledWith({
-      where: { id: 'a1', state: 'slot_locked' },
-    });
+    // FIX B: NEVER delete the payment-referenced appointment (Payment FK is RESTRICT → P2003).
+    // Force-expire the lock instead (a plain update, no FK touched) — both records are preserved.
+    expect(prisma.appointment.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.appointment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'a1', state: 'slot_locked' } }),
+    );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'payment.reconciliation_refund', targetRef: 'a1' }),
     );
@@ -250,9 +280,11 @@ describe('payment.reconcileUnconfirmed (F04.03)', () => {
     const data = prisma.payment.update.mock.calls.at(-1)[0].data;
     expect(data.refundStatus).toBe('manual_required');
     expect(data.status).toBe('success');
-    expect(prisma.appointment.deleteMany).toHaveBeenCalledWith({
-      where: { id: 'a1', state: 'slot_locked' },
-    });
+    // FIX B: lock force-expired (no delete) so the success-Payment FK cannot P2003.
+    expect(prisma.appointment.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.appointment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'a1', state: 'slot_locked' } }),
+    );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'payment.reconciliation_refund',
@@ -261,13 +293,15 @@ describe('payment.reconcileUnconfirmed (F04.03)', () => {
     );
   });
 
-  it('gateway-failed → same cleanup as the failed-IPN path', async () => {
+  it('gateway-failed → same Option-B cleanup as the failed-IPN path (mark failed + free lock)', async () => {
     paymentProvider.queryPaymentStatus.mockResolvedValue({ status: 'failed' });
     prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'slot_locked' });
     await reconcileUnconfirmed(NOW);
-    expect(prisma.appointment.deleteMany).toHaveBeenCalledWith({
-      where: { id: 'a1', state: 'slot_locked' },
-    });
+    // No delete (Payment FK is RESTRICT): the lock is force-expired instead.
+    expect(prisma.appointment.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.appointment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'a1', state: 'slot_locked' } }),
+    );
     expect(prisma.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'failed' } }),
     );

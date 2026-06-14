@@ -19,6 +19,7 @@
     "build:client": "npm --workspace client run build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write .",
     "prisma:generate": "prisma generate",
@@ -27,6 +28,7 @@
     "bootstrap:admin": "node prisma/scripts/bootstrap-admin.js"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "eslint": "^9.0.0",
     "prettier": "^3.3.0",
     "prisma": "6.19.3",

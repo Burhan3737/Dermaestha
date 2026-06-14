@@ -63,10 +63,7 @@ export async function processWebhook({ event, providerRef, amount, gatewayFee })
 
   if (event === 'payment.failed') {
     if (payment.status !== 'pending') return { ok: true }; // ignore late/replayed failure after success
-    await prisma.appointment.deleteMany({
-      where: { id: payment.appointmentId, state: 'slot_locked' },
-    });
-    await prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed' } });
+    await markFailedAndReleaseLock(payment.id, payment.appointmentId);
     return { ok: true };
   }
 
@@ -75,6 +72,22 @@ export async function processWebhook({ event, providerRef, amount, gatewayFee })
 
   await self.confirmPaidAppointment({ payment, appointment: appt, amount, gatewayFee });
   return { ok: true };
+}
+
+/**
+ * Failed-payment handling (Option B — no schema migration). Mark the intent `failed` and free the
+ * held slot WITHOUT deleting the appointment: `Payment.appointment` is `ON DELETE RESTRICT` (no
+ * cascade — prisma/schema.prisma), so deleting a slot_locked appointment while its pending Payment
+ * still FK-references it raises P2003. Instead we force-expire the lock (a plain update, no FK
+ * touched); the slot is then immediately reclaimable via lazy-expiry / reclaim-on-conflict (ADR-23).
+ * The Payment is left as `failed` (terminal, not `pending`), so reconcileUnconfirmed skips it.
+ */
+async function markFailedAndReleaseLock(paymentId, appointmentId) {
+  await prisma.payment.update({ where: { id: paymentId }, data: { status: 'failed' } });
+  await prisma.appointment.updateMany({
+    where: { id: appointmentId, state: 'slot_locked' },
+    data: { lockExpiresAt: new Date() },
+  });
 }
 
 /** The single atomic confirm commit (#2): transition + payment success + outbox enqueue.
@@ -176,9 +189,8 @@ async function reconcileOne(p) {
   const appt = await prisma.appointment.findUnique({ where: { id: p.appointmentId } });
 
   if (q.status === 'failed') {
-    // Mirror the failed-IPN path: drop the lock, close the intent.
-    await prisma.appointment.deleteMany({ where: { id: p.appointmentId, state: 'slot_locked' } });
-    await prisma.payment.update({ where: { id: p.id }, data: { status: 'failed' } });
+    // Mirror the failed-IPN path (Option B): mark the intent failed and free the lock.
+    await markFailedAndReleaseLock(p.id, p.appointmentId);
     return;
   }
 
@@ -223,7 +235,16 @@ async function refundInFull(p) {
       refundStatus: result.status,
     },
   });
-  await prisma.appointment.deleteMany({ where: { id: p.appointmentId, state: 'slot_locked' } });
+  // Do NOT delete the payment-referenced appointment: `Payment.appointment` is ON DELETE RESTRICT
+  // (no cascade — prisma/schema.prisma), and we just set this Payment to `success`, so a delete
+  // would P2003 → crash AFTER the money was refunded. The refund happened — preserve the audit
+  // trail for both records. Force-expire the lock instead (a plain update, no FK touched): the row
+  // no longer holds a slot, the real slot is already held by the other confirmed appointment, and
+  // reconcileUnconfirmed skips this row (it only queries `pending` payments).
+  await prisma.appointment.updateMany({
+    where: { id: p.appointmentId, state: 'slot_locked' },
+    data: { lockExpiresAt: new Date() },
+  });
   await audit.record({
     eventType: 'payment.reconciliation_refund',
     actorType: 'system',
