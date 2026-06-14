@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.15                                                                                               |
+| Version          | 1.16                                                                                               |
 | Last updated     | 2026-06-14                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -51,6 +51,8 @@
 36. [ADR-35 — Landing at root, doctor listing relocated to `/browse`; legal pages ship as a review-gated structured DRAFT](#adr-35--landing-at-root-doctor-listing-relocated-to-browse-legal-pages-ship-as-a-review-gated-structured-draft)
 37. [ADR-36 — Sentry DSN-gated error tracking with PII scrubbing, alongside the audit bridge](#adr-36--sentry-dsn-gated-error-tracking-with-pii-scrubbing-alongside-the-audit-bridge)
 38. [ADR-37 — Single zod@3 copy via the `shared` workspace + root `overrides.zod`; ZodError duck-typing removed](#adr-37--single-zod3-copy-via-the-shared-workspace--root-overrideszod-zoderror-duck-typing-removed)
+39. [ADR-38 — Playwright E2E harness (root `e2e/`) against the mock adapters as the v1 launch gate](#adr-38--playwright-e2e-harness-root-e2e-against-the-mock-adapters-as-the-v1-launch-gate)
+40. [ADR-39 — Payment/appointment no-cascade release policy (refines ADR-23)](#adr-39--paymentappointment-no-cascade-release-policy-refines-adr-23)
 
 ---
 
@@ -546,6 +548,34 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-38 — Playwright E2E harness (root `e2e/`) against the mock adapters as the v1 launch gate
+
+**Date:** 2026-06-14
+
+**Status:** Accepted
+
+**Context:** Slice H · S7 is the v1 launch-gate QA cycle (doc 09 §7 exit criteria). The unit + integration suite (Vitest) verifies service logic, much of it against a **mocked** Prisma client; it cannot see crashes that surface only when a real browser drives the real Postgres DB through the actual HTTP stack. A launch gate needs the critical end-to-end journeys proven against the shipped app, runnable offline/CI with no live vendor credentials.
+
+**Decision:** Adopt a **Playwright E2E harness** rooted at `e2e/` (`playwright.config.js`; `npm run test:e2e` → `playwright test`; `@playwright/test` is a root devDependency). One spec per journey under `e2e/tests/`, shared fixtures/helpers in `e2e/support/`, and `e2e/global-setup.js` for the Prisma DB seed. It runs **serially** (`workers: 1`, `fullyParallel: false`, on shared seeded rows for determinism) against a `webServer` Playwright builds + boots with the **mock adapters** (`PAYMENT_PROVIDER=mock`, `VIDEO_PROVIDER=mock`, `EMAIL_PROVIDER=console`) — the same dev simulators as ADR-22/24, exercising the real signature/webhook/commit paths. The **6 Critical journeys J1–J6** (doc 12 §6 execution record) are the v1 launch gate. The suite is living/extensible: a new journey is a new spec reusing `support/`.
+
+**Consequences:** The critical money / booking / video / auth journeys are proven against the real DB + HTTP stack, catching a class of bug the mocked-Prisma unit suite cannot (see ADR-39). Mock adapters keep the gate offline/CI-runnable (consistent with ADR-22/24); live-vendor validation remains a separate launch gate (doc 07 §3 PayFast, §10 Daily). Serial execution trades speed for determinism on the shared seed. The point-in-time **release recommendation** lives in `docs/superpowers/reports/` (not canon); source-of-truth statuses stay in doc 13, enumerated cases in doc 12.
+
+---
+
+## ADR-39 — Payment/appointment no-cascade release policy (refines ADR-23)
+
+**Date:** 2026-06-14
+
+**Status:** Accepted
+
+**Context:** The S7 E2E gate (ADR-38), driving the real DB, surfaced a **class** of pre-existing crash the mocked-Prisma unit suite could not see: deleting a `slot_locked` appointment that a `Payment` row FK-references. `Payment.appointment` (and `Prescription.appointment`) are **`ON DELETE RESTRICT`** (no cascade — `prisma/schema.prisma`), so such a delete raises `P2003`. Three money-path sites deleted (or could delete) such an appointment to free its slot: the `payment.failed` webhook + reconcile-failed paths, `createWithReclaim`'s lazy reclaim (ADR-23), and `refundInFull` (edge #6a — after the money was already refunded).
+
+**Decision:** **Never delete a possibly-paid, payment-referenced appointment to free a slot** — force-expire the lock instead (a plain `updateMany` setting `lockExpiresAt = now`; no FK touched) and let lazy-expiry / reclaim-on-conflict (ADR-23) free the slot. Specifically: (1) on `payment.failed` (and reconcile → `failed`), `markFailedAndReleaseLock` marks the Payment `failed` (terminal — `reconcileUnconfirmed` only queries `pending`, so it is skipped) **and** force-expires the lock; no delete, no migration. (2) `createWithReclaim` reclaims only `failed`/absent blockers (clearing the dead intent first so the reclaim delete cannot `P2003`); a **pending**-payment blocker → `SLOT_TAKEN 409`, left intact for the hourly reconciliation / the `payment.manual_review_required` admin path — **never silently delete possibly-paid money**. (3) `refundInFull` (edge #6a) force-expires the lock (`deleteMany` → `updateMany`), preserving the now-`success` Payment + the refund/audit records.
+
+**Consequences:** The FK-`RESTRICT` crash class is eliminated at every money-path site (proven by 3 new real-Postgres integration tests, S7); a lost-but-paid payment can never be silently deleted — it degrades to reconciliation or a manual-review alert (ADR-32). No schema change. **Refines ADR-23:** the lazy-reclaim "delete the expired blocker" step now first inspects/clears the blocker's Payment and stands down for a pending intent. Only the reclaim path now deletes a `slot_locked` appointment (a dead `failed`/absent hold), which makes doc 04 §2n's older "the `payment.failed` / edge-#6a paths delete slot_locked appointments" rationale partly stale — corrected there.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -566,3 +596,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-14 | Added ADR-34 (Video UI: lazy-loaded brand-themed Daily Prebuilt iframe + app chrome; P-11 get-ready screen with no app preview pane — Daily prejoin owns device check; one shared role-aware `VideoRoom` for P-12/D-04; fire-and-forget client `track.js` KPI #3 seam) | Slice H · S3 (video consultation UI); new architectural decision |
 | 2026-06-14 | Added ADR-35 (landing at root + doctor listing relocated to `/browse`; logged-in-patient `/`→`/browse` redirect; legal pages as a review-gated structured DRAFT via reusable `LegalPage`; KPI #1 `landing_view`/`booking_started` client emits over the shared `track.js`) | Slice H · S4 (public surface — landing + legal); new architectural decision |
 | 2026-06-14 | Added ADR-36 (Sentry DSN-gated error tracking; `sendDefaultPii:false` + `beforeSend` PII scrub; parallel to the ADR-30 audit bridge, does not feed A3; `SENTRY_DSN` canonical) and ADR-37 (single zod@3 copy via `shared` workspace + root `overrides.zod`; transitive zod@4 collapsed; errorHandler ZodError duck-typing removed; override is a global constraint) | Slice H · S6 (launch foundation + hardening); two new architectural decisions |
+| 2026-06-14 | Added ADR-38 (Playwright E2E harness at root `e2e/` against the mock adapters; 6 Critical journeys J1–J6 as the v1 launch gate; living/extensible, one spec per journey + shared `support/`) and ADR-39 (payment/appointment no-cascade release policy — `Payment.appointment` is ON DELETE RESTRICT; `payment.failed`/reconcile-failed mark Payment failed + force-expire the lock, reclaim only `failed`/absent blockers, refundInFull force-expires; refines ADR-23) | Slice H · S7 (E2E QA + launch gate) + the four money-path fixes; two new architectural decisions |

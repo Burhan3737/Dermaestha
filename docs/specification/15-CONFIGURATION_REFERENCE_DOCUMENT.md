@@ -3,7 +3,7 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.9                                          |
+| Version          | 1.10                                         |
 | Last updated     | 2026-06-14                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
@@ -21,7 +21,8 @@
 7. [Money & Locale](#6-money--locale)
 8. [Migration Caveats](#7-migration-caveats)
 9. [Environment Variable Contract](#8-environment-variable-contract)
-10. [Revision Footer](#revision-footer)
+10. [Build & Test Scripts](#9-build--test-scripts)
+11. [Revision Footer](#revision-footer)
 
 ---
 
@@ -286,6 +287,19 @@ All **three** `settings` tunables are editable at runtime via `PUT /api/admin/se
 
 ---
 
+## 9. Build & Test Scripts
+
+Source: root `package.json` (`scripts` + `devDependencies`). Run from the project root.
+
+| Script             | Command          | Purpose                                                                                  |
+| ------------------ | ---------------- | ---------------------------------------------------------------------------------------- |
+| `npm run test`     | `vitest run`     | Unit + integration suite (server/shared + the client config; doc 09 §1)                  |
+| `npm run test:e2e` | `playwright test` | Playwright end-to-end launch-gate suite over `e2e/` (`playwright.config.js`; 6 Critical journeys J1–J6 vs the mock adapters; ADR-38, doc 09 §4) |
+
+`@playwright/test` is a **root devDependency** — a cross-cutting test tool spanning the whole repo (like `vitest`), not scoped to a single workspace. The harness config is `playwright.config.js`; specs and fixtures live under `e2e/` (`tests/`, `support/`, `global-setup.js`).
+
+---
+
 ## Revision Footer
 
 | Date       | Change           | Why                                                  |
@@ -300,3 +314,4 @@ All **three** `settings` tunables are editable at runtime via `PUT /api/admin/se
 | 2026-06-13 | PayFast env section (§8): added `PAYFAST_SECURED_KEY`, `PAYFAST_MERCHANT_NAME`, `PAYFAST_STORE_ID`; redefined `PAYFAST_PASSPHRASE` as dev-mock-only; removed `PAYFAST_MERCHANT_KEY` (South-Africa-only, dropped); noted `PAYFAST_MODE` default `sandbox`; changed `PAYMENT_PROVIDER` enum to `stub\|mock\|payfast` | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | Added `DAILY_WEBHOOK_SECRET` to the Daily.co env section (§8); updated the `VIDEO_PROVIDER` row so `daily` resolves to the real `daily.js` adapter (HMAC-verified webhook + slot-bounded rooms, gated by doc 07) rather than the stub | Slice H · S2 (Daily.co video adapter; ADR-33) |
 | 2026-06-14 | Renamed the Error-Tracking env var `ERROR_TRACKING_DSN` → `SENTRY_DSN` (string, optional; DSN-gated Sentry + PII scrub; ADR-36); flipped §7 #4 Dual-Zod "known inconsistency" → resolved (single zod@3 via `shared` workspace + root `overrides.zod`; duck-typing removed; ADR-37) | Slice H · S6 (launch foundation + hardening) |
+| 2026-06-14 | Added §9 Build & Test Scripts — recorded `npm run test:e2e` (`playwright test`) + noted `@playwright/test` as a cross-cutting root devDependency (like `vitest`); ADR-38 | Slice H · S7 (E2E QA + launch gate) |

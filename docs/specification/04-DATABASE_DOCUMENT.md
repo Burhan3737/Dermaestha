@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.8                                                           |
+| Version          | 1.9                                                           |
 | Last updated     | 2026-06-14                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
@@ -307,6 +307,8 @@ model Payment {
 
 Against the real PayFast **Pakistan** adapter (which exposes no refund API), a refund instead degrades immediately to `refundStatus = manual_required` — one `payment.refund_manual_required` alert, **no** retry — and an admin later records the out-of-band settlement, flipping it to `settled` and reusing the `refundIdempotencyKey` (doc 11 ADR-32; `RefundStatus` gained `manual_required` via migration `20260613181905_slice_h_refund_manual_required`).
 
+**No-cascade release policy (ADR-39):** `Payment.appointment` (and `Prescription.appointment`, §2g) are deliberately **`ON DELETE RESTRICT`** (no `onDelete` declared → Prisma's required-relation default; no cascade). A `slot_locked` appointment that a `Payment` row FK-references therefore cannot be deleted (it would raise `P2003`). The failed/abandoned-payment paths consequently **release the slot by force-expiring the lock, not by deleting the appointment**: on `payment.failed` (and reconcile → `failed`) `markFailedAndReleaseLock` marks the Payment `failed` + sets `lockExpiresAt = now`; the edge-#6a `refundInFull` likewise force-expires the lock and preserves the refunded Payment. The slot then frees via lazy-expiry / reclaim-on-conflict (ADR-23). This is a service-layer policy — **no schema change**.
+
 ---
 
 ### 2g. Prescription
@@ -526,7 +528,7 @@ model NotificationJob {
 }
 ```
 
-`recipientEmail` and `vars` are snapshots taken at enqueue time (doc 14 §5 merge-var contract) — no PHI beyond what `appointments`/`users` already hold. The `@@unique([appointmentId, type, dedupeKey])` makes enqueue idempotent (a replayed `payment.success` IPN re-runs enqueue as a no-op upsert). `dedupeKey` defaults to `''`, preserving the Slice E singleton-per-`(appointment, type)` semantics; Slice F (migration `20260612003907_slice_f_outbox_dedupe_key`) widened the constraint to a 3-column composite so `prescription_ready` can set `dedupeKey` to the prescription id and thus enqueue one email per prescription (including corrections). `onDelete: Cascade` matters: the `payment.failed` webhook path and the edge-#6a reconciliation path delete `slot_locked` appointments, and a leftover job row must not block that. The `@@index([status, scheduledFor])` feeds the dispatch worker's due-rows query.
+`recipientEmail` and `vars` are snapshots taken at enqueue time (doc 14 §5 merge-var contract) — no PHI beyond what `appointments`/`users` already hold. The `@@unique([appointmentId, type, dedupeKey])` makes enqueue idempotent (a replayed `payment.success` IPN re-runs enqueue as a no-op upsert). `dedupeKey` defaults to `''`, preserving the Slice E singleton-per-`(appointment, type)` semantics; Slice F (migration `20260612003907_slice_f_outbox_dedupe_key`) widened the constraint to a 3-column composite so `prescription_ready` can set `dedupeKey` to the prescription id and thus enqueue one email per prescription (including corrections). `onDelete: Cascade` matters: the lazy-reclaim path (`createWithReclaim`, ADR-23/39) deletes a dead `slot_locked` appointment (an expired hold whose Payment is `failed`/absent) so a new patient can take the slot, and a leftover job row must not block that delete. (Note: the `payment.failed` and edge-#6a reconciliation paths no longer delete the appointment — they force-expire the lock instead, ADR-39 — so the cascade now backstops the reclaim-delete path specifically.) The `@@index([status, scheduledFor])` feeds the dispatch worker's due-rows query.
 
 ---
 
@@ -689,3 +691,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-13 | Corrected `AuditLog.targetRef` example to bare id / route-path (not `type:id`) (§2j); documented `Doctor.photoUrl` `/uploads/doctors/<id>.<ext>` static-serve format (§2c); added §4d deferred-index note (`audit_log.targetRef`, `appointments.slotStart`) | Slice G as-built sweep |
 | 2026-06-13 | Added `manual_required` to the `RefundStatus` enum (§2a) + a `Payment` prose note on the PayFast-PK manual-refund degradation (§2f); migration `20260613181905_slice_h_refund_manual_required` | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | Applied the two deferred admin indexes — `appointments.slotStart` + `audit_log.targetRef` — to the embedded schema (§2e, §2j), §4c inventory, and §4d (now "applied", no longer deferred); migration `20260613213051_slice_h_s6_indexes` | Slice H · S6 (launch foundation + hardening) |
+| 2026-06-14 | Documented the no-cascade release policy (§2f): `Payment.appointment` / `Prescription.appointment` are `ON DELETE RESTRICT` (no schema change) and the failed/abandoned-payment paths force-expire the lock rather than delete (ADR-39); corrected the now-stale §2n `onDelete: Cascade` rationale (the `payment.failed`/edge-#6a paths no longer delete — the cascade now backstops the lazy-reclaim delete) | Slice H · S7 (E2E QA + launch gate; ADR-39) |

@@ -4,9 +4,9 @@
 | ---------------- | ------------------------------------------------- |
 | Document ID      | `09-DEVTESTING_QATESTING_DOCUMENT`                |
 | Status           | Canonical                                         |
-| Version          | 1.3                                               |
-| Last updated     | 2026-06-13                                        |
-| Sources absorbed | `docs/specification/02, 04, 08; vitest.config.js` |
+| Version          | 1.4                                               |
+| Last updated     | 2026-06-14                                        |
+| Sources absorbed | `docs/specification/02, 04, 08; vitest.config.js; playwright.config.js` |
 | Related docs     | 02, 04, 08, 12                                    |
 
 ---
@@ -41,7 +41,7 @@ The v1 testing programme spans four layers.
 
 **Integration testing** covers the live application stack: Express routes exercised against a real PostgreSQL instance (using the `DATABASE_URL` env var loaded via Vite's `loadEnv`). The same Vitest runner and config are used. Integration test files live under `server/src/test/`.
 
-**QA functional testing** covers the complete user-facing flows for all 16 features (F01–F16) on the deployed staging environment. Tests are executed manually (or via assisted browser automation) against the 24 defined screens. Each test case maps to one or more acceptance criteria from doc 02.
+**QA functional testing** covers the complete user-facing flows for all 16 features (F01–F16) on the deployed staging environment. Tests are executed manually (or via assisted browser automation) against the 24 defined screens. Each test case maps to one or more acceptance criteria from doc 02. This layer was **executed in Slice H · S7** (the v1 launch-gate cycle): the assisted-browser-automation form is realized as the **Playwright E2E harness** (see §4); the non-Critical / UI surfaces (P-01 landing, `/legal/terms`, `/legal/privacy`, P-02 browse, login + role-routing, admin A-01/A-03/A-04/A-05) were covered by an assisted-manual pass; and the Daily.co REST adapter (`createRoom` + idempotent reuse + `issueToken` + room-URL/auth) was validated **live** against the real account. The consolidated point-in-time **release recommendation** for that cycle lives in `docs/superpowers/reports/` (not canon); source-of-truth statuses stay in doc 13 and enumerated cases in doc 12.
 
 **User acceptance testing (UAT)** is conducted by the client (patient-side) and a designated doctor representative at the end of each milestone (M1 slot booking, M2 payment and calls, M3 prescription and admin, M4 legal content and notifications). Sign-off at each milestone is required before the next milestone begins.
 
@@ -109,6 +109,8 @@ Deployment details are cross-referenced in doc 10; this document does not duplic
 ## 4. Test types
 
 **Functional testing** validates that each acceptance criterion defined in doc 02 is met for features F01–F16. Every named rule (e.g., Slot-Lock Rule, Free-Cancel Window Rule, Room-Isolation Rule) constitutes a testable criterion. Test cases are enumerated in doc 12 using the `TC-<Feature>-<Seq>` format defined in §5 below.
+
+**End-to-end (E2E) testing** is the realized "assisted browser automation" layer: a **Playwright harness** rooted at `e2e/` (`playwright.config.js`; run with `npm run test:e2e`; `@playwright/test` is a root devDependency), one spec per journey under `e2e/tests/` over shared `e2e/support/` fixtures, driving a real browser against the app booted with the **mock adapters** (`PAYMENT_PROVIDER=mock`, `VIDEO_PROVIDER=mock`, `EMAIL_PROVIDER=console`) and a seeded Postgres DB (`e2e/global-setup.js`). The **6 Critical journeys J1–J6** (book→pay→confirm incl. fail-path; video lifecycle; prescription issue→view→PDF; cancel/refund; auth/role gates; admin onboarding→forced password change) are the v1 launch gate (ADR-38). The harness is living/extensible — a new journey is a new spec reusing `support/`. Live-vendor validation (PayFast, Daily) remains a separate launch gate (doc 07 §3/§10).
 
 **Regression testing** is run after each bug fix or feature change. The full Vitest unit and integration suite is executed to confirm that no previously passing criterion has regressed. QA functional regression is scoped to the feature areas touched by the change plus any features with shared dependencies (e.g., state machine, payment flow, audit log).
 
@@ -279,3 +281,4 @@ The release recommendation is a brief document (or structured comment) that stat
 | 2026-06-11 | Re-pointed the transition-table ref to `modules/appointment/service.js` (merged) and updated the Vitest glob to include `server/src/**/test.js` + `shared/**/*.test.js` | Folder-structure restructure (ADR-26); domain-module tests are co-located as `test.js` |
 | 2026-06-11 | Corrected the stale "no `.test.jsx` files exist yet" clause — the client suite exists and is co-located per unit | Reflect actual client test tree (pre-existing drift, fixed during the restructure pass) |
 | 2026-06-13 | Fixed §8 DoD ADR misreference (doc 13 → doc 11); no structural testing changes — the Slice G admin integration suite (`server/src/test/admin.integration.test.js`, 8 tests) lands in the already-documented `server/src/test/` location, taking final counts to 248 server / 97 client | Slice G as-built sweep |
+| 2026-06-14 | Recorded the QA-functional layer as executed (Slice H · S7 launch gate); added the **Playwright E2E harness** (`e2e/`, `npm run test:e2e`, 6 Critical journeys J1–J6 vs mock adapters; ADR-38) as the realized "assisted browser automation" layer (§1/§4); noted the assisted-manual UI pass + the live Daily REST validation; pointed at the release recommendation under `docs/superpowers/reports/` | Slice H · S7 (E2E QA + launch gate) |

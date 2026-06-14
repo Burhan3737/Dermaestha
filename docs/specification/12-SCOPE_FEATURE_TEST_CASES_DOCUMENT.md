@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.5                                    |
-| Last updated     | 2026-06-13                             |
+| Version          | 1.6                                    |
+| Last updated     | 2026-06-14                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -286,6 +286,32 @@ These cases trace directly to doc 08 controls. Per doc 09 §5, access-control an
 - **Mapping.** Every case maps to a doc 02 feature/rule or doc 08 control; defects filed against a failing case carry the affected feature ID (F01–F16) per the doc 09 §9 defect summary format, and Critical defects note any data-integrity invariant involved.
 - **Release readiness.** Release-gate and Definition-of-Done criteria are owned by doc 09 §7–§8 — including Verified status for all Critical/High cases, exercised coverage of all ten invariants, and the minimum audit-log confirmations. This document supplies the cases that those criteria are evaluated against; it does not restate the gate.
 
+### S7 E2E QA cycle — execution record (2026-06-14)
+
+The Slice H · S7 launch-gate cycle executed the Critical paths end-to-end via the Playwright harness (`e2e/`, `npm run test:e2e`; 6 Critical journeys J1–J6 vs the mock adapters; ADR-38), backed by the Vitest unit + integration suite (incl. 3 new real-Postgres money-path integration tests). The point-in-time consolidated report lives at `docs/superpowers/reports/2026-06-14-v1-release-recommendation.md` (verdict: **Conditional-Go**); this record is the canonical case-level outcome.
+
+**Verified this cycle (E2E + integration):** the Critical cases covered by the six journeys —
+
+| Journey | Cases reaching Verified | Backing |
+| --- | --- | --- |
+| J1 book → pay → confirm (+ `payment.failed` fail-path) | TC-F03-001/002/005/006, TC-F04-001/002/003/004/006/007/008 (invariants #1/#2/#6/#7) | E2E + `paymentFailed`/`reconcileRefund` integration |
+| J2 video lifecycle (join → in_progress/completed/no-show) | TC-F05-003/004/008/010/011/012/014/015 | E2E + live-Daily REST |
+| J3 prescription issue → patient view + PDF | TC-F08-004/005/008/012/013 (+ TC-F08-006 download) | E2E |
+| J4 cancel/refund (≥2h refunded / <2h no-refund) | TC-F06-001/002/003/005/006/007 (invariant #10) | E2E + `reconcileRefund` integration |
+| J5 auth/role gates | TC-F15-001/003, TC-SEC-001/002 | E2E |
+| J6 admin onboarding → forced password change | TC-F10-001/003/004, TC-F15-002 | E2E |
+
+**Verified via the assisted-manual UI pass** (all render + function): TC-F02-001/002/003 (P-02 browse), TC-F16-001/002 (`/legal/terms`, `/legal/privacy`), the P-01 landing surface, login + role-routing, and the admin A-01/A-03/A-04/A-05 views (the F10/F12/F13/F14 admin cases). No open Critical/High case remains unverified; the only outstanding exit item is human **UAT sign-off** (doc 09 §7).
+
+**Defects found and fixed in this cycle** (all Closed/Verified — the gate's value; driving the real DB surfaced an FK-`RESTRICT` crash class the mocked-Prisma unit tests could not see; resolution policy = ADR-39):
+
+| ID | Sev | Site | Resolution |
+| --- | --- | --- | --- |
+| BUG-1 | High | `payment.failed` webhook + `reconcileOne`→failed | `markFailedAndReleaseLock` — mark Payment `failed` + force-expire the lock; no appointment delete, no migration (slot frees via lazy reclaim, ADR-23/39). Re-verified by `paymentFailed` integration |
+| FIX-A | High (latent) | `createWithReclaim` lazy reclaim | Reclaim only `failed`/absent blockers (clearing the dead intent first); a **pending**-payment blocker → `SLOT_TAKEN 409`, left for reconciliation / `payment.manual_review_required` — never silently delete possibly-paid money (ADR-39) |
+| FIX-B | High (latent) | `refundInFull` (edge #6a) | `deleteMany` → `updateMany` (force-expire lock); the refunded Payment + refund/audit records preserved (ADR-39). Re-verified by `reconcileRefund` integration |
+| BUG-2 | Low (dev-only) | mock `recordJoin` | Posted to `/dev/video/join` (was an `/api/…` 404); dev/CI mock path only — production unaffected |
+
 ---
 
 ## 7. Deferred — Medicine Ordering test cases (NOT in v1 build)
@@ -307,3 +333,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-11 | Added TC-F01-006 (G4 timing equalization), TC-F03-009 (G2 active-doctor booking), TC-F04-008 (F04.03 lost-IPN confirm), TC-F05-016 (G3 doctor today-scope), TC-F06-007 (F06.03 refund-retry/exhaustion, G1), TC-F07-005 (F07 outbox atomicity) | Slice E (F04.03/F06.03/F07 + G2/G3/G4 fixes); feature → test cases |
 | 2026-06-12 | Added TC-F08-008…014 (immutable submit + snapshots, correction = new row + email, wrong-state 409, unknown-medicine 400, double-submit race, owner gates, history `hasPrescription`) and TC-F11-004…006 (active-only name+genericName search, admin CRUD + audit rows, admin-only authz) | Slice F (F08 prescriptions + F11 backend); feature → test cases |
 | 2026-06-13 | Added TC-F10-006 (admin weekly-template editor), TC-F12-004 (second-resend idempotency 409), TC-F12-005 (`system.unhandled_exception` alert source), TC-F13-004 (email-resend audit trail + 409), TC-F14-004 (settings floor + A-05 confirm gate) | Slice G as-built sweep |
+| 2026-06-14 | Added the §6 "S7 E2E QA cycle — execution record": Critical J1–J6 cases marked Verified (E2E + integration) + the assisted-manual UI cases (F02/F16/F10/F12/F13/F14) Verified; logged the 4 cycle defects (BUG-1 / FIX-A / FIX-B / BUG-2) as found-and-fixed with resolutions (ADR-39); pointed at the release recommendation | Slice H · S7 (E2E QA + launch gate) |

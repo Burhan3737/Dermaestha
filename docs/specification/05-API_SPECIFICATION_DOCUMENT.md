@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.14                          |
+| Version          | 1.15                          |
 | Last updated     | 2026-06-14                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
@@ -177,7 +177,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                | Role   | Purpose                                           | Notes                                                                                                                    |
 | ---------------------------- | ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `POST /api/webhooks/payfast` | system | `payment.success`/`failed` ingest (CHECKOUT_URL server callback) | **signature-verified or 401 + alert**; success commits appointment+payment in one tx (#2), snapshots `feeAtBooking` (#6) |
+| `POST /api/webhooks/payfast` | system | `payment.success`/`failed` ingest (CHECKOUT_URL server callback) | **signature-verified or 401 + alert**; success commits appointment+payment in one tx (#2), snapshots `feeAtBooking` (#6); `payment.failed` marks the Payment `failed` + **releases the slot-lock (force-expire `lockExpiresAt`), no appointment delete** (ADR-39) |
 | `POST /api/payments/verify-return` | patient | Verify + commit the browser SUCCESS_URL/FAILURE_URL return params (dual-channel confirm; doc 14 §2) | calls `verifyReturn` → the **same** `processWebhook` atomic commit as the IPN; idempotent if the callback already confirmed; bad signature → `401` + `payment.webhook_rejected` audit |
 | `POST /api/webhooks/daily`   | system | Participant join/leave events → evaluation worker | **HMAC signature-verified over the raw body** or `401` + `video.webhook_rejected` audit (doc 14 §3); verified joins record `doctorJoinedAt`/`patientJoinedAt`, feeding no-show resolution |
 | `POST /api/webhooks/resend`  | system | Bounce/complaint signal                           | flags email failures to A3                                                                                               |
@@ -259,7 +259,7 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | --------------------- | --------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------- |
 | _(none)_              | `slot_locked`               | patient picks slot + Pay (patient)       | set `lockExpiresAt=now+10m`; partial unique index guards #1                               |
 | `slot_locked`         | `confirmed`                 | `payment.success` webhook (system)       | **one tx**: snapshot `feeAtBooking` (#6) + write payment (#2); enqueue confirmation email |
-| `slot_locked`         | _(row removed / released)_  | lock expiry or `payment.failed` (system) | slot becomes available again                                                              |
+| `slot_locked`         | _(lock released)_           | lock expiry or `payment.failed` (system) | lock force-expired (`lockExpiresAt=now`), **not** deleted; `payment.failed` also marks the Payment `failed`; slot frees via lazy-expiry / reclaim (ADR-23/39) |
 | `confirmed`           | `cancelled_refunded`        | patient cancels ≥2h before (patient)     | refund net-of-fee (policy #5); slot released; refund email                                |
 | `confirmed`           | `cancelled_no_refund`       | patient cancels <2h before (patient)     | no refund; slot stays blocked                                                             |
 | `confirmed`           | `doctor_cancelled`          | doctor cancels any time (doctor)         | refund net-of-fee; **apology email**; slot released                                       |
@@ -346,3 +346,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-14 | `POST /api/webhooks/daily` row (F04) now documents HMAC raw-body signature verification → `401` + `video.webhook_rejected` audit on bad signature; verified joins record `doctorJoinedAt`/`patientJoinedAt` (doc 14 §3) | Slice H · S2 (Daily.co video adapter; ADR-33) |
 | 2026-06-14 | Analytics-events row: noted that the **client caller** now exists (`lib/analytics/track.js`, ADR-34) POSTing `{ type, networkType, meta }` fire-and-forget; the route itself stays owned/defined by S6 (not yet built) | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | `POST /api/analytics/events` row → **Built (Slice H · S6)**: public, rate-limited 60/min/IP, body validated against the closed doc 14 §6 catalog (unknown `type` → `400 VALIDATION_FAILED`), success `202 { ok: true }`, best-effort writer | Slice H · S6 (launch foundation + hardening) |
+| 2026-06-14 | `payment.failed` outcome corrected on the `POST /api/webhooks/payfast` row + the `slot_locked` state-machine row: marks the Payment `failed` + **releases the slot-lock (force-expire), no appointment delete** — was "row removed / released" (ADR-39) | Slice H · S7 (E2E QA + launch gate; ADR-39) |
