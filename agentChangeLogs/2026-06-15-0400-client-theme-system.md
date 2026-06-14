@@ -30,6 +30,8 @@ User requested a full design/theme refactor, client-side only, with themes livin
 | `client/src/modules/legal/components/LegalPage/LegalPage.jsx` | Modified | Fixed DRAFT banner's broken `--color-warn`/`--color-warn-bg` refs (silent orange fallback) → real `--color-warning`/`--color-warning-bg` (latent bug + theming leak) |
 | `client/__theme_preview__/gallery.html` | Created (subagent) | Reusable theme-gallery harness built from the real production CSS (`?screen=&theme=` URLs) |
 | `theme-redesign/METHOD.md`, `theme-redesign/before/**` | Created (subagent) | Before-state baseline: 24 desktop + 6 mobile + component inventory + 6 live public screens |
+| `client/src/modules/admin/views/AdminAppearance/AdminAppearance.jsx` | Created | A-06 Appearance view: theme cards (swatches + tagline) + live component preview; pure client (setTheme) |
+| `client/src/modules/admin/admin.routes.jsx` | Modified | Register AdminAppearance: import + `ADMIN_LINKS` "Appearance" entry + `/admin/appearance` route |
 
 ## Dependencies / config / schema
 None yet. (Plan: no new runtime dependencies; theme persistence is client-side `localStorage` only — no schema/env/API change.)
@@ -53,7 +55,17 @@ None yet. (Plan: no new runtime dependencies; theme persistence is client-side `
 Low. Additive + default-unchanged. Rollback = delete branch. No server/data changes.
 
 ## Open items / next session
-- Finalize 2–3 theme palettes (research-backed).
-- Implement token split + themes layer + runtime + admin Appearance tab + fix 2 view leaks.
-- Before/after visual report across themes.
-- Doc-impact check vs. specs (esp. doc 06 design system) — track, present verdict at end.
+**Remaining work (gated on design-exploration workflow output):**
+- Append the 3 finalist theme palettes to `themes.css` + 3 entries to the `THEMES` registry in `theme.js`.
+- Decide live default: keep spruce, or flip `DEFAULT_THEME` (+ index.html bootstrap default) to the recommended new theme (one-click revert preserved either way).
+- After-capture across all themes (reuse `client/__theme_preview__/gallery.html` via `?theme=<id>`) → `theme-redesign/after/` + a before/after `report.md`.
+- Per-theme WCAG AA contrast double-check.
+- Write the design rationale doc (`docs/theme-redesign/THEME-DESIGN.md` or similar).
+
+**Doc-impact running list (track now; apply surgically at END after code committed, with version bumps + revision footers per doc-00 change protocol). Anchors verified: next ADR = ADR-41; next feature = F17; new screen = A-06.**
+1. **Doc 02 (Scope/Feature):** add **F17 — Appearance / theme switcher** (admin-selectable client-side theme; style-only; no DB/API). Change-impact matrix "new feature → 02, then 04/05/12/13" — 04/05 N/A (no schema/API); 12 optional TC; 13 status.
+2. **Doc 06 (Design System & Theme):** §2 admin sidebar + screen inventory → add **A-06 Appearance**; new section documenting the layered token architecture (invariant `tokens.css` scale vs swappable `themes.css` palettes), the 8 extended role tokens, the `data-theme`+localStorage runtime, the available themes + recommended default; note components.css is now fully tokenized (the doc's "no raw hex" claim is now literally true). §4 palette gets a note that listed values are the DEFAULT (spruce) theme.
+3. **Doc 11 (ADR):** add **ADR-41 — client-side theming (data-theme + localStorage), layered tokens, no server-backed global theme in v1 (scope/cost; client-only, style-only mandate)**.
+4. **Doc 13 (Product Status Tracker):** record theming capability + A-06 Appearance as built.
+5. **Doc 15 (Config Reference):** brief note of the `dermestha.theme` localStorage key + default-theme id as a client tunable (decide at end).
+6. **Doc 12 (Test cases):** optional TC for F17 (theme selection persists + re-colours without screen change).
