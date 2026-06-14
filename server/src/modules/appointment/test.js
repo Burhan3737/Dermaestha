@@ -203,7 +203,7 @@ describe('booking.lockSlot', () => {
     expect(prisma.appointment.create).toHaveBeenCalledOnce();
   });
 
-  it('reclaims an expired lock on P2002 then retries', async () => {
+  it('reclaims an expired lock with a FAILED-payment blocker, then retries', async () => {
     bookable();
     prisma.appointment.create
       .mockRejectedValueOnce({ code: 'P2002' })
@@ -212,12 +212,49 @@ describe('booking.lockSlot', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'expired1' });
+    // FIX A: the blocker carries a FAILED (dead) intent — safe to clear + reclaim.
+    prisma.payment.findFirst.mockResolvedValueOnce({ id: 'pay1', status: 'failed' });
     prisma.appointment.delete.mockResolvedValue({});
     const out = await lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true });
     // The blocker's dead Payment intent is cleared first (FK is RESTRICT), then the row is reclaimed.
     expect(prisma.payment.deleteMany).toHaveBeenCalledWith({ where: { appointmentId: 'expired1' } });
     expect(prisma.appointment.delete).toHaveBeenCalledWith({ where: { id: 'expired1' } });
     expect(out).toMatchObject({ id: 'a2' });
+  });
+
+  it('reclaims an expired lock with NO payment blocker, then retries', async () => {
+    bookable();
+    prisma.appointment.create
+      .mockRejectedValueOnce({ code: 'P2002' })
+      .mockResolvedValueOnce({ id: 'a2', state: 'slot_locked' });
+    prisma.appointment.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'expired1' });
+    // FIX A: no Payment ever attached → nothing to clear, but the row is still reclaimed.
+    prisma.payment.findFirst.mockResolvedValueOnce(null);
+    prisma.appointment.delete.mockResolvedValue({});
+    const out = await lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true });
+    expect(prisma.payment.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.appointment.delete).toHaveBeenCalledWith({ where: { id: 'expired1' } });
+    expect(out).toMatchObject({ id: 'a2' });
+  });
+
+  it('FIX A: refuses to reclaim a PENDING-payment blocker (possibly-paid money is never deleted)', async () => {
+    bookable();
+    prisma.appointment.create.mockRejectedValueOnce({ code: 'P2002' });
+    prisma.appointment.findFirst
+      .mockResolvedValueOnce(null) // live lock
+      .mockResolvedValueOnce(null) // overlap
+      .mockResolvedValueOnce({ id: 'expired1' }); // expired blocker
+    // The blocker still has a PENDING intent (possible lost-IPN) — the conflict must stand.
+    prisma.payment.findFirst.mockResolvedValueOnce({ id: 'pay1', status: 'pending' });
+    await expect(
+      lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }),
+    ).rejects.toMatchObject({ code: 'SLOT_TAKEN', status: 409 });
+    // The pending Payment + its appointment are left intact for reconciliation / S1.
+    expect(prisma.payment.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.appointment.delete).not.toHaveBeenCalled();
   });
 
   it('returns SLOT_TAKEN on P2002 when the blocker is NOT an expired lock', async () => {

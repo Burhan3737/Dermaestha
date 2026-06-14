@@ -234,11 +234,25 @@ async function createWithReclaim(data, doctorId, slotStartDate, now) {
       select: { id: true },
     });
     if (!blocker) throw new AppError('SLOT_TAKEN', 'That slot was just taken.', 409);
-    // The blocker is an expired, never-confirmed slot_locked hold. Any Payment it carries is a
-    // dead intent (only `pending`/`failed` is reachable — a successful pay would have moved it to
-    // `confirmed`, out of this branch). `Payment.appointment` is ON DELETE RESTRICT, so clear the
-    // intent first or the reclaim delete raises P2003 (ADR-23 lazy-reclaim must actually free it).
-    await prisma.payment.deleteMany({ where: { appointmentId: blocker.id } });
+    // The blocker is an expired, never-confirmed slot_locked hold (a successful pay would have
+    // moved it to `confirmed`, out of this branch). Inspect any Payment it carries before
+    // reclaiming — only `pending`/`failed` is reachable here:
+    //   • `failed` or absent → a dead intent. `Payment.appointment` is ON DELETE RESTRICT (no
+    //     cascade — prisma/schema.prisma), so clear the leftover intent (if any) first, or the
+    //     reclaim delete raises P2003 (ADR-23 lazy-reclaim must actually free the slot).
+    //   • still `pending` → may be a paid-but-lost-IPN. NEVER silently delete possibly-paid money:
+    //     let the booking conflict stand and leave the row + intent intact for the hourly
+    //     reconciliation / the payment.manual_review_required admin path (S1) to resolve.
+    const blockerPayment = await prisma.payment.findFirst({
+      where: { appointmentId: blocker.id },
+      select: { id: true, status: true },
+    });
+    if (blockerPayment?.status === 'pending') {
+      throw new AppError('SLOT_TAKEN', 'That slot was just taken.', 409);
+    }
+    if (blockerPayment) {
+      await prisma.payment.deleteMany({ where: { appointmentId: blocker.id } });
+    }
     await prisma.appointment.delete({ where: { id: blocker.id } });
     try {
       return await prisma.appointment.create({ data });
