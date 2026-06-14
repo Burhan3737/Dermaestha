@@ -51,6 +51,8 @@
   /* Typography */
   --font-head: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Large display/headings only (themes may swap to a serif). Small UI labels keep --font-head. */
+  --font-display: var(--font-head);
   --fs-display: 30px; --fs-h1: 24px; --fs-h2: 20px; --fs-h3: 17px;
   --fs-body-lg: 16px; --fs-body: 14px; --fs-body-sm: 13px; --fs-caption: 12px; --fs-label: 11px;
 

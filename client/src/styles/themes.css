@@ -9,9 +9,183 @@
  * pre-paint bootstrap in index.html). `:root[data-theme="x"]` outranks the base `:root`
  * in specificity, so these palettes win regardless of stylesheet order.
  *
- * Authoring contract: a theme block should provide a value for every themeable token a
- * theme can change (all `--color-*`, the focus/backdrop/shadow effects, and optionally
- * the radius scale + heading font). Anything it omits inherits the spruce default.
+ * Each block supplies: the full colour set + the extended role tokens (on-accent,
+ * on-danger, text-disabled, tab-inactive, focus rings, backdrop, shadow), the radius
+ * scale, and the display font (--font-display; the body font stays Hanken everywhere
+ * for 3G performance). Display webfonts are lazy-loaded per active theme by theme.js.
  *
- * --- New theme palettes are added below. ---
+ * Provenance: palettes are the output of the design-exploration workflow (research →
+ * generation → adversarial AA-contrast repair). All required text pairs verified at
+ * WCAG 2.1 AA on both canvas and card grounds. Discipline rules the palettes assume:
+ *   (1) --color-accent is fill / large-bold / non-text only; small accent text uses
+ *       --color-accent-deep.
+ *   (2) status is never colour-only (every state already pairs colour + icon + label).
  */
+
+/* ============================================================================
+   IVORY & INK — warm bone-and-ink editorial luxe; one burnt-amber accent.
+   Sharp 1/2/4px geometry. Recommended live default.
+   ============================================================================ */
+:root[data-theme="ivory-ink"] {
+  --font-display: "Fraunces", "Spectral", Georgia, "Times New Roman", serif;
+  --r-sm: 1px; --r-md: 2px; --r-lg: 4px;
+
+  --color-primary:        #211C17;
+  --color-primary-hover:  #100C09;
+  --color-primary-tint:   #E9E1D1;
+  --color-primary-border: #CFC6B2;
+  --color-on-primary:     #FAF6EE;
+
+  --color-accent:      #A8531A;
+  --color-accent-deep: #8A4514;
+  --color-accent-tint: #F6E7D2;
+  --color-on-accent:   #FFFFFF;
+
+  --color-bg:             #EFE8DA;
+  --color-surface:        #FBF7EF;
+  --color-surface-sunken: #E6DECE;
+  --color-border:         #DED5C3;
+  --color-border-strong:  #94835F;
+  --color-text-strong:    #1A1714;
+  --color-text-body:      #423B33;
+  --color-text-muted:     #6A5F50;
+  --color-text-disabled:  #998B73;
+  --color-tab-inactive:   #736750;
+
+  --color-feature-bg:     #211A13;
+  --color-on-dark:        #ECE3D2;
+  --color-on-dark-muted:  #C2B49B;
+  --color-on-dark-accent: #E3A766;
+
+  --color-dark-bg:      #15110C;
+  --color-dark-surface: #322819;
+  --color-dark-border:  #604F34;
+  --color-dark-deep:    #0E0B07;
+
+  --color-success: #4E6A3E; --color-success-bg: #EBEEDD;
+  --color-info:    #356268; --color-info-bg:    #E4EDEC;
+  --color-warning: #8A5010; --color-warning-bg: #F6E7D2;
+  --color-danger:  #A8412E; --color-danger-bg:  #F6E4DE;
+  --color-danger-deep: #8C2F1F;
+  --color-neutral: #6A5F50; --color-neutral-bg: #EBE5D7;
+
+  --color-on-danger: #FFFFFF;            /* brick danger → white text */
+
+  --focus-ring:      rgba(33,28,23,.32);
+  --focus-ring-soft: rgba(33,28,23,.16);
+  --backdrop:        rgba(26,20,14,.50);
+  --shadow-overlay:  0 16px 40px rgba(26,20,14,.22);
+}
+
+/* ============================================================================
+   DERMA NOIR — dark, immersive aubergine-charcoal; fresh jade + soft rose-gold.
+   Soft 6/10/14px geometry. A designed dark "mood mode" (not an invert).
+   NOTE: on dark, the text-safe accent (accent-deep) is LIGHTER than the fill
+   accent, and danger-deep is a lighter error ink — roles are preserved.
+   ============================================================================ */
+:root[data-theme="derma-noir"] {
+  --font-display: "DM Serif Display", "Fraunces", Georgia, serif;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+
+  --color-primary:        #6FD8B0;
+  --color-primary-hover:  #54C29A;
+  --color-primary-tint:   #1A352D;
+  --color-primary-border: #356254;
+  --color-on-primary:     #08130E;
+
+  --color-accent:      #D9A893;
+  --color-accent-deep: #ECC2B0;
+  --color-accent-tint: #33231C;
+  --color-on-accent:   #2A1812;
+
+  --color-bg:             #100C16;
+  --color-surface:        #281F36;
+  --color-surface-sunken: #0C0814;
+  --color-border:         #332C42;
+  --color-border-strong:  #766C94;
+  --color-text-strong:    #F4F0F7;
+  --color-text-body:      #D8D1DF;
+  --color-text-muted:     #ABA2B5;
+  --color-text-disabled:  #827A8E;
+  --color-tab-inactive:   #9A92A6;
+
+  --color-feature-bg:     #13231D;
+  --color-on-dark:        #D8E8DF;
+  --color-on-dark-muted:  #A6C2B5;
+  --color-on-dark-accent: #84E8C2;
+
+  --color-dark-bg:      #0E0B13;
+  --color-dark-surface: #262036;
+  --color-dark-border:  #544B6A;
+  --color-dark-deep:    #07050B;
+
+  --color-success: #5FCB9E; --color-success-bg: #13271F;
+  --color-info:    #56BFC0; --color-info-bg:    #112624;
+  --color-warning: #E0B070; --color-warning-bg: #2A2114;
+  --color-danger:  #E88476; --color-danger-bg:  #2E1814;
+  --color-danger-deep: #F2A294;
+  --color-neutral: #ABA2B5; --color-neutral-bg: #1E1926;
+
+  --color-on-danger: #2A1812;            /* light-coral danger fill → dark text */
+  --color-on-dark-strong: #FFFFFF;
+
+  --focus-ring:      rgba(111,216,176,.45);
+  --focus-ring-soft: rgba(111,216,176,.22);
+  --backdrop:        rgba(7,5,11,.66);
+  --shadow-overlay:  0 20px 50px rgba(4,2,8,.62);
+}
+
+/* ============================================================================
+   SAGE & BLUSH SPA — calming greige canvas, grayed sage brand, clay-rose accent.
+   Gentle 8/12/16px geometry. The softest, most "treatment-room" of the set.
+   ============================================================================ */
+:root[data-theme="sage-blush"] {
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+
+  --color-primary:        #41624E;
+  --color-primary-hover:  #33503E;
+  --color-primary-tint:   #E5EDE7;
+  --color-primary-border: #C7D6CC;
+  --color-on-primary:     #FBF8F3;
+
+  --color-accent:      #9E5048;
+  --color-accent-deep: #8E4838;
+  --color-accent-tint: #F4E3DC;
+  --color-on-accent:   #FFFFFF;
+
+  --color-bg:             #ECE7DE;
+  --color-surface:        #FBF8F3;
+  --color-surface-sunken: #E6DFD3;
+  --color-border:         #DED5C6;
+  --color-border-strong:  #90836C;
+  --color-text-strong:    #29302B;
+  --color-text-body:      #4D544C;
+  --color-text-muted:     #5E645B;
+  --color-text-disabled:  #9C9384;
+  --color-tab-inactive:   #6E6858;
+
+  --color-feature-bg:     #243A2E;
+  --color-on-dark:        #DCE6DD;
+  --color-on-dark-muted:  #AEC2B2;
+  --color-on-dark-accent: #9FD9B6;
+
+  --color-dark-bg:      #14201A;
+  --color-dark-surface: #22342B;
+  --color-dark-border:  #3E5C4A;
+  --color-dark-deep:    #0E1813;
+
+  --color-success: #2C6A47; --color-success-bg: #E3EFE7;
+  --color-info:    #2C6076; --color-info-bg:    #E0EBF0;
+  --color-warning: #845C1A; --color-warning-bg: #F4E8D2;
+  --color-danger:  #B23A2E; --color-danger-bg:  #FAE7E3;
+  --color-danger-deep: #8F271D;
+  --color-neutral: #56625B; --color-neutral-bg: #E9ECE7;
+
+  --color-on-danger: #FFFFFF;            /* brick danger → white text */
+
+  --focus-ring:      rgba(65,98,78,.32);
+  --focus-ring-soft: rgba(65,98,78,.16);
+  --backdrop:        rgba(20,32,26,.45);
+  --shadow-overlay:  0 18px 44px rgba(20,32,26,.22);
+}
