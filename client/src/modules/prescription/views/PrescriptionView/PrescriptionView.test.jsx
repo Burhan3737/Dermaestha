@@ -68,6 +68,13 @@ describe('P-13 prescription view', () => {
     vi.unstubAllGlobals();
   });
 
+  it('shows a not-found message on a cross-tenant / 404 fetch (ISSUE-10)', async () => {
+    api.get.mockRejectedValue({ status: 404 });
+    setup();
+    // No data leak (the API 404s); the UI must still say something, not a bare heading.
+    await waitFor(() => expect(screen.getByText(/not available/i)).toBeTruthy());
+  });
+
   it('renders corrections chronologically, each with its own Download button', async () => {
     api.get.mockResolvedValue({
       data: [RX(), RX({ id: 'rx2', issuedAt: '2099-01-05T09:00:00.000Z' })],

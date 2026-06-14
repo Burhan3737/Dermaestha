@@ -38,6 +38,13 @@ describe('P-01 Landing', () => {
     expect(screen.getByRole('link', { name: /privacy policy/i }).getAttribute('href')).toBe('/legal/privacy');
   });
 
+  it('static featured/hero cards do not dead-end to /doctors/sample (ISSUE-5)', () => {
+    const { container } = setup();
+    // doc 06 §3: the featured grid is static placeholder data for v1 — cards must not link to a
+    // non-existent profile ("/doctors/sample" rendered "Doctor not found.").
+    expect(container.querySelectorAll('a[href="/doctors/sample"]').length).toBe(0);
+  });
+
   it('emits landing_view once on mount with referrer meta', () => {
     setup();
     expect(track).toHaveBeenCalledTimes(1);

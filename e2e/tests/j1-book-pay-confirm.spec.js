@@ -14,7 +14,8 @@ test.describe('J1 book → pay → confirm', () => {
     await page.getByRole('link', { name: /Dr E2E Primary/ }).click();
     await expect(page.getByRole('heading', { name: /Dr E2E Primary/ })).toBeVisible();
 
-    // Pick the first available slot (seeded today-window guarantees ≥1).
+    // Book on a future day via the day picker (ISSUE-1) — time-independent vs. a same-day slot.
+    await page.getByRole('tab').nth(1).click();
     const slot = page.locator('button.slot').first();
     await expect(slot).toBeVisible();
     await slot.click();
@@ -42,6 +43,7 @@ test.describe('J1 book → pay → confirm', () => {
     await signupUi(page, { fullName: 'J1 Fail', email: uniqueEmail('j1fail'), phone: '03007770002' });
     await expect(page).toHaveURL(/\/browse/);
     await page.getByRole('link', { name: /Dr E2E Primary/ }).click();
+    await page.getByRole('tab').nth(1).click();
     await page.locator('button.slot').first().click();
     await page.getByRole('button', { name: 'Confirm & Pay' }).click();
     await expect(page).toHaveURL(/\/dev\/checkout/);
@@ -50,12 +52,15 @@ test.describe('J1 book → pay → confirm', () => {
     // slot_locked row with an expired lock, so the return page never reaches "Booking confirmed".
     await page.getByRole('button', { name: 'Fail' }).click();
     await expect(page).toHaveURL(/\/pay\/return/);
+    // Positive terminal state (ISSUE-3): a Failure/Lock-released card, not an infinite poll.
+    await expect(page.getByRole('heading', { name: 'Payment not completed' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Booking confirmed' })).toHaveCount(0);
 
     // The slot is freed: re-book the same earliest slot. This exercises reclaim-on-conflict over
     // the expired, payment-attached blocker (the FK that P2003'd pre-fix) and lands on /book/.
     await page.goto('/browse');
     await page.getByRole('link', { name: /Dr E2E Primary/ }).click();
+    await page.getByRole('tab').nth(1).click();
     await page.locator('button.slot').first().click();
     await expect(page).toHaveURL(/\/book\//);
   });

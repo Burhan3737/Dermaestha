@@ -54,7 +54,8 @@ export function Landing() {
             </div>
           </div>
           <div className="hero-card">
-            <Link to="/doctors/sample" style={{ textDecoration: 'none', display: 'block', maxWidth: 280, width: '100%' }}>
+            {/* Static placeholder card (doc 06 §3) — display-only, no profile link. */}
+            <div style={{ display: 'block', maxWidth: 280, width: '100%' }}>
               <div className="doc-card">
                 <div className="doc-card__img">
                   <img src="https://randomuser.me/api/portraits/women/65.jpg" alt="Dr. Ayesha Khan" />
@@ -69,7 +70,7 @@ export function Landing() {
                   </div>
                 </div>
               </div>
-            </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -121,7 +122,8 @@ export function Landing() {
           </div>
           <div className="doc-grid">
             {FEATURED.map((d) => (
-              <Link key={d.name} to="/doctors/sample" style={{ textDecoration: 'none' }}>
+              // Static placeholder card (doc 06 §3) — display-only, no profile link.
+              <div key={d.name}>
                 <div className="doc-card">
                   <div className="doc-card__img">
                     <img src={d.img} alt={d.name} />
@@ -136,7 +138,7 @@ export function Landing() {
                     </div>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
           <div style={{ textAlign: 'center', marginTop: 32 }}>

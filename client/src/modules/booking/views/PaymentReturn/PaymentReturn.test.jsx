@@ -35,4 +35,18 @@ describe('P-07 PaymentReturn', () => {
     setup();
     await waitFor(() => expect(screen.getByText(/payment did not complete/i)).toBeTruthy());
   });
+
+  it('shows a terminal failure state (not an infinite poll) when the lock is released after a failed payment (ISSUE-3)', async () => {
+    // payment.failed → state stays slot_locked but the lock is force-expired (lockExpiresAt ≤ serverNow).
+    api.get.mockResolvedValue({
+      id: 'a1',
+      state: 'slot_locked',
+      lockExpiresAt: '2020-01-01T00:00:00.000Z',
+      serverNow: '2020-01-01T00:10:00.000Z',
+    });
+    setup();
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Payment not completed' })).toBeTruthy());
+    // The old infinite-poll copy must NOT be shown.
+    expect(screen.queryByText(/awaiting payment confirmation/i)).toBeNull();
+  });
 });

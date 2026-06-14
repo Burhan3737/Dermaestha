@@ -42,7 +42,9 @@ export function logout(req, res, next) {
 
 export async function me(req, res, next) {
   try {
-    if (!req.session?.userId) throw new AppError('UNAUTHENTICATED', 'Sign in to continue.', 401);
+    // Anonymous bootstrap is normal (every public page load). Return 200 null instead of 401 so
+    // the SPA's /auth/me probe doesn't emit a browser console error on public pages (ISSUE-13).
+    if (!req.session?.userId) return res.json(null);
     const user = await authService.getById(req.session.userId);
     if (!user)
       return req.session.destroy(() =>

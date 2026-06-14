@@ -53,6 +53,24 @@ describe('AdminMedicines (A-02)', () => {
     );
   });
 
+  it('Edit prefills the form and PATCHes the changed fields (ISSUE-7 / F11.03)', async () => {
+    api.patch.mockResolvedValue({ id: 'm1' });
+    renderView();
+    await screen.findByText('Adapalene Gel');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    // form prefilled from the row
+    expect(screen.getByLabelText('Name').value).toBe('Adapalene Gel');
+    expect(screen.getByLabelText('Unit price (PKR)').value).toBe('300');
+    fireEvent.change(screen.getByLabelText('Unit price (PKR)'), { target: { value: '350' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/admin/medicines/m1',
+        expect.objectContaining({ name: 'Adapalene Gel', unitPrice: 35000 }),
+      ),
+    );
+  });
+
   it('add form POSTs name, dosage forms and paisa price', async () => {
     api.post.mockResolvedValue({ id: 'm3' });
     renderView();

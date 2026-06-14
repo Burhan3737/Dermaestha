@@ -25,10 +25,17 @@ export function DoctorForm({ mode, initial = {}, isSaving = false, error = null,
   });
   const [blocks, setBlocks] = useState(initial.blocks ?? []);
   const [photoFile, setPhotoFile] = useState(null);
+  const [photoError, setPhotoError] = useState(null);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = (e) => {
     e.preventDefault();
+    // F10.01: a profile photo is required when onboarding a doctor (edit keeps it optional, F10.02).
+    if (mode === 'add' && !photoFile) {
+      setPhotoError('A profile photo is required.');
+      return;
+    }
+    setPhotoError(null);
     const common = {
       fullName: form.fullName.trim(),
       phone: form.phone.trim(),
@@ -81,13 +88,17 @@ export function DoctorForm({ mode, initial = {}, isSaving = false, error = null,
       )}
 
       <Field
-        label="Profile photo (JPEG/PNG/WebP, max 2MB)"
+        label={`Profile photo (JPEG/PNG/WebP, max 2MB)${mode === 'add' ? ' — required' : ''}`}
         id="df-photo"
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          setPhotoFile(e.target.files?.[0] ?? null);
+          setPhotoError(null);
+        }}
       />
       {photoFile && <p className="help">Selected: {photoFile.name}</p>}
+      {photoError && <p className="error-text">{photoError}</p>}
 
       <h3>Weekly availability template</h3>
       {mode === 'edit' && (

@@ -15,7 +15,10 @@ export function PatientLayout({ children }) {
           <nav className="topnav__links">
             <NavLink to="/browse">Browse</NavLink>
             {session ? (
-              <NavLink to="/appointments">Appointments</NavLink>
+              <>
+                <NavLink to="/appointments">Appointments</NavLink>
+                <NavLink to="/profile">Profile</NavLink>
+              </>
             ) : (
               <Link to="/login" className="btn btn--secondary btn--sm">
                 Log in
