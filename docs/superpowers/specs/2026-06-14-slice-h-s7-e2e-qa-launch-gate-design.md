@@ -71,7 +71,22 @@ The real PayFast/Daily integrations are credential-gated + (PayFast PK) research
 - **PayFast PK:** real `GetAccessToken→PostTransaction` handoff, the actual signature algorithm, the `CHECKOUT_URL` callback shape, the dual-channel **`verify-return`** browser path (mock confirms via the webhook channel + polling; verify-return is unit-covered only, S1), and the **manual-refund degradation** (no real refund API) → **doc 07 §3**.
 - **Daily.co:** real `createRoom`/`issueToken`, the Prebuilt **iframe + media on 3G**, and the **webhook HMAC against real Daily deliveries** → **doc 07 §10**.
 
-This split is the mechanical reason the verdict is **Conditional-Go**: Tier 1 closes in S7; Tier 2 is irreducibly human + credentialed.
+This split is the mechanical reason the verdict is **Conditional-Go**: Tier 1 closes in S7; Tier 2 is partly closed in S7 (Daily — see §2b) and partly irreducibly human + credentialed (PayFast).
+
+## 2b. Real-vendor sandbox decisions (2026-06-14)
+
+After researching both vendors' sandbox availability, the user's call:
+
+**Daily.co — real-sandbox validation IS executed in S7.** Credentials provided (`DAILY_API_KEY` + `dermaestha.daily.co`, in `.env`, gitignored, to be rotated post-test). Approach: run the app locally with `VIDEO_PROVIDER=daily`; Playwright drives Chromium with `--use-fake-device-for-media-stream` (no real camera); a **`cloudflared` quick tunnel** (no account) exposes the local server so Daily's participant-event webhook reaches it → validates real rooms/tokens/Prebuilt-iframe/join + the **HMAC raw-body** check, **closing doc 07 §10**. Staged: local-only first (rooms/tokens/iframe/join, no tunnel), then tunnel for the webhook. This is a semi-manual validation pass (controller-driven), separate from the always-green mock Playwright suite.
+
+**PayFast PK — stays MOCK in S7; the §3 merchant gate remains.** Research verdict: PayFast PK publishes **no public sandbox keys / test cards / fixed OTP** (unlike Stripe) — UAT `MERCHANT_ID`/`SECURED_KEY` are merchant-KYC-issued and OTPs come from the real issuing bank. No merchant account yet → no sandbox run. The signed-IPN mock (Tier 1) remains the payment E2E.
+
+**Research-driven corrections to fold into the canon (doc 07 §3 + S1 follow-ups), regardless of the above:**
+- ✅ The `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` signature is **confirmed correct** (Hosted-Checkout product).
+- ⚠️ **`STORE_ID` is unfounded** (in neither documented flow; the adapter never sends it) → remove the vestigial env var (S1 follow-up).
+- ⚠️ **Refund + status-query APIs DO exist** in PayFast's REST product (`POST /transaction/refund/<id>`, `GET /transaction/<id>`) — contradicting S1's "no API → manual degradation." UNVERIFIED whether a Hosted-Checkout merchant can call them → **revisit the manual-degradation decision once merchant creds + product are known.**
+- ⚠️ **Two products** (Hosted-Checkout md5 vs REST HMAC-SHA256) + **missing PostTransaction fields** in the S1 adapter (`CUSTOMER_MOBILE_NO`, `CUSTOMER_EMAIL_ADDRESS`, `VERSION`, `ORDER_DATE`) → confirm product + add fields when wiring the real adapter.
+- The exact `CHECKOUT_URL`/IPN callback payload remains UNVERIFIED (official PDF Cloudflare-blocked) → still a §3 gate item.
 
 ## 3. Automated E2E — Playwright harness (durable)
 
@@ -139,6 +154,8 @@ Same spec→plan→execute pattern, but S7 is more controller-driven: a lead sub
 | 12 | Per-TC Verified/Failed verdicts for executed cases |
 | 13 | M4 → E2E QA done; v1 launch-readiness (Conditional-Go) |
 | 02/03/04/05/06 | Surgical cross-reference additions ONLY where the §6 traceability pass finds a missing hop |
+| 07 §3 | Sharpen the PayFast-PK merchant-verification checklist with the §2b research findings (md5 confirmed; `STORE_ID` unfounded; refund/status REST APIs exist → revisit manual-degradation; two products md5-vs-HMAC; missing PostTransaction fields; IPN payload still unverified). Add the doc 07 §10 Daily gate → resolved-if the sandbox validation passes |
+| 10/15 | Note the `cloudflared` tunnel + `VIDEO_PROVIDER=daily` sandbox-validation procedure (deploy/runbook); `DAILY_*` already in doc 15 |
 | 11 | New ADR — "Playwright E2E harness (root `e2e/`) against mock adapters as the v1 launch gate; living/extensible suite" |
 | 15 / 10 | `test:e2e` script (15 §scripts); Playwright/CI + the consolidated pre-launch gate as deploy notes (10) |
 | — | NOT a spec doc: the release recommendation lives in `docs/superpowers/reports/` |
