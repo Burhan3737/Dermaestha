@@ -12,14 +12,10 @@ test.afterAll(async () => {
 // Tags: F05.03 (TC-F05-004 room/join), §5 worker (TC-F05-011 in_progress, TC-F05-014 completed),
 // §3 no-show (TC-F05-008 doctor_no_show, TC-F05-013 patient_no_show); ADR-12/25.
 test.describe('J2 video lifecycle', () => {
-  // BUG-2 (product defect, mock/dev-only, Low-Medium): in mock mode the SPA never records a
-  // join. VideoRoom's recordJoin calls api.post(joinSimUrl) and the api client prepends "/api"
-  // (client/src/lib/apiClient/apiClient.js), so the request hits /api/dev/video/join (404)
-  // instead of the dev simulator at /dev/video/join (200, verified). The .catch() swallows it.
+  // BUG-2 fixed: recordJoin now uses a raw fetch to the dev sim at /dev/video/join (200) instead
+  // of api.post, which prepended "/api" → /api/dev/video/join (404) and silently swallowed it.
   // Production is unaffected (VIDEO_PROVIDER=daily → joinSimUrl=null → recordJoin not called).
-  // Flip to `test(` once the controller fixes the join-sim URL. The worker-driven lifecycle
-  // transitions below are proven independently from seeded joins.
-  test.fixme('patient + doctor join the mock room → both joins recorded', async ({ browser }) => {
+  test('patient + doctor join the mock room → both joins recorded', async ({ browser }) => {
     const id = seedIds.appts.liveJoin;
     const patientCtx = await browser.newContext();
     const doctorCtx = await browser.newContext();

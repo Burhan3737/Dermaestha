@@ -64,9 +64,19 @@ describe('VideoRoom', () => {
   });
 
   it('mock mode: records this participant join via the sim URL', async () => {
+    // recordJoin uses a raw fetch (not api.post) so it hits the dev sim at /dev/video/join,
+    // not /api/dev/video/join (the api client's /api prefix would 404). See useVideo.js.
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchSpy);
     mock({ peerJoined: false, mockMode: true });
     setup();
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/dev/video/join', { appointmentId: 'a1' }));
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/dev/video/join',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ appointmentId: 'a1' }) }),
+      ),
+    );
+    vi.unstubAllGlobals();
   });
 
   // --- real Daily path (joinSimUrl null): iframe mounts, chrome around it ---
