@@ -183,6 +183,23 @@ Lead Opus subagent: plan + implemented (TDD, direct — no nested dispatch tool 
 
 **Verification (controller-independent):** clean `npm install` + `npm ls zod` → single `zod@3.25.76`; `npm test` → 42 files / **312 passed** (297→+15); `npm --workspace client test` → **123**; `npm --workspace client run build` → success; `prisma migrate status` → up to date. No forbidden paths. Merged `--no-ff` (`ab9e62e`).
 
+## S7 — EXECUTION step 1: mock E2E harness + money-path fixes (MERGED to main, merge `f04194b`, 2026-06-14)
+
+Controller-driven, staged execution (user involved). Step 1 = the mock Playwright harness + fixing the bugs it found.
+
+**Harness (lead subagent, branch `feature/slice-h-s7-e2e-harness`):** root `e2e/` (Playwright @root devDep, `playwright.config.js` w/ `webServer` build+start + mock env, `global-setup.js` namespaced/idempotent seed, `support/` helpers, J1–J6 specs); `test:e2e` script; `.gitignore` artifacts. `npm run test:e2e` → 11/11. No source/`data-testid` changes for the harness itself.
+
+**4 money-path fixes (the harness found a CLASS of pre-existing crash: deleting a `slot_locked` appointment that a `Payment` FK-references — `Payment.appointment` is ON DELETE RESTRICT → P2003 → 500; mocked-Prisma unit tests never saw the real FK):**
+- **BUG-1 (High):** `payment.failed` (processWebhook) + `reconcileOne`-failed → shared `markFailedAndReleaseLock` (mark Payment `failed` + force-expire the lock via `appointment.updateMany`; NO delete, NO migration). Option B (user-approved): slot frees via lazy-reclaim (ADR-23).
+- **FIX-A (reclaim safety):** `createWithReclaim` now inspects the blocker's Payment — `failed`/absent → clear + reclaim (J1 green); **`pending` → `SLOT_TAKEN` 409**, leaving the row + intent intact for reconciliation / `payment.manual_review_required` (S1). Never silently deletes possibly-paid money. (Also was a pre-existing latent reclaim crash.)
+- **FIX-B (refundInFull, edge #6a):** `deleteMany`→`updateMany` (force-expire lock), preserving the refunded Payment + appointment audit trail; no P2003.
+- **BUG-2 (Low, dev-only):** mock-mode `recordJoin` → raw `fetch('/dev/video/join')` (was `/api/dev/video/join` 404). Prod unaffected.
+- Confirmed (code search): this is now the **LAST** instance of the delete-payment-referenced-appointment class (one guarded reclaim-delete remains).
+
+**Verification (controller-independent):** `npm test` → 45 files / **320 passed** (312→+8: 2 unit + 3 integration `paymentFailed`/`reclaimSafety`/`reconcileRefund` + harness-adjacent); `npm --workspace client test` → **123**; `npm run test:e2e` → **11/11**; `npm --workspace client run build` → success. No forbidden paths. Merged `--no-ff` (`f04194b`).
+
+**Tracked for the S7-END canon sweep (NOT yet applied):** doc 09 (Playwright layer + `test:e2e`), doc 11 (ADR — Playwright harness + the no-cascade payment-release policy: failed→release, pending→leave-for-reconciliation, #6a→force-expire, never delete pending money), doc 12 (per-TC verdicts), doc 13 (M4 E2E QA progress + close the money follow-ups), doc 15 (`test:e2e`). Applied with the release recommendation at S7 end.
+
 ## Open items / next session
 - **ALL OF S1–S6 ARE MERGED TO `main` AND PUSHED TO `origin/main`.** Merge sequence: S1 `b987472` → S2 `f6d3bd5` → S3 `1ea70ac` → S4 `a94ccce` → S5 `bfb8c7b` → S6 `ab9e62e`; each followed by a controller-reviewed canon-doc sweep commit + push. Final suite state: **312 server+shared / 123 client** green; client build clean; `prisma migrate status` up to date; single `zod@3.25.76` copy.
 - ADRs added this session: **ADR-32** (PayFast PK), **ADR-33** (Daily adapter), **ADR-34** (video UI), **ADR-35** (public surface), **ADR-36** (Sentry), **ADR-37** (Zod single-copy).
