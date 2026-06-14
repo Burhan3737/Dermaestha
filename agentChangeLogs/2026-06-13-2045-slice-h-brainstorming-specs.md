@@ -1,6 +1,6 @@
 # 2026-06-13-2045 — slice-h-brainstorming-specs
 
-**Status:** Partial (Slice H S1–S6 all brainstormed→built→merged→pushed; S7 E2E/QA gate remains, to be brainstormed with the user)
+**Status:** Completed (Slice H S1–S7 all brainstormed→built→merged→pushed; v1 launch gate = CONDITIONAL GO, remaining items are human/vendor pre-launch gates, not engineering)
 **Goal:** Brainstorm Slice H (the final v1-completion slice) decomposed into independent sub-slices, producing one verified design spec per sub-slice, ahead of parallel plan-writing.
 **Skill(s) used:** superpowers:brainstorming (user invoked /brainstorming)
 **Ticket / issue:** None
