@@ -1,6 +1,6 @@
 # 2026-06-14-2336 — flow-audit-fix-and-test
 
-**Status:** Completed — all 13 fixes done, verified in-app, committed (f6dbe8b on `fix/flow-audit-issues`); spec edits applied (docs 05/06/12/13). Not pushed (CLAUDE.md).
+**Status:** Completed — all 13 fixes done, verified in-app, committed (f6dbe8b + b29afdd on `fix/flow-audit-issues`), spec edits applied (docs 05/06/12/13), **merged to main no-ff (ad07a35) + pushed to origin** (user-approved).
 **Goal:** Fix the 13 flow issues from the 2026-06-15 three-role visual audit, each locked test-first (red→green) with a committed Playwright/unit spec, without disrupting the green j1–j6 suite.
 **Skill(s) used:** `find-skills` (opted in, for recommendation), `superpowers:test-driven-development` (lead, opted in)
 **Ticket / issue:** docs/superpowers/reports/2026-06-15-three-role-flow-audit.md
@@ -121,7 +121,6 @@ Frontend-heavy changes; risk = regressing the green j1–j6 e2e suite. Mitigatio
 - No edit required (code caught up to a correct spec): ISSUE-1 core (F03.01), ISSUE-2 patient-desktop (doc 06 §2), ISSUE-4 route (doc 06 §2), ISSUE-9 (doc 06 §3 badge map), ISSUE-11 (doc 06 §2 registry note).
 
 ## Open items / next session
-- DONE: fixes + tests + in-app verify + spec edits, all committed on `fix/flow-audit-issues`.
-- **Awaiting user:** push `fix/flow-audit-issues` and/or open a PR (CLAUDE.md forbids push without approval); merge decision.
-- Untracked pre-existing artifacts left for the human to decide on (NOT part of this branch's commits): `CLAUDE.md` mod, the audit changelog/report/screenshots, `prisma/scripts/seed-baseline.js`, and a runtime `uploads/` dir (consider gitignoring).
+- DONE: fixes + tests + in-app verify + spec edits → merged to main (ad07a35) + pushed to origin (user-approved).
+- Untracked pre-existing artifacts still in the working tree (NOT in any commit): `CLAUDE.md` mod, the audit changelog/report/screenshots, `prisma/scripts/seed-baseline.js`, the 3 verify screenshots, and a runtime `uploads/` dir (consider gitignoring `uploads/`).
 - The mock server on :3000 was stopped at the end of the verify pass.
