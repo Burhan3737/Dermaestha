@@ -58,6 +58,21 @@ The built app (server serving the built client) against local Postgres, env: `PA
 
 > The mock stack is the only viable v1 E2E target (real adapters are researched/credential-gated). Mock mode also bypasses the real Daily iframe (uses the `joinSimUrl` path), so J2 runs headless.
 
+## 2a. Video & payment test strategy (two-tier — the critical nuance)
+
+The real PayFast/Daily integrations are credential-gated + (PayFast PK) researched-not-confirmed, so video/payment are tested in **two tiers**, and the release report shows them as **separate columns** (never conflated):
+
+**Tier 1 — offline E2E against the mock adapters (automatable, IN S7).** Proves our internal contract end-to-end:
+- **Payment:** `payfast.mock.createCheckout` → app-served `/dev/checkout` (`server/src/dev/devCheckout.js`) → "Pay" builds a **real HMAC-signed IPN** (`buildSignedIpn`) POSTed through the production `verifyWebhook`→`processWebhook` atomic commit (ADR-22). Exercises signature verify, atomic confirm (#2), `feeAtBooking` (#6), intent idempotency (#7), 401-on-bad-sig; P-07 (`PaymentReturn`) **polls** status → `confirmed`; "Fail" → `payment.failed` → lock released. Refund (J4) via mock `refund()=settled` → net-of-fee + idempotency (#10).
+- **Video:** `issueAppointmentToken` returns `joinSimUrl='/dev/video/join'`; `VideoRoom` records joins via the `/dev/video` simulator (normalized via `mock.verifyWebhook`, S2) — **the real Daily iframe is bypassed in mock mode** — then `/dev/worker/evaluate` drives `confirmed→in_progress→completed` + no-show (ADR-12/25).
+- **Time-dependent flows** (no-show slot+15m, free-cancel ≥2h) are made deterministic by **seeding appointments at controlled `slotStart` offsets** + firing the clock-injectable `/dev/worker/*` triggers.
+
+**Tier 2 — real-vendor validation (manual, post-credential, NOT automatable in S7) → the pre-launch gate.** What the mock deliberately does NOT replicate:
+- **PayFast PK:** real `GetAccessToken→PostTransaction` handoff, the actual signature algorithm, the `CHECKOUT_URL` callback shape, the dual-channel **`verify-return`** browser path (mock confirms via the webhook channel + polling; verify-return is unit-covered only, S1), and the **manual-refund degradation** (no real refund API) → **doc 07 §3**.
+- **Daily.co:** real `createRoom`/`issueToken`, the Prebuilt **iframe + media on 3G**, and the **webhook HMAC against real Daily deliveries** → **doc 07 §10**.
+
+This split is the mechanical reason the verdict is **Conditional-Go**: Tier 1 closes in S7; Tier 2 is irreducibly human + credentialed.
+
 ## 3. Automated E2E — Playwright harness (durable)
 
 Critical journeys (doc 09 §5 Critical set), one spec file each, each step tagged with its feature + TC ID:
