@@ -1,0 +1,1018 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dermestha — Theme Preview Gallery</title>
+
+  <!-- Same Google Fonts as client/index.html -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- REAL production CSS, linked in the same order as src/main.jsx (tokens -> components),
+       with an optional themes.css slot for the after-pass (may 404 today — handled gracefully). -->
+  <link rel="stylesheet" href="../src/styles/tokens.css" />
+  <link rel="stylesheet" href="../src/styles/themes.css" onerror="this.remove()" />
+  <link rel="stylesheet" href="../src/styles/components.css" />
+  <link rel="stylesheet" href="../src/modules/marketing/views/Landing/Landing.css" />
+
+  <!-- Harness-only chrome. Prefixed .gx-* so it never collides with app classes. -->
+  <style>
+    .gx-toolbar { position: sticky; top: 0; z-index: 60; background: #13241D; color: #fff;
+      padding: 10px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      font-family: var(--font-body); font-size: 13px; }
+    .gx-toolbar strong { font-family: var(--font-head); }
+    .gx-toolbar select { font: inherit; padding: 4px 8px; border-radius: 4px; border: 0; }
+    .gx-index { background: #0E3328; color: #DCE9E2; padding: 12px 16px; font-family: var(--font-body); font-size: 12px; }
+    .gx-index a { color: #9BE3B8; text-decoration: none; display: inline-block; margin: 2px 10px 2px 0; }
+    .gx-screen { border-bottom: 8px solid #c7d2cb; }
+    .gx-label { background: #0F3A2A; color: #fff; font-family: var(--font-head); font-weight: 700;
+      font-size: 13px; letter-spacing: .4px; padding: 8px 16px; }
+    .gx-note { background: var(--color-warning-bg); color: var(--color-warning); font-size: 12px;
+      padding: 6px 16px; border-bottom: 1px solid var(--color-primary-border); }
+    /* Single-screen capture mode: show only the targeted surface, no harness chrome. */
+    body.gx-single .gx-toolbar,
+    body.gx-single .gx-index,
+    body.gx-single .gx-note,
+    body.gx-single .gx-label { display: none !important; }
+    body.gx-single .gx-screen { display: none !important; }
+    body.gx-single .gx-screen.gx-target { display: block !important; border: 0 !important; }
+    /* Helper: doctor photo as the real DoctorCard initials fallback (deterministic, themeable). */
+    .gx-photo { width: 100%; height: 100%; border-radius: 0; display: grid; place-items: center; font-size: 30px; }
+    .gx-inv { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+    .gx-inv h2 { margin: 28px 0 12px; }
+    .gx-inv__grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+    .gx-inv__panel { background: var(--color-surface); border: var(--border-1); border-radius: var(--r-md); padding: 16px; }
+    .gx-stack { display: flex; flex-direction: column; gap: 12px; }
+  </style>
+</head>
+<body>
+
+  <div class="gx-toolbar">
+    <strong>Dermestha theme preview</strong>
+    <span>·</span>
+    <label>Theme:
+      <select onchange="if(this.value){document.documentElement.dataset.theme=this.value}else{delete document.documentElement.dataset.theme}">
+        <option value="">default (spruce)</option>
+        <option value="after">after</option>
+      </select>
+    </label>
+    <span style="opacity:.7">Single-screen capture: append <code>?screen=P-01</code> (or any ID / <code>inventory</code>). Add <code>&amp;theme=after</code> to preview a theme.</span>
+  </div>
+
+  <nav class="gx-index">
+    <strong style="color:#fff">Surfaces:</strong>
+    <a href="?screen=P-01">P-01</a><a href="?screen=P-02">P-02</a><a href="?screen=P-03">P-03</a>
+    <a href="?screen=P-04">P-04</a><a href="?screen=P-05">P-05</a><a href="?screen=P-06">P-06</a>
+    <a href="?screen=P-07">P-07</a><a href="?screen=P-08">P-08</a><a href="?screen=P-09">P-09</a>
+    <a href="?screen=P-10">P-10</a><a href="?screen=P-11">P-11</a><a href="?screen=P-12">P-12</a>
+    <a href="?screen=P-13">P-13</a>
+    <a href="?screen=D-01">D-01</a><a href="?screen=D-02">D-02</a><a href="?screen=D-03">D-03</a>
+    <a href="?screen=D-04">D-04</a><a href="?screen=D-05">D-05</a><a href="?screen=D-06">D-06</a>
+    <a href="?screen=A-01">A-01</a><a href="?screen=A-02">A-02</a><a href="?screen=A-03">A-03</a>
+    <a href="?screen=A-04">A-04</a><a href="?screen=A-05">A-05</a>
+    <a href="?screen=inventory">inventory</a>
+  </nav>
+
+  <!-- ============================================================= P-01 Landing -->
+  <section class="gx-screen" id="P-01" data-screen="P-01">
+    <div class="gx-label">P-01 — Landing (marketing)</div>
+    <div class="gx-frame">
+      <nav class="topnav">
+        <div class="topnav__inner">
+          <a class="brand" href="#"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <div class="topnav__links">
+            <a href="#">Browse</a>
+            <a href="#">How it works</a>
+            <a href="#">For doctors</a>
+            <a href="#" class="btn btn--secondary btn--sm">Log in</a>
+          </div>
+        </div>
+      </nav>
+      <section class="feature">
+        <div class="hero-inner">
+          <div class="hero-copy">
+            <span class="feature__eyebrow">PMC-Verified Dermatologists</span>
+            <h1 class="display" style="margin-top:14px;margin-bottom:16px;">See a real skin doctor without leaving home.</h1>
+            <p class="body-lg" style="color:var(--color-on-dark);max-width:460px;">Book a 30-minute video consultation with a verified dermatologist — get a proper diagnosis, prescription, and follow-up plan. From anywhere in Pakistan.</p>
+            <div class="hero-cta">
+              <a href="#" class="btn btn--primary btn--lg">Find your dermatologist</a>
+              <a href="#" class="btn btn--secondary btn--lg">Create your account</a>
+            </div>
+            <div class="trust-row">
+              <span class="trust-item"><span class="trust-dot"></span>PMC-verified</span>
+              <span class="trust-item"><span class="trust-dot"></span>30-min video</span>
+              <span class="trust-item"><span class="trust-dot"></span>Itemised Rx</span>
+            </div>
+          </div>
+          <div class="hero-card">
+            <div style="display:block;max-width:280px;width:100%;">
+              <div class="doc-card">
+                <div class="doc-card__img"><div class="avatar avatar--lg gx-photo">AK</div><span class="pmc-badge">✓ PMC</span></div>
+                <div class="doc-card__body">
+                  <p class="doc-card__name">Dr. Ayesha Khan</p>
+                  <p class="doc-card__spec">Acne &amp; Pigmentation · 8 yrs</p>
+                  <div class="doc-card__foot">
+                    <span class="doc-card__fee tnum">PKR 2,000</span>
+                    <span class="doc-card__slot tnum">Today 6:30 PM</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="porcelain section">
+        <div class="container">
+          <div class="section-title"><p class="h2">How Dermestha works</p><p class="body-lg muted" style="margin-top:8px;">Three steps to clear skin, from your phone or laptop.</p></div>
+          <div class="how-grid">
+            <div class="step-card"><div class="step-num">01</div><p class="h3" style="margin-bottom:8px;">Browse &amp; book</p><p style="margin:0;">Choose from PMC-verified dermatologists by specialization, availability, and fee. Pick a slot that works for you.</p></div>
+            <div class="step-card"><div class="step-num">02</div><p class="h3" style="margin-bottom:8px;">Consult by video</p><p style="margin:0;">Join a 30-minute HD video call. Your doctor will examine your skin, ask questions, and make a proper diagnosis.</p></div>
+            <div class="step-card"><div class="step-num">03</div><p class="h3" style="margin-bottom:8px;">Receive your Rx</p><p style="margin:0;">Your itemised prescription is available to download instantly after the consultation — with dosage, duration, and prices.</p></div>
+          </div>
+        </div>
+      </section>
+      <section class="porcelain section" style="padding-top:0;">
+        <div class="container">
+          <div class="section-title"><p class="h2">Featured specialists</p><p class="body-lg muted" style="margin-top:8px;">Browse our full panel of PMC-verified dermatologists.</p></div>
+          <div class="doc-grid">
+            <div><div class="doc-card"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">AK</div><span class="pmc-badge">✓ PMC</span></div><div class="doc-card__body"><p class="doc-card__name">Dr. Ayesha Khan</p><p class="doc-card__spec">Acne &amp; Pigmentation · 8 yrs</p><div class="doc-card__foot"><span class="doc-card__fee tnum">PKR 2,000</span><span class="doc-card__slot tnum">Today 6:30 PM</span></div></div></div></div>
+            <div><div class="doc-card"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">BS</div><span class="pmc-badge">✓ PMC</span></div><div class="doc-card__body"><p class="doc-card__name">Dr. Bilal Sheikh</p><p class="doc-card__spec">Hair &amp; Scalp · 12 yrs</p><div class="doc-card__foot"><span class="doc-card__fee tnum">PKR 2,500</span><span class="doc-card__slot tnum">Tomorrow 10:00 AM</span></div></div></div></div>
+            <div><div class="doc-card"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">ZM</div><span class="pmc-badge">✓ PMC</span></div><div class="doc-card__body"><p class="doc-card__name">Dr. Zara Malik</p><p class="doc-card__spec">Eczema &amp; Anti-ageing · 6 yrs</p><div class="doc-card__foot"><span class="doc-card__fee tnum">PKR 1,800</span><span class="doc-card__slot tnum">Today 8:00 PM</span></div></div></div></div>
+          </div>
+          <div style="text-align:center;margin-top:32px;"><a href="#" class="btn btn--secondary">View all specialists</a></div>
+        </div>
+      </section>
+      <div class="trust-strip">
+        <div class="trust-strip-inner">
+          <div class="trust-strip-item"><span class="trust-strip-num tnum">120+</span><span class="caption">PMC-verified doctors</span></div>
+          <div class="trust-strip-item"><span class="trust-strip-num tnum">15,000+</span><span class="caption">Consultations completed</span></div>
+          <div class="trust-strip-item"><span class="trust-strip-num tnum">4.8 / 5</span><span class="caption">Average patient rating</span></div>
+          <div class="trust-strip-item"><span class="trust-strip-num tnum">30-min</span><span class="caption">Standard consultation</span></div>
+        </div>
+      </div>
+      <footer class="feature feature-footer">
+        <div class="feature-footer-inner">
+          <span class="feature__eyebrow">Ready to start?</span>
+          <h2 class="display" style="margin-top:12px;color:#fff;">Clearer skin is one click away.</h2>
+          <p class="body-lg" style="color:var(--color-on-dark);margin-top:12px;max-width:480px;margin-left:auto;margin-right:auto;">No referral needed. No waiting room. Just expert dermatology, when and where you need it.</p>
+          <a href="#" class="btn btn--brass btn--lg" style="margin-top:24px;">Find your dermatologist</a>
+          <div class="footer-links"><a href="#">For doctors</a><a href="#">About Dermestha</a><a href="#">Terms of Service</a><a href="#">Privacy Policy</a></div>
+          <p class="footer-copy">© 2026 Dermestha · All consultations conducted by PMC-registered physicians</p>
+        </div>
+      </footer>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-02 Doctor listing / Browse -->
+  <section class="gx-screen" id="P-02" data-screen="P-02">
+    <div class="gx-label">P-02 — Doctor listing / Browse</div>
+    <div class="gx-frame">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a class="active" href="#">Browse</a><a href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <h1>Find a dermatologist</h1>
+        <div style="display:grid;gap:var(--sp-4);grid-template-columns:repeat(auto-fill,minmax(240px,1fr));margin-top:var(--sp-5);">
+          <a href="#" class="doc-card" style="text-decoration:none;display:block;"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">AK</div></div><div class="doc-card__body"><h3 class="doc-card__name">Dr. Ayesha Khan</h3><p class="doc-card__spec">Acne &amp; Pigmentation</p><div class="doc-card__foot"><span class="doc-card__fee">Rs 2,000</span><span class="doc-card__slot">Next: Mon, 16 Jun, 6:30 PM</span></div></div></a>
+          <a href="#" class="doc-card" style="text-decoration:none;display:block;"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">BS</div></div><div class="doc-card__body"><h3 class="doc-card__name">Dr. Bilal Sheikh</h3><p class="doc-card__spec">Hair &amp; Scalp</p><div class="doc-card__foot"><span class="doc-card__fee">Rs 2,500</span><span class="doc-card__slot">Next: Tue, 17 Jun, 10:00 AM</span></div></div></a>
+          <a href="#" class="doc-card" style="text-decoration:none;display:block;"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">ZM</div></div><div class="doc-card__body"><h3 class="doc-card__name">Dr. Zara Malik</h3><p class="doc-card__spec">Eczema &amp; Anti-ageing</p><div class="doc-card__foot"><span class="doc-card__fee">Rs 1,800</span><span class="doc-card__slot">Next: Mon, 16 Jun, 8:00 PM</span></div></div></a>
+          <a href="#" class="doc-card" style="text-decoration:none;display:block;"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">IQ</div></div><div class="doc-card__body"><h3 class="doc-card__name">Dr. Imran Qureshi</h3><p class="doc-card__spec">General Dermatology</p><div class="doc-card__foot"><span class="doc-card__fee">Rs 2,200</span><span class="doc-card__slot">Next: Wed, 18 Jun, 1:00 PM</span></div></div></a>
+          <a href="#" class="doc-card" style="text-decoration:none;display:block;"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">ST</div></div><div class="doc-card__body"><h3 class="doc-card__name">Dr. Sana Tariq</h3><p class="doc-card__spec">Pediatric Dermatology</p><div class="doc-card__foot"><span class="doc-card__fee">Rs 1,500</span><span class="doc-card__slot">No slots</span></div></div></a>
+          <a href="#" class="doc-card" style="text-decoration:none;display:block;"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">HA</div></div><div class="doc-card__body"><h3 class="doc-card__name">Dr. Hamza Ali</h3><p class="doc-card__spec">Cosmetic Dermatology</p><div class="doc-card__foot"><span class="doc-card__fee">Rs 3,000</span><span class="doc-card__slot">Next: Thu, 19 Jun, 5:00 PM</span></div></div></a>
+        </div>
+      </main>
+      <nav class="tabbar only-mobile"><a href="#" class="tabbar__item active">Browse</a><a href="#" class="tabbar__item">Appointments</a><a href="#" class="tabbar__item">Profile</a></nav>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-03 Doctor profile + slot grid -->
+  <section class="gx-screen" id="P-03" data-screen="P-03">
+    <div class="gx-label">P-03 — Doctor profile (day-tabbed slot grid)</div>
+    <div class="gx-frame">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a class="active" href="#">Browse</a><a href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <section class="section-card">
+          <h1>Dr. Ayesha Khan</h1>
+          <p class="doc-card__spec">Acne &amp; Pigmentation</p>
+          <p>Consultant dermatologist with 8 years of experience treating acne, melasma and post-inflammatory pigmentation. Special interest in evidence-based skincare for South-Asian skin tones.</p>
+          <p class="doc-card__fee">Rs 2,000</p>
+        </section>
+        <section class="section-card">
+          <h2>Available slots</h2>
+          <div class="day-tabs" role="tablist" aria-label="Choose a day" style="display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:var(--sp-3);">
+            <button type="button" class="day-tab btn btn--sm btn--primary">Today</button>
+            <button type="button" class="day-tab btn btn--sm btn--secondary">Mon 16 Jun</button>
+            <button type="button" class="day-tab btn btn--sm btn--secondary">Tue 17 Jun</button>
+            <button type="button" class="day-tab btn btn--sm btn--secondary">Wed 18 Jun</button>
+            <button type="button" class="day-tab btn btn--sm btn--secondary">Thu 19 Jun</button>
+            <button type="button" class="day-tab btn btn--sm btn--secondary">Fri 20 Jun</button>
+            <button type="button" class="day-tab btn btn--sm btn--secondary">Sat 21 Jun</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--sp-2);">
+            <button type="button" class="slot">5:00 PM</button>
+            <button type="button" class="slot">5:30 PM</button>
+            <button type="button" class="slot slot--selected">6:00 PM</button>
+            <button type="button" class="slot">6:30 PM</button>
+            <button type="button" class="slot slot--disabled">7:00 PM</button>
+            <button type="button" class="slot">7:30 PM</button>
+            <button type="button" class="slot slot--locked">8:00 PM</button>
+            <button type="button" class="slot">8:30 PM</button>
+          </div>
+        </section>
+      </main>
+      <nav class="tabbar only-mobile"><a href="#" class="tabbar__item active">Browse</a><a href="#" class="tabbar__item">Appointments</a><a href="#" class="tabbar__item">Profile</a></nav>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-04 Sign up -->
+  <section class="gx-screen" id="P-04" data-screen="P-04">
+    <div class="gx-label">P-04 — Sign up (auth-split)</div>
+    <div class="gx-frame">
+      <div class="auth-split">
+        <aside class="auth-panel">
+          <div class="auth-panel__top"><span class="auth-panel__mark"></span><span class="auth-panel__word">Dermestha</span></div>
+          <h1 class="auth-panel__headline">Create your account</h1>
+          <p class="auth-panel__foot">Dermatology consultations, simplified.</p>
+        </aside>
+        <main class="auth-form-side">
+          <div class="auth-form">
+            <div class="auth-brand-mobile"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+            <form class="section-card">
+              <h2>Sign up</h2>
+              <div class="field"><label for="su-name">Full name</label><input id="su-name" class="input" value="Imran Qureshi" /></div>
+              <div class="field"><label for="su-email">Email</label><input id="su-email" class="input" type="email" value="imran@example.com" /></div>
+              <div class="field"><label for="su-phone">Phone</label><input id="su-phone" class="input" value="+92 300 1234567" /></div>
+              <div class="field"><label for="su-pw">Password</label><input id="su-pw" class="input" type="password" value="password123" /><div class="help">At least 8 characters.</div></div>
+              <label class="choice" for="su-tos"><input type="checkbox" id="su-tos" checked /><span>I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></span></label>
+              <button type="submit" class="btn btn--primary btn--block" style="margin-top:var(--sp-3);">Create account</button>
+              <p class="help">Already have an account? <a href="#">Log in</a></p>
+            </form>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-05 Login + recovery -->
+  <section class="gx-screen" id="P-05" data-screen="P-05">
+    <div class="gx-label">P-05 — Login (+ password recovery)</div>
+    <div class="gx-frame">
+      <div class="auth-split">
+        <aside class="auth-panel">
+          <div class="auth-panel__top"><span class="auth-panel__mark"></span><span class="auth-panel__word">Dermestha</span></div>
+          <h1 class="auth-panel__headline">Welcome back</h1>
+          <p class="auth-panel__foot">Dermatology consultations, simplified.</p>
+        </aside>
+        <main class="auth-form-side">
+          <div class="auth-form">
+            <div class="auth-brand-mobile"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+            <form class="section-card">
+              <h2>Log in</h2>
+              <div class="field"><label for="li-email">Email</label><input id="li-email" class="input" type="email" value="imran@example.com" /></div>
+              <div class="field"><label for="li-pw">Password</label><input id="li-pw" class="input" type="password" value="password123" /></div>
+              <button type="submit" class="btn btn--primary btn--block" style="margin-top:var(--sp-3);">Log in</button>
+              <p class="help"><a href="#">Forgot password?</a></p>
+              <p class="help">New here? <a href="#">Create an account</a></p>
+            </form>
+            <form class="section-card" style="margin-top:var(--sp-4);">
+              <h2>Forgot password</h2>
+              <div class="field"><label for="fp-email">Email</label><input id="fp-email" class="input" type="email" value="imran@example.com" /></div>
+              <button type="submit" class="btn btn--primary btn--block" style="margin-top:var(--sp-3);">Send reset link</button>
+              <p class="help"><a href="#">Back to log in</a></p>
+            </form>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-06 Booking (stepper) -->
+  <section class="gx-screen" id="P-06" data-screen="P-06">
+    <div class="gx-label">P-06 — Booking (stepper: slot / who-for / pay)</div>
+    <div class="gx-note">Note: the design system ships a <code>.stepper</code> (registry calls P-06 a slot/who-for/pay stepper). The current Booking.jsx renders the section-cards below; the stepper header is shown to represent the intended flow + exercise the component.</div>
+    <div class="gx-frame">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a href="#">Browse</a><a href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <div class="stepper">
+          <span class="stepper__step active"><span class="stepper__num">1</span> Choose slot</span>
+          <span class="stepper__step active"><span class="stepper__num">2</span> Who is it for</span>
+          <span class="stepper__step"><span class="stepper__num">3</span> Pay</span>
+        </div>
+        <section class="section-card">
+          <h1>Dr. Ayesha Khan</h1>
+          <p class="doc-card__spec">Acne &amp; Pigmentation</p>
+          <p>Slot: Mon, 16 Jun, 6:00 PM</p>
+          <p class="doc-card__fee">Rs 2,000</p>
+        </section>
+        <section class="section-card">
+          <h2>Who is this consultation for?</h2>
+          <label><input type="radio" name="who" checked /> Myself</label><br />
+          <label><input type="radio" name="who" /> Someone else</label>
+          <button type="button" class="btn btn--primary" style="margin-top:var(--sp-4);">Confirm &amp; Pay</button>
+        </section>
+      </main>
+      <nav class="tabbar only-mobile"><a href="#" class="tabbar__item">Browse</a><a href="#" class="tabbar__item">Appointments</a><a href="#" class="tabbar__item">Profile</a></nav>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-07 Payment return -->
+  <section class="gx-screen" id="P-07" data-screen="P-07">
+    <div class="gx-label">P-07 — Payment return (success + not-completed)</div>
+    <div class="gx-frame">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a href="#">Browse</a><a href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <section class="section-card status-card">
+          <h1>Booking confirmed</h1>
+          <a class="btn btn--primary" href="#">View my appointments</a>
+        </section>
+        <section class="section-card status-card" style="margin-top:var(--sp-4);">
+          <h1>Payment not completed</h1>
+          <p class="help">The payment didn’t go through and your slot hold was released. Please pick another time.</p>
+          <a class="btn btn--primary" href="#">Back to doctors</a>
+        </section>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-08 Dashboard Upcoming -->
+  <section class="gx-screen" id="P-08" data-screen="P-08">
+    <div class="gx-label">P-08 — Dashboard: Upcoming appointments</div>
+    <div class="gx-frame">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a href="#">Browse</a><a class="active" href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <section class="section-card">
+          <div class="tabs" role="tablist"><a class="tab tab--active" href="#">Upcoming</a> <a class="tab" href="#">Past</a></div>
+          <h1>Upcoming appointments</h1>
+          <div class="appt-row"><strong>Dr. Ayesha Khan</strong> — Acne &amp; Pigmentation<div>Mon, 16 Jun, 6:00 PM</div><div>Rs 2,000</div><a class="btn btn--secondary" href="#">Join Call</a> <button type="button" class="btn btn--ghost">Cancel</button></div>
+          <div class="appt-row"><strong>Dr. Bilal Sheikh</strong> — Hair &amp; Scalp<div>Tue, 17 Jun, 10:00 AM</div><div>for: Hassan Q. (son)</div><div>Rs 2,500</div><button type="button" class="btn btn--secondary" disabled>Join Call</button> <button type="button" class="btn btn--ghost">Cancel</button></div>
+          <div class="appt-row"><strong>Dr. Zara Malik</strong> — Eczema &amp; Anti-ageing<div>Thu, 19 Jun, 8:00 PM</div><div>Rs 1,800</div><button type="button" class="btn btn--secondary" disabled>Join Call</button> <button type="button" class="btn btn--ghost">Cancel</button></div>
+        </section>
+      </main>
+      <nav class="tabbar only-mobile"><a href="#" class="tabbar__item">Browse</a><a href="#" class="tabbar__item active">Appointments</a><a href="#" class="tabbar__item">Profile</a></nav>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-09 Past appointments -->
+  <section class="gx-screen" id="P-09" data-screen="P-09">
+    <div class="gx-label">P-09 — Past appointments</div>
+    <div class="gx-frame">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a href="#">Browse</a><a class="active" href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <section class="section-card">
+          <div class="tabs" role="tablist"><a class="tab" href="#">Upcoming</a> <a class="tab tab--active" href="#">Past</a></div>
+          <h1>Past appointments</h1>
+          <div class="appt-row"><strong>Dr. Ayesha Khan</strong> — Acne &amp; Pigmentation<div>Sat, 7 Jun, 6:00 PM</div><span class="badge badge--neutral">Prescription issued</span> <a class="btn btn--secondary" href="#">Download Prescription</a></div>
+          <div class="appt-row"><strong>Dr. Imran Qureshi</strong> — General Dermatology<div>Tue, 3 Jun, 1:00 PM</div><span class="badge badge--neutral">Completed</span></div>
+          <div class="appt-row"><strong>Dr. Hamza Ali</strong> — Cosmetic Dermatology<div>Fri, 30 May, 5:00 PM</div><span class="badge badge--neutral">Cancelled</span></div>
+        </section>
+      </main>
+      <nav class="tabbar only-mobile"><a href="#" class="tabbar__item">Browse</a><a href="#" class="tabbar__item active">Appointments</a><a href="#" class="tabbar__item">Profile</a></nav>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-10 Cancellation modal (patient) -->
+  <section class="gx-screen" id="P-10" data-screen="P-10">
+    <div class="gx-label">P-10 — Cancellation modal (patient)</div>
+    <div class="gx-frame" style="min-height:100vh;background:var(--color-bg);">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a href="#">Browse</a><a class="active" href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <section class="section-card"><h1>Upcoming appointments</h1><div class="appt-row"><strong>Dr. Ayesha Khan</strong> — Acne &amp; Pigmentation<div>Mon, 16 Jun, 6:00 PM</div><div>Rs 2,000</div></div></section>
+      </main>
+      <div class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal modal--danger">
+          <div class="modal__accent modal__accent--danger"></div>
+          <div class="modal__body">
+            <h2>Cancel appointment?</h2>
+            <p>Paid: Rs 2,000</p>
+            <p>Gateway fee: −Rs 60</p>
+            <p><strong>Refund: <span>Rs 1,940</span></strong></p>
+            <p class="help">Refund excludes the payment-gateway fee charged at booking.</p>
+            <div class="modal__actions">
+              <button type="button" class="btn btn--ghost">Keep appointment</button>
+              <button type="button" class="btn btn--danger">Cancel &amp; refund</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-11 Waiting room -->
+  <section class="gx-screen" id="P-11" data-screen="P-11">
+    <div class="gx-label">P-11 — Pre-call waiting room</div>
+    <div class="gx-frame">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a href="#">Browse</a><a href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <section class="section-card">
+          <h1>Waiting room</h1>
+          <div class="appt-row"><strong>Dr. Ayesha Khan</strong> — Acne &amp; Pigmentation<div>Mon, 16 Jun, 6:00 PM</div></div>
+          <div class="alert alert--info"><strong>For the best consultation:</strong> find a well-lit area — sit facing a window or lamp if you can. Good lighting helps your doctor see your skin clearly.</div>
+          <p class="help" role="status">Doctor will be with you shortly. Please stay on this page.</p>
+          <a class="btn btn--primary btn--block" href="#">Join Call</a>
+        </section>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-12 Video consultation (patient) -->
+  <section class="gx-screen" id="P-12" data-screen="P-12">
+    <div class="gx-label">P-12 — Video consultation (patient)</div>
+    <div class="gx-note">Note: <code>.video-page/.video-timer/.video-controls</code> have no CSS in the app (chrome is unstyled); a centered max-width container + padding is added here only for legible capture.</div>
+    <div class="gx-frame">
+      <main class="video-page" style="background:var(--color-dark-deep);min-height:100vh;">
+        <div style="max-width:1040px;margin:0 auto;padding:var(--sp-6) var(--sp-4);">
+          <div class="video-timer" style="color:var(--color-on-dark);margin-bottom:var(--sp-3);">Time remaining: 24:13</div>
+          <div class="video-stage">
+            <p style="color:var(--color-on-dark);">● Live — connected</p>
+            <div class="video-self"></div>
+          </div>
+          <div class="video-controls">
+            <button type="button" class="video-ctrl">🎤</button>
+            <button type="button" class="video-ctrl">🎥</button>
+            <button type="button" class="video-ctrl video-ctrl--leave">Leave</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============================================================= P-13 Prescription view (rx-paper) -->
+  <section class="gx-screen" id="P-13" data-screen="P-13">
+    <div class="gx-label">P-13 — Prescription view (rx-paper document)</div>
+    <div class="gx-note">Note: rendered with the shipped <code>.rx-item / .rx-total / .tag-unpriced</code> design components (registry: "the rx-paper document"). The current PrescriptionView.jsx renders a simpler ul/li scaffold.</div>
+    <div class="gx-frame">
+      <header class="topnav">
+        <div class="topnav__inner container">
+          <a href="#" class="brand"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></a>
+          <nav class="topnav__links"><a href="#">Browse</a><a class="active" href="#">Appointments</a><a href="#">Profile</a></nav>
+        </div>
+      </header>
+      <main class="container" style="padding:var(--sp-6) var(--sp-4) 80px;">
+        <h1>Prescriptions</h1>
+        <div class="section-card" style="max-width:640px;">
+          <div class="between" style="align-items:flex-start;">
+            <div>
+              <h2>Prescription</h2>
+              <p class="help">Dr. Ayesha Khan — Acne &amp; Pigmentation (PMC 12345-D)</p>
+            </div>
+            <span class="badge badge--success">Issued</span>
+          </div>
+          <p class="caption" style="margin-top:var(--sp-2);">Sat, 7 Jun 2026, 6:42 PM · Patient: Imran Qureshi</p>
+          <div style="margin-top:var(--sp-4);">
+            <div class="rx-item"><div><div class="rx-item__name">Tretinoin 0.025% cream</div><div class="rx-item__detail">Apply pea-sized amount at night · 8 weeks</div></div><div class="rx-item__price">Rs 850</div></div>
+            <div class="rx-item"><div><div class="rx-item__name">Doxycycline 100mg</div><div class="rx-item__detail">1 capsule daily after food · 6 weeks</div></div><div class="rx-item__price">Rs 1,200</div></div>
+            <div class="rx-item"><div><div class="rx-item__name">Clindamycin 1% gel</div><div class="rx-item__detail">Apply twice daily to affected areas · 4 weeks</div></div><div class="rx-item__price">Rs 540</div></div>
+            <div class="rx-item"><div><div class="rx-item__name">Ceramide moisturiser</div><div class="rx-item__detail">Apply morning &amp; night · ongoing <span class="tag-unpriced">NOT PRICED</span></div></div><div class="rx-item__price">—</div></div>
+          </div>
+          <div class="rx-total"><span>Estimated total</span><span class="tnum">Rs 2,590</span></div>
+          <p class="help" style="margin-top:var(--sp-2);">1 item not priced. Follow-up: 12 Jul 2026.</p>
+          <button type="button" class="btn btn--primary" style="margin-top:var(--sp-4);">Download PDF</button>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============================================================= D-01 Forced password change -->
+  <section class="gx-screen" id="D-01" data-screen="D-01">
+    <div class="gx-label">D-01 — Forced password change (doctor)</div>
+    <div class="gx-frame">
+      <div class="auth-split">
+        <aside class="auth-panel">
+          <div class="auth-panel__top"><span class="auth-panel__mark"></span><span class="auth-panel__word">Dermestha</span></div>
+          <h1 class="auth-panel__headline">Set a new password to continue</h1>
+          <p class="auth-panel__foot">Dermatology consultations, simplified.</p>
+        </aside>
+        <main class="auth-form-side">
+          <div class="auth-form">
+            <div class="auth-brand-mobile"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+            <form class="section-card">
+              <h2>Change your password</h2>
+              <p class="help">For your security, please choose a new password before continuing, Dr. Bilal Sheikh.</p>
+              <div class="field"><label for="cp-cur">Current password</label><input id="cp-cur" class="input" type="password" value="temp-pass-9931" /></div>
+              <div class="field"><label for="cp-new">New password</label><input id="cp-new" class="input" type="password" value="newpassword123" /><div class="help">At least 8 characters.</div></div>
+              <button type="submit" class="btn btn--primary btn--block" style="margin-top:var(--sp-3);">Update password</button>
+            </form>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= D-02 Today's appointments + History -->
+  <section class="gx-screen" id="D-02" data-screen="D-02">
+    <div class="gx-label">D-02 — Doctor: Today’s appointments + History</div>
+    <div class="gx-frame">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link active">Today</a>
+          <a href="#" class="sidebar__link">Availability</a>
+          <a href="#" class="sidebar__link">History</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <section class="section-card">
+            <div class="tabs" role="tablist"><button type="button" class="tab tab--active">Today</button> <button type="button" class="tab">History</button></div>
+            <h1>Today’s appointments</h1>
+            <div class="appt-row"><div>9:30 AM</div><strong>Imran Qureshi</strong><a class="btn btn--secondary" href="#">Join Call</a></div>
+            <div class="appt-row"><div>11:00 AM</div><strong>Fatima Noor</strong><div>for: Ali (son)</div><button type="button" class="btn btn--secondary" disabled>Join Call</button> <button type="button" class="btn btn--ghost">Cancel</button></div>
+            <div class="appt-row"><div>2:00 PM</div><strong>Usman Riaz</strong><span class="badge badge--warning">Awaiting prescription</span> <a class="btn btn--secondary" href="#">Write prescription</a></div>
+            <div class="appt-row"><div>4:30 PM</div><strong>Sara Mehmood</strong><button type="button" class="btn btn--secondary" disabled>Join Call</button></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= D-03 Weekly availability grid -->
+  <section class="gx-screen" id="D-03" data-screen="D-03">
+    <div class="gx-label">D-03 — Weekly availability grid (doctor)</div>
+    <div class="gx-frame">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link">Today</a>
+          <a href="#" class="sidebar__link active">Availability</a>
+          <a href="#" class="sidebar__link">History</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <h1>Weekly availability</h1>
+          <div class="alert alert--success" style="margin-top:var(--sp-3);">Availability saved.</div>
+          <div style="overflow-x:auto;margin:var(--sp-4) 0;">
+            <table class="table" id="gx-avail">
+              <thead><tr><th>Hour</th><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn--primary">Save availability</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= D-04 Video (doctor) -->
+  <section class="gx-screen" id="D-04" data-screen="D-04">
+    <div class="gx-label">D-04 — Video consultation (doctor)</div>
+    <div class="gx-note">Note: <code>.video-page/.video-timer/.video-warning/.video-controls</code> are unstyled in the app; a centered container is added for legible capture.</div>
+    <div class="gx-frame">
+      <main class="video-page" style="background:var(--color-dark-deep);min-height:100vh;">
+        <div style="max-width:1040px;margin:0 auto;padding:var(--sp-6) var(--sp-4);">
+          <div class="video-timer" style="color:var(--color-on-dark);margin-bottom:var(--sp-2);">Time remaining: 4:38</div>
+          <p class="video-warning" role="status" style="color:var(--color-on-dark-accent);margin:0 0 var(--sp-3);">5 minutes remaining</p>
+          <div class="video-stage">
+            <p style="color:var(--color-on-dark);">● Live — connected · Imran Qureshi</p>
+            <div class="video-self"></div>
+          </div>
+          <div class="video-controls">
+            <button type="button" class="video-ctrl">🎤</button>
+            <button type="button" class="video-ctrl">🎥</button>
+            <button type="button" class="video-ctrl video-ctrl--leave">Leave</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============================================================= D-05 Prescription builder -->
+  <section class="gx-screen" id="D-05" data-screen="D-05">
+    <div class="gx-label">D-05 — Prescription builder (doctor)</div>
+    <div class="gx-frame">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link active">Today</a>
+          <a href="#" class="sidebar__link">Availability</a>
+          <a href="#" class="sidebar__link">History</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <section class="section-card">
+            <h1>Write prescription</h1>
+            <div class="section-card"><strong>Imran Qureshi</strong><div class="help">Consultation: Mon, 16 Jun, 6:00 PM</div></div>
+            <div class="field"><label for="d5-search">Add medicine</label><input id="d5-search" class="input" placeholder="Search medicine…" /></div>
+            <div class="appt-row"><strong>Tretinoin 0.025% cream</strong> Rs 850<div class="field"><label>Dosage</label><input class="input" value="Pea-sized, at night" /></div><div class="field"><label>Duration</label><input class="input" value="8 weeks" /></div><div class="field"><label>Instructions</label><input class="input" value="Avoid sun; use sunscreen" /></div><button type="button" class="btn btn--ghost">Remove</button></div>
+            <div class="appt-row"><strong>Ceramide moisturiser</strong> <span class="badge badge--neutral">not priced</span><div class="field"><label>Dosage</label><input class="input" value="Apply twice daily" /></div><div class="field"><label>Duration</label><input class="input" value="Ongoing" /></div><div class="field"><label>Instructions</label><input class="input" value="Morning and night" /></div><button type="button" class="btn btn--ghost">Remove</button></div>
+            <p><strong>Total: Rs 850</strong></p>
+            <p class="help">1 item(s) not priced</p>
+            <div class="field"><label for="d5-notes">General notes (optional)</label><input id="d5-notes" class="input" value="Review in 6 weeks; expect mild peeling early on." /></div>
+            <div class="field"><label for="d5-fu">Follow-up date (optional)</label><input id="d5-fu" class="input" type="date" value="2026-07-28" /></div>
+            <button type="button" class="btn btn--primary">Submit prescription</button>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= D-06 Cancel modal (doctor) -->
+  <section class="gx-screen" id="D-06" data-screen="D-06">
+    <div class="gx-label">D-06 — Cancel modal (doctor)</div>
+    <div class="gx-frame" style="min-height:100vh;background:var(--color-bg);">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link active">Today</a>
+          <a href="#" class="sidebar__link">Availability</a>
+          <a href="#" class="sidebar__link">History</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <section class="section-card"><h1>Today’s appointments</h1><div class="appt-row"><div>11:00 AM</div><strong>Fatima Noor</strong></div></section>
+        </div>
+      </div>
+      <div class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal modal--danger">
+          <div class="modal__accent modal__accent--danger"></div>
+          <div class="modal__body">
+            <h2>Cancel appointment</h2>
+            <p class="help">The patient is refunded automatically (net of the gateway fee) and emailed an apology.</p>
+            <label for="d6-reason">Reason (internal)</label>
+            <textarea id="d6-reason" class="input" style="min-height:72px;margin-top:var(--sp-1);">Doctor unwell — clinic emergency.</textarea>
+            <div class="modal__actions">
+              <button type="button" class="btn btn--ghost">Keep appointment</button>
+              <button type="button" class="btn btn--danger">Cancel &amp; refund</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= A-01 Doctors list/add/edit -->
+  <section class="gx-screen" id="A-01" data-screen="A-01">
+    <div class="gx-label">A-01 — Admin: Doctors (list + add/edit form)</div>
+    <div class="gx-frame">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link active">Doctors</a>
+          <a href="#" class="sidebar__link">Medicines</a>
+          <a href="#" class="sidebar__link">Records &amp; audit</a>
+          <a href="#" class="sidebar__link">System health</a>
+          <a href="#" class="sidebar__link">Settings</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <h1>Doctors</h1>
+          <div class="section-card">
+            <div class="modal__actions" style="justify-content:flex-end;"><button type="button" class="btn btn--primary">Add doctor</button></div>
+            <table class="table">
+              <thead><tr><th>Name</th><th>PMC</th><th>Specialization</th><th>Fee</th><th>Status</th><th>Upcoming</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>Dr. Ayesha Khan</td><td>12345-D</td><td>Acne &amp; Pigmentation</td><td>Rs 2,000</td><td><span class="badge badge--success">Active</span></td><td>7</td><td><button class="btn btn--ghost btn--sm">Edit</button> <button class="btn btn--danger btn--sm">Deactivate</button> <button class="btn btn--ghost btn--sm">Reset password</button></td></tr>
+                <tr><td>Dr. Bilal Sheikh</td><td>22817-D</td><td>Hair &amp; Scalp</td><td>Rs 2,500</td><td><span class="badge badge--info">Pending</span></td><td>0</td><td><button class="btn btn--ghost btn--sm">Edit</button> <button class="btn btn--danger btn--sm">Deactivate</button> <button class="btn btn--ghost btn--sm">Reset password</button></td></tr>
+                <tr><td>Dr. Hamza Ali</td><td>30992-D</td><td>Cosmetic Dermatology</td><td>Rs 3,000</td><td><span class="badge badge--warning">Deactivated</span></td><td>1</td><td><button class="btn btn--ghost btn--sm">Edit</button> <button class="btn btn--secondary btn--sm">Activate</button> <button class="btn btn--ghost btn--sm">Reset password</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="section-card">
+            <h2>Edit Dr. Ayesha Khan</h2>
+            <div class="field"><label>Full name</label><input class="input" value="Dr. Ayesha Khan" /></div>
+            <div class="field"><label>Phone</label><input class="input" value="+92 300 1234567" /></div>
+            <div class="field"><label>Specialization</label><input class="input" value="Acne &amp; Pigmentation" /></div>
+            <div class="field"><label>Consultation fee (PKR)</label><input class="input" type="number" value="2000" /></div>
+            <p class="help">Fee changes never affect existing appointments — the fee was snapshotted at booking.</p>
+            <div class="field"><label>Bio</label><input class="input" value="Consultant dermatologist, 8 yrs." /></div>
+            <div class="modal__actions" style="margin-top:var(--sp-4);"><button type="button" class="btn btn--ghost">Cancel</button><button type="submit" class="btn btn--primary">Save doctor</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= A-02 Medicine catalogue -->
+  <section class="gx-screen" id="A-02" data-screen="A-02">
+    <div class="gx-label">A-02 — Admin: Medicine catalogue</div>
+    <div class="gx-frame">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link">Doctors</a>
+          <a href="#" class="sidebar__link active">Medicines</a>
+          <a href="#" class="sidebar__link">Records &amp; audit</a>
+          <a href="#" class="sidebar__link">System health</a>
+          <a href="#" class="sidebar__link">Settings</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <h1>Medicines</h1>
+          <div class="section-card">
+            <div class="filters"><div class="field"><label>Search</label><input class="input" value="" /></div></div>
+            <table class="table">
+              <thead><tr><th>Name</th><th>Generic</th><th>Forms</th><th>Unit price</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>Tretinoin 0.025%</td><td>Tretinoin</td><td>cream</td><td>Rs 850</td><td><span class="badge badge--success">Active</span></td><td><button class="btn btn--ghost btn--sm">Edit</button> <button class="btn btn--danger btn--sm">Deactivate</button></td></tr>
+                <tr><td>Doxycycline 100mg</td><td>Doxycycline</td><td>capsule</td><td>Rs 1,200</td><td><span class="badge badge--success">Active</span></td><td><button class="btn btn--ghost btn--sm">Edit</button> <button class="btn btn--danger btn--sm">Deactivate</button></td></tr>
+                <tr><td>Clindamycin 1%</td><td>Clindamycin</td><td>gel, solution</td><td>Rs 540</td><td><span class="badge badge--warning">Deactivated</span></td><td><button class="btn btn--ghost btn--sm">Edit</button> <button class="btn btn--secondary btn--sm">Reactivate</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="section-card">
+            <h2>Add medicine</h2>
+            <div class="field"><label>Name</label><input class="input" value="" /></div>
+            <div class="field"><label>Generic name (optional)</label><input class="input" value="" /></div>
+            <div class="field"><label>Dosage forms (comma-separated)</label><input class="input" value="cream, gel" /></div>
+            <div class="field"><label>Unit price (PKR)</label><input class="input" type="number" value="" /></div>
+            <div class="modal__actions" style="margin-top:var(--sp-4);"><button type="submit" class="btn btn--primary">Add medicine</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= A-03 System health / alerts -->
+  <section class="gx-screen" id="A-03" data-screen="A-03">
+    <div class="gx-label">A-03 — Admin: System health / alerts</div>
+    <div class="gx-frame">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link">Doctors</a>
+          <a href="#" class="sidebar__link">Medicines</a>
+          <a href="#" class="sidebar__link">Records &amp; audit</a>
+          <a href="#" class="sidebar__link active">System health</a>
+          <a href="#" class="sidebar__link">Settings</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <h1>System health</h1>
+          <div class="section-card">
+            <div class="section-card" style="margin-bottom:var(--sp-3);"><p><span class="badge badge--danger">Payment mismatch</span> <span class="help">15 Jun 2026, 2:14 PM</span></p><p>Gateway reported PKR 2,000 captured but appointment fee snapshot is PKR 2,500.</p><p><a href="#">View record</a></p></div>
+            <div class="section-card" style="margin-bottom:var(--sp-3);"><p><span class="badge badge--warning">Email failed</span> <span class="help">15 Jun 2026, 11:02 AM</span></p><p>Booking confirmation to fatima@example.com failed after final retry.</p><p><a href="#">View record</a> <button class="btn btn--secondary btn--sm" style="margin-left:var(--sp-2);">Resend confirmation</button></p></div>
+            <div class="section-card" style="margin-bottom:var(--sp-3);"><p><span class="badge badge--warning">Awaiting prescription</span> <span class="help">14 Jun 2026, 9:30 PM</span></p><p>Consultation completed 12h ago with no prescription issued.</p><p><a href="#">View record</a></p></div>
+            <div class="section-card" style="margin-bottom:0;"><p><span class="badge badge--danger">Exception</span> <span class="help">14 Jun 2026, 4:51 PM</span></p><p>Unhandled exception in refund worker (job 8842).</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= A-04 Records & audit -->
+  <section class="gx-screen" id="A-04" data-screen="A-04">
+    <div class="gx-label">A-04 — Admin: Records &amp; audit (table + pagination)</div>
+    <div class="gx-frame">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link">Doctors</a>
+          <a href="#" class="sidebar__link">Medicines</a>
+          <a href="#" class="sidebar__link active">Records &amp; audit</a>
+          <a href="#" class="sidebar__link">System health</a>
+          <a href="#" class="sidebar__link">Settings</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <h1>Records &amp; audit log</h1>
+          <div class="tabs"><button type="button" class="tab tab--active">Records</button> <button type="button" class="tab">Audit log</button></div>
+          <div class="section-card">
+            <form class="filters">
+              <div class="field"><label>Patient email / phone</label><input class="input" /></div>
+              <div class="field"><label>Doctor name</label><input class="input" /></div>
+              <div class="field"><label>Appointment ID</label><input class="input" /></div>
+              <div class="field"><label>Payment ref</label><input class="input" /></div>
+              <div class="field"><label>From</label><input class="input" type="date" /></div>
+              <div class="field"><label>To</label><input class="input" type="date" /></div>
+              <button type="submit" class="btn btn--primary">Search</button>
+            </form>
+            <table class="table">
+              <thead><tr><th>Slot</th><th>Patient</th><th>Doctor</th><th>State</th><th>Paid</th><th>Payment ref</th><th>Refund ref</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>16 Jun 2026, 6:00 PM</td><td>Imran Qureshi</td><td>Dr. Ayesha Khan</td><td><span class="badge badge--info">confirmed</span></td><td>Rs 2,000</td><td>pay_9f2a71</td><td>—</td><td><a href="#">View</a></td></tr>
+                <tr><td>15 Jun 2026, 10:00 AM</td><td>Fatima Noor <span class="help">(for: Ali)</span></td><td>Dr. Bilal Sheikh</td><td><span class="badge badge--info">completed</span> <span class="badge badge--danger">Disputed</span></td><td>Rs 2,500</td><td>pay_7c1d04</td><td>—</td><td><a href="#">View</a></td></tr>
+                <tr><td>12 Jun 2026, 5:00 PM</td><td>Usman Riaz</td><td>Dr. Hamza Ali</td><td><span class="badge badge--info">cancelled</span></td><td>Rs 3,000</td><td>pay_3b88e0</td><td>ref_55a210</td><td><a href="#">View</a></td></tr>
+                <tr><td>10 Jun 2026, 1:00 PM</td><td>Sara Mehmood</td><td>Dr. Imran Qureshi</td><td><span class="badge badge--info">prescription_issued</span></td><td>Rs 2,200</td><td>pay_1aa9c2</td><td>—</td><td><a href="#">View</a></td></tr>
+              </tbody>
+            </table>
+            <div class="filters" style="justify-content:flex-end;align-items:center;"><button class="btn btn--ghost" disabled>Previous</button><span>Page 1 of 6</span><button class="btn btn--ghost">Next</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= A-05 Settings -->
+  <section class="gx-screen" id="A-05" data-screen="A-05">
+    <div class="gx-label">A-05 — Admin: Platform settings</div>
+    <div class="gx-frame">
+      <div class="layout">
+        <nav class="sidebar">
+          <div class="brand" style="margin-bottom:var(--sp-6);"><span class="brand__mark"></span><span class="brand__word">Dermestha</span></div>
+          <a href="#" class="sidebar__link">Doctors</a>
+          <a href="#" class="sidebar__link">Medicines</a>
+          <a href="#" class="sidebar__link">Records &amp; audit</a>
+          <a href="#" class="sidebar__link">System health</a>
+          <a href="#" class="sidebar__link active">Settings</a>
+          <button type="button" class="sidebar__link" style="margin-top:auto;background:none;border:none;font:inherit;text-align:left;cursor:pointer;width:100%;">Log out</button>
+        </nav>
+        <div class="content">
+          <h1>Platform settings</h1>
+          <div class="section-card">
+            <div class="field"><label>Minimum booking lead time (minutes)</label><input class="input" type="number" value="120" /><div class="help">Applies to future booking attempts only; existing appointments are unaffected.</div></div>
+            <div class="field"><label>Fallback fee — percentage (basis points)</label><input class="input" type="number" value="290" /><div class="help">Used only when the gateway does not report a per-transaction fee; a reported fee always wins.</div></div>
+            <div class="field"><label>Fallback fee — fixed (PKR)</label><input class="input" type="number" value="0" /></div>
+            <button type="submit" class="btn btn--primary">Save settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================= COMPONENT INVENTORY -->
+  <section class="gx-screen" id="inventory" data-screen="inventory">
+    <div class="gx-label">Component inventory</div>
+    <div class="gx-frame">
+      <div class="gx-inv">
+        <h1 class="h1">Component inventory</h1>
+
+        <h2 class="h2">Buttons</h2>
+        <div class="gx-inv__grid">
+          <button class="btn btn--primary">Primary</button>
+          <button class="btn btn--primary" style="background:var(--color-primary-hover);">Primary · hover</button>
+          <button class="btn btn--primary" style="box-shadow:0 0 0 3px rgba(15,58,42,.30);">Primary · focus</button>
+          <button class="btn btn--secondary">Secondary</button>
+          <button class="btn btn--ghost">Ghost</button>
+          <button class="btn btn--danger">Danger</button>
+          <button class="btn btn--brass">Brass</button>
+          <button class="btn btn--primary btn--sm">Small</button>
+          <button class="btn btn--primary btn--lg">Large</button>
+          <button class="btn btn--primary" disabled>Disabled</button>
+        </div>
+        <div style="max-width:320px;margin-top:12px;"><button class="btn btn--primary btn--block">Block button</button></div>
+
+        <h2 class="h2">Inputs &amp; form fields</h2>
+        <div class="gx-inv__grid">
+          <div class="field"><label>Default</label><input class="input" value="Imran Qureshi" /><div class="help">Helper text under the field.</div></div>
+          <div class="field"><label>Focus state</label><input class="input" value="focused" style="border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(15,58,42,.15);" /></div>
+          <div class="field"><label>Error state</label><input class="input input--error" value="bad@" /><div class="error-text">Enter a valid email address.</div></div>
+          <div class="field"><label>Disabled</label><input class="input" value="read only" disabled style="background:var(--color-surface-sunken);" /></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;">
+          <label class="choice"><input type="checkbox" checked /><span>Checkbox</span></label>
+          <label class="choice"><input type="radio" name="invradio" checked /><span>Radio A</span></label>
+          <label class="choice"><input type="radio" name="invradio" /><span>Radio B</span></label>
+        </div>
+
+        <h2 class="h2">Badges</h2>
+        <div class="gx-inv__grid">
+          <span class="badge badge--success">Success</span>
+          <span class="badge badge--info">Info</span>
+          <span class="badge badge--warning">Warning</span>
+          <span class="badge badge--danger">Danger</span>
+          <span class="badge badge--neutral">Neutral</span>
+          <span class="tag-unpriced">NOT PRICED</span>
+          <span class="pmc-badge" style="position:static;">✓ PMC</span>
+        </div>
+
+        <h2 class="h2">Alerts</h2>
+        <div class="gx-stack" style="max-width:560px;">
+          <div class="alert alert--success">Availability saved.</div>
+          <div class="alert alert--info"><strong>Tip:</strong> find a well-lit area before your call.</div>
+          <div class="alert alert--warning">This action affects future bookings only.</div>
+          <div class="alert alert--danger">Could not create your account.</div>
+        </div>
+
+        <h2 class="h2">Banners</h2>
+        <div class="gx-stack">
+          <div class="banner banner--warning">Your session expires in 5 minutes.</div>
+          <div class="banner banner--danger">Payment reconciliation mismatch detected.</div>
+        </div>
+
+        <h2 class="h2">Slots</h2>
+        <div class="gx-inv__grid">
+          <button class="slot">6:00 PM</button>
+          <button class="slot slot--selected">6:30 PM</button>
+          <button class="slot slot--disabled">7:00 PM</button>
+          <button class="slot slot--locked">7:30 PM</button>
+        </div>
+
+        <h2 class="h2">Stepper</h2>
+        <div class="stepper">
+          <span class="stepper__step active"><span class="stepper__num">1</span> Choose slot</span>
+          <span class="stepper__step active"><span class="stepper__num">2</span> Who is it for</span>
+          <span class="stepper__step"><span class="stepper__num">3</span> Pay</span>
+        </div>
+
+        <h2 class="h2">Avatars</h2>
+        <div class="gx-inv__grid" style="align-items:center;">
+          <span class="avatar avatar--sm">AK</span>
+          <span class="avatar avatar--md">BS</span>
+          <span class="avatar avatar--lg">ZM</span>
+        </div>
+
+        <h2 class="h2">Doctor cards</h2>
+        <div class="gx-inv__grid">
+          <div style="width:240px;"><div class="doc-card"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">AK</div></div><div class="doc-card__body"><h3 class="doc-card__name">Dr. Ayesha Khan</h3><p class="doc-card__spec">Acne &amp; Pigmentation</p><div class="doc-card__foot"><span class="doc-card__fee">Rs 2,000</span><span class="doc-card__slot">Next: 6:30 PM</span></div></div></div></div>
+          <div style="width:240px;"><div class="doc-card"><div class="doc-card__img"><div class="avatar avatar--lg gx-photo">BS</div><span class="pmc-badge">✓ PMC</span></div><div class="doc-card__body"><p class="doc-card__name">Dr. Bilal Sheikh</p><p class="doc-card__spec">Hair &amp; Scalp · 12 yrs</p><div class="doc-card__foot"><span class="doc-card__fee tnum">PKR 2,500</span><span class="doc-card__slot tnum">Tomorrow 10:00 AM</span></div></div></div></div>
+        </div>
+
+        <h2 class="h2">Modal</h2>
+        <div style="max-width:360px;"><div class="modal" style="box-shadow:var(--shadow-overlay);"><div class="modal__accent modal__accent--danger"></div><div class="modal__body"><h2>Cancel appointment?</h2><p>Refund: <strong>Rs 1,940</strong></p><p class="help">Refund excludes the gateway fee.</p><div class="modal__actions"><button class="btn btn--ghost">Keep</button><button class="btn btn--danger">Cancel &amp; refund</button></div></div></div></div>
+
+        <h2 class="h2">Table</h2>
+        <table class="table" style="max-width:560px;">
+          <thead><tr><th>Name</th><th>Specialization</th><th class="num">Fee</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Dr. Ayesha Khan</td><td>Acne &amp; Pigmentation</td><td class="num">Rs 2,000</td><td><span class="badge badge--success">Active</span></td></tr>
+            <tr><td>Dr. Bilal Sheikh</td><td>Hair &amp; Scalp</td><td class="num">Rs 2,500</td><td><span class="badge badge--info">Pending</span></td></tr>
+          </tbody>
+        </table>
+
+        <h2 class="h2">Prescription items (rx-paper)</h2>
+        <div class="gx-inv__panel" style="max-width:560px;">
+          <div class="rx-item"><div><div class="rx-item__name">Tretinoin 0.025% cream</div><div class="rx-item__detail">Pea-sized at night · 8 weeks</div></div><div class="rx-item__price">Rs 850</div></div>
+          <div class="rx-item"><div><div class="rx-item__name">Ceramide moisturiser <span class="tag-unpriced">NOT PRICED</span></div><div class="rx-item__detail">Twice daily · ongoing</div></div><div class="rx-item__price">—</div></div>
+          <div class="rx-total"><span>Estimated total</span><span class="tnum">Rs 850</span></div>
+        </div>
+
+        <h2 class="h2">Empty state</h2>
+        <div class="gx-inv__panel" style="max-width:420px;"><div class="empty"><div class="empty__icon">○</div><p>No upcoming appointments.</p></div></div>
+
+        <h2 class="h2">Video chrome</h2>
+        <div style="max-width:480px;background:var(--color-dark-deep);padding:16px;border-radius:var(--r-lg);">
+          <div class="video-stage"><p style="color:var(--color-on-dark);">● Live — connected</p><div class="video-self"></div></div>
+          <div class="video-controls"><button class="video-ctrl">🎤</button><button class="video-ctrl">🎥</button><button class="video-ctrl video-ctrl--leave">Leave</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // Build the D-03 availability grid (08:00–22:00 × 7 days) with a realistic selection pattern.
+    (function buildAvail() {
+      const tb = document.querySelector('#gx-avail tbody');
+      if (!tb) return;
+      const sel = { 1: [9,10,11,17,18], 2: [9,10,11], 3: [16,17,18,19], 4: [9,10], 6: [11,12,13] };
+      for (let h = 8; h <= 22; h++) {
+        const tr = document.createElement('tr');
+        const th = document.createElement('td');
+        th.textContent = String(h).padStart(2, '0') + ':00';
+        tr.appendChild(th);
+        for (let d = 0; d < 7; d++) {
+          const td = document.createElement('td');
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = (sel[d] && sel[d].includes(h)) ? 'slot slot--selected' : 'slot';
+          b.style.cssText = 'width:28px;height:28px;min-height:0;padding:0;';
+          td.appendChild(b);
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      }
+    })();
+
+    // Single-screen capture mode + theme switch via URL.
+    (function () {
+      const params = new URLSearchParams(location.search);
+      const theme = params.get('theme');
+      if (theme) document.documentElement.dataset.theme = theme;
+      const screen = params.get('screen');
+      if (screen) {
+        document.body.classList.add('gx-single');
+        const el = document.getElementById(screen) ||
+                   document.querySelector('[data-screen="' + screen + '"]');
+        if (el) el.classList.add('gx-target');
+      }
+    })();
+  </script>
+</body>
+</html>

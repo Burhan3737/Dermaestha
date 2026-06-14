@@ -37,6 +37,17 @@
   --color-danger-deep: #9A2A20;
   --color-neutral: #56625B; --color-neutral-bg: #EAEEEA;
 
+  /* Extended role tokens (themeable; overridden per-theme in themes.css).
+     Defaults below preserve the original "spruce" appearance exactly. */
+  --color-on-accent:      #FFFFFF;
+  --color-on-danger:      #FFFFFF;
+  --color-on-dark-strong: #FFFFFF;
+  --color-text-disabled:  #9AA69E;
+  --color-tab-inactive:   #A6B0AA;
+  --focus-ring:           rgba(15,58,42,.30);
+  --focus-ring-soft:      rgba(15,58,42,.15);
+  --backdrop:             rgba(15,33,24,.45);
+
   /* Typography */
   --font-head: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

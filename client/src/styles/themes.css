@@ -1,0 +1,17 @@
+/* themes.css — Dermestha swappable theme palettes.
+ *
+ * Each block below redefines ONLY the themeable design tokens for one theme. Structural
+ * tokens (spacing, type scale, layout, motion, radius defaults) live in tokens.css and
+ * are shared by every theme. The base `:root` in tokens.css IS the "spruce" theme, so
+ * spruce needs no block here — selecting it simply clears any `[data-theme]` override.
+ *
+ * Runtime switching: set `data-theme="<id>"` on <html> (see lib/theme/theme.js + the
+ * pre-paint bootstrap in index.html). `:root[data-theme="x"]` outranks the base `:root`
+ * in specificity, so these palettes win regardless of stylesheet order.
+ *
+ * Authoring contract: a theme block should provide a value for every themeable token a
+ * theme can change (all `--color-*`, the focus/backdrop/shadow effects, and optionally
+ * the radius scale + heading font). Anything it omits inherits the spruce default.
+ *
+ * --- New theme palettes are added below. ---
+ */

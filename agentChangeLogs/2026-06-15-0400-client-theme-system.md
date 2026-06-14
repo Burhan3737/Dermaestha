@@ -6,7 +6,7 @@
 **Ticket / issue:** None
 **Branch:** feature/client-theme-system
 **Commits / PR:** (in progress — committing on branch; NOT pushing per CLAUDE.md)
-**Last updated:** 2026-06-15-0400
+**Last updated:** 2026-06-15-0430
 **Tags:** #refactor #frontend #design #theming
 
 ## Summary
@@ -20,6 +20,16 @@ User requested a full design/theme refactor, client-side only, with themes livin
 |---|---|---|
 | `agentChangeLogs/2026-06-15-0400-client-theme-system.md` | Created | This session log |
 | `agentChangeLogs/index.md` | Modified | Index entry for this session |
+| `client/src/styles/tokens.css` | Modified | Added 8 themeable "extended role" tokens (on-accent/on-danger/on-dark-strong/text-disabled/tab-inactive/focus-ring/focus-ring-soft/backdrop) with spruce-default values |
+| `client/src/styles/components.css` | Modified | Tokenized 14 residual literals (white-on-color, disabled/tab grays, focus-ring/backdrop rgba) → tokens; restores doc-06 "no raw hex" rule and makes them themeable |
+| `client/src/styles/themes.css` | Created | New swappable theme-palette layer (`:root[data-theme="<id>"]` blocks); header now, palettes appended after design exploration |
+| `client/src/lib/theme/theme.js` | Created | Client-only theme runtime: STORAGE_KEY, DEFAULT_THEME, THEMES registry, init/apply/set/getActive (data-theme + localStorage; no API/DB) |
+| `client/src/main.jsx` | Modified | Import `themes.css` + call `initTheme()` before render |
+| `client/index.html` | Modified | Pre-paint inline theme bootstrap (no flash-of-wrong-theme) |
+| `client/src/modules/marketing/views/Landing/Landing.jsx` | Modified | Removed hardcoded `color:'#fff'` on a feature-band heading → inherits themeable `.feature .display` color |
+| `client/src/modules/legal/components/LegalPage/LegalPage.jsx` | Modified | Fixed DRAFT banner's broken `--color-warn`/`--color-warn-bg` refs (silent orange fallback) → real `--color-warning`/`--color-warning-bg` (latent bug + theming leak) |
+| `client/__theme_preview__/gallery.html` | Created (subagent) | Reusable theme-gallery harness built from the real production CSS (`?screen=&theme=` URLs) |
+| `theme-redesign/METHOD.md`, `theme-redesign/before/**` | Created (subagent) | Before-state baseline: 24 desktop + 6 mobile + component inventory + 6 live public screens |
 
 ## Dependencies / config / schema
 None yet. (Plan: no new runtime dependencies; theme persistence is client-side `localStorage` only — no schema/env/API change.)
@@ -36,7 +46,8 @@ None yet. (Plan: no new runtime dependencies; theme persistence is client-side `
 - `index.html` has no inline theme bootstrap — will add a tiny pre-paint script to avoid a flash of the default theme.
 
 ## Verification
-Not verified yet. (Plan: client `npm --workspace client run test`, `npm run build:client`, lint, and before/after visual capture across themes.)
+- Foundation pass (spruce-identical): `npm --workspace client run build` → clean (356 modules, CSS 19.2 kB). `npm --workspace client run test` → **135/135 passed (40 files)**. components.css grep confirms no raw theme-coupled hex remains (only `var(--color-on-dark-strong, #fff)` defensive fallbacks).
+- Pending: per-theme AA contrast verification + before/after visual capture across themes.
 
 ## Risk / rollback
 Low. Additive + default-unchanged. Rollback = delete branch. No server/data changes.

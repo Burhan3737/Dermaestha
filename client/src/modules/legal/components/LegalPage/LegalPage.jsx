@@ -21,9 +21,9 @@ export function LegalPage({ title, lastUpdated, sections }) {
         <div
           role="note"
           style={{
-            border: '1px solid var(--color-warn, #b45309)',
-            background: 'var(--color-warn-bg, #fff7ed)',
-            color: 'var(--color-warn, #b45309)',
+            border: '1px solid var(--color-warning)',
+            background: 'var(--color-warning-bg)',
+            color: 'var(--color-warning)',
             borderRadius: 'var(--r-md)',
             padding: 'var(--sp-3) var(--sp-4)',
             marginBottom: 'var(--sp-5)',

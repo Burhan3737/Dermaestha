@@ -171,7 +171,7 @@ export function Landing() {
       <footer className="feature feature-footer">
         <div className="feature-footer-inner">
           <span className="feature__eyebrow">Ready to start?</span>
-          <h2 className="display" style={{ marginTop: 12, color: '#fff' }}>
+          <h2 className="display" style={{ marginTop: 12 }}>
             Clearer skin is one click away.
           </h2>
           <p className="body-lg" style={{ color: 'var(--color-on-dark)', marginTop: 12, maxWidth: 480, marginLeft: 'auto', marginRight: 'auto' }}>
