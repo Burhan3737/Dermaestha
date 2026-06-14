@@ -1,6 +1,6 @@
 # 2026-06-15-0305 — server-test-centralization-design
 
-**Status:** Completed (not pushed — awaiting user per CLAUDE.md)
+**Status:** Completed (pushed to origin/main, user-approved)
 **Goal:** Brainstorm + spec a single centralized `test/` folder for the server (and shared) test suites, replacing ADR-26 co-location.
 **Skill(s) used:** superpowers:brainstorming (user-invoked `/brainstorming`)
 **Ticket / issue:** None
@@ -60,6 +60,6 @@ Client move (commit `6bd9869`) — verified by controller: re-ran `npm --workspa
 Server move done + committed (not pushed). Blast radius = test files + root `vitest.config.js`; zero production source change. Rollback via `git revert 23d09e3` (history preserved by `git mv`).
 
 ## Open items / next session
-- **Push decision:** 4 commits on `main` (`23d09e3`, `4c86ebb`, `6bd9869`, doc-impact + log) NOT pushed — awaiting user approval per CLAUDE.md.
+- **Pushed:** all session commits (`9983ec6`…`0cd7abe`, 7 total) pushed to `origin/main` (`48d9dac..0cd7abe`), user-approved.
 - **Pre-existing repo issues** (noted, out of scope, not introduced by this work): root ESLint broken (ESLint v9 needs flat config; legacy `.eslintrc.json`); 3 server integration tests fail on dirty-DB state; one intentional unused-var each in `env.test.js` / `DoctorToday.test.jsx`.
 - Doc-impact: APPLIED (docs 03/09/11/13) with user approval. Re-grep confirmed no live stale test-path claims remain (only ADR-26 historical text + footer rows, intentionally preserved).
