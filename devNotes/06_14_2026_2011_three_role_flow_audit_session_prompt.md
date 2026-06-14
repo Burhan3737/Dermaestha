@@ -28,7 +28,7 @@
 > - **2 patients:** `baseline.patient1@dermestha.test`, `baseline.patient2@dermestha.test` (ToS-accepted)
 > - **1 doctor:** `baseline.doctor@dermestha.test` — active, with a today availability window
 > - **1 medicine** (active), and **pre-seeded appointments on the baseline doctor** in the states the doctor/patient flows need without live cross-stream dependencies: one `confirmed` in the join window, one `completed` **with a prescription** (for the patient's view-prescription flow), one `confirmed` ≥2h-future (cancel→refund), one `confirmed` <2h (cancel→no-refund).
-> - A single known password for all accounts that passes the password policy (confirm it validates; document the exact value in the report). Reuse `e2e/support/db.js` helpers (hashing etc.) where sensible.
+> - **Password for ALL baseline accounts: `Test123!`** (pinned — passes the policy `z.string().min(8)`; reuse it everywhere so the human can log in to any baseline account with it). Reuse `e2e/support/db.js` helpers (hashing etc.) where sensible.
 > Run it, then build + start the server on mocks: `npm run build:client`, then background `PAYMENT_PROVIDER=mock VIDEO_PROVIDER=mock EMAIL_PROVIDER=console NODE_ENV=development node --env-file=.env server/src/index.js`; confirm `GET /api/health` → 200. *(Expected-local, not bugs: email logs to console; video is the mock-join path; payment is the `/dev/checkout` signed IPN.)*
 >
 > ### Phase 3 — Decompose for parallel execution
