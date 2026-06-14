@@ -10,11 +10,11 @@
 
 ### Specs
 
-- At the START of any task, read `docs/specification/00-INDEX_AND_GOVERNANCE.md` first. Treat it as the authoritative source of project context and specifications.
-- Treat the documentation suite `docs/specification/` files `00`–`15` as the SOLE source of truth.
-- As you work, actively check after each change whether it requires updates to any file in `docs/specification/` (`00`–`15`). This check is mandatory — DO NOT SKIP it.
-- Before editing any spec, follow the change protocol and change-impact matrix defined in `docs/specification/00-INDEX_AND_GOVERNANCE.md`.
-- Before making any spec change, list your proposed updates to the user and wait for their explicit approval. Do not edit until approved.
+- At the START of any task, read `docs/specification/00-INDEX_AND_GOVERNANCE.md` first, then treat `docs/specification/` (`00`–`15`) as the SOLE, authoritative source of truth.
+- Run a doc-impact check against `00`–`15` after EVERY change, and again at every review, course-correction, or unplanned discovery mid-task. This is mandatory — DO NOT SKIP it. Do NOT edit any spec mid-task; instead, record each required update in a running list as you find it. Decisions, edge cases, and deviations uncovered during implementation that were not in the plan/design phase are the single most common source of spec drift — track them here the moment they surface, NOT in a later prompt. A task is NOT complete until this check has run and all required updates are tracked.
+- End every task with an explicit doc-impact verdict: either state "No spec updates required" with a one-line reason, or present the consolidated running list of all tracked spec updates.
+- Spec updates are applied only at the END of the task, in this exact order: (1) ensure all code is committed; (2) present the consolidated list of tracked updates for approval, following the change protocol and change-impact matrix in `00`; (3) apply the updates only after the user's explicit approval. Do not edit any spec before code is committed, and never without approval.
+
 
 ### Agent Logs
 

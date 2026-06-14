@@ -17,3 +17,6 @@ test-results/
 /playwright/.cache/
 e2e/.seed-ids.json
 e2e/.auth/
+
+# runtime doctor-photo uploads (written to UPLOADS_DIR at runtime)
+uploads/
