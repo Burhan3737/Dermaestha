@@ -235,7 +235,16 @@ async function refundInFull(p) {
       refundStatus: result.status,
     },
   });
-  await prisma.appointment.deleteMany({ where: { id: p.appointmentId, state: 'slot_locked' } });
+  // Do NOT delete the payment-referenced appointment: `Payment.appointment` is ON DELETE RESTRICT
+  // (no cascade — prisma/schema.prisma), and we just set this Payment to `success`, so a delete
+  // would P2003 → crash AFTER the money was refunded. The refund happened — preserve the audit
+  // trail for both records. Force-expire the lock instead (a plain update, no FK touched): the row
+  // no longer holds a slot, the real slot is already held by the other confirmed appointment, and
+  // reconcileUnconfirmed skips this row (it only queries `pending` payments).
+  await prisma.appointment.updateMany({
+    where: { id: p.appointmentId, state: 'slot_locked' },
+    data: { lockExpiresAt: new Date() },
+  });
   await audit.record({
     eventType: 'payment.reconciliation_refund',
     actorType: 'system',

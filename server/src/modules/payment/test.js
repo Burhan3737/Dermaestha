@@ -253,9 +253,12 @@ describe('payment.reconcileUnconfirmed (F04.03)', () => {
     expect(paymentProvider.refund).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 250000, idempotencyKey: 'rf_a1' }), // FULL amount
     );
-    expect(prisma.appointment.deleteMany).toHaveBeenCalledWith({
-      where: { id: 'a1', state: 'slot_locked' },
-    });
+    // FIX B: NEVER delete the payment-referenced appointment (Payment FK is RESTRICT → P2003).
+    // Force-expire the lock instead (a plain update, no FK touched) — both records are preserved.
+    expect(prisma.appointment.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.appointment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'a1', state: 'slot_locked' } }),
+    );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'payment.reconciliation_refund', targetRef: 'a1' }),
     );
@@ -277,9 +280,11 @@ describe('payment.reconcileUnconfirmed (F04.03)', () => {
     const data = prisma.payment.update.mock.calls.at(-1)[0].data;
     expect(data.refundStatus).toBe('manual_required');
     expect(data.status).toBe('success');
-    expect(prisma.appointment.deleteMany).toHaveBeenCalledWith({
-      where: { id: 'a1', state: 'slot_locked' },
-    });
+    // FIX B: lock force-expired (no delete) so the success-Payment FK cannot P2003.
+    expect(prisma.appointment.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.appointment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'a1', state: 'slot_locked' } }),
+    );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'payment.reconciliation_refund',
