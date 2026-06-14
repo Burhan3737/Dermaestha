@@ -10,41 +10,32 @@ export const EMAILS = {
   patient: 'e2e.patient@dermestha.test',
   patient2: 'e2e.patient2@dermestha.test',
   doctor: 'e2e.doctor@dermestha.test',
+  futureDoctor: 'e2e.futuredoctor@dermestha.test',
   cancelDoctor: 'e2e.cancel@dermestha.test',
   da3doctor: 'e2e.da3doctor@dermestha.test',
 };
 const MEDICINE = 'E2E Acne Cream';
 
 const MIN = 60 * 1000;
+const DAY = 24 * 60 * 60 * 1000;
 const rel = (ms) => new Date(Date.now() + ms);
 
-/** Karachi weekday (0=Sun..6=Sat) + a today availability window guaranteeing a future bookable slot. */
-function todayWindow() {
-  const fmt = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Karachi',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const parts = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]));
-  const weekdayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  const weekday = weekdayMap[parts.weekday];
-  // Start ~45m ahead, rounded up to the next :00/:30 boundary.
-  let h = Number(parts.hour);
-  let m = Number(parts.minute) + 45;
-  h += Math.floor(m / 60);
-  m %= 60;
-  if (m === 0) {
-    // already on the hour
-  } else if (m <= 30) {
-    m = 30;
-  } else {
-    m = 0;
-    h += 1;
-  }
-  const startTime = `${String(Math.min(h, 23)).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  return { weekday, startTime, endTime: '23:30' };
+/** Karachi weekday (0=Sun..6=Sat) for a given date. */
+function karachiWeekday(d) {
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'short' }).format(d);
+  return { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[wd];
+}
+
+/** Full-week 09:00–21:00 availability so a bookable future-day slot always exists regardless of
+ *  the current Karachi time-of-day (the day picker — ISSUE-1 — reaches it). */
+function allWeekWindow() {
+  return [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, startTime: '09:00', endTime: '21:00' }));
+}
+
+/** Availability ONLY on the weekday two days from now → bookable solely via the day picker.
+ *  This is the dedicated ISSUE-1 proof: a doctor with no slots "today" but slots on a future day. */
+function futureOnlyDay() {
+  return { weekday: karachiWeekday(new Date(Date.now() + 2 * DAY)), startTime: '09:00', endTime: '21:00' };
 }
 
 /** Delete every row owned by an `*@dermestha.test` user, in FK-safe order. Idempotent. */
@@ -170,7 +161,16 @@ export async function seedAll() {
     fullName: 'Dr E2E Primary',
     spec: 'E2E Dermatology',
     active: true,
-    blocks: [todayWindow()],
+    blocks: allWeekWindow(),
+  });
+  const Dfuture = await makeDoctor({
+    email: EMAILS.futureDoctor,
+    pmc: 'E2E-DOC-4',
+    fee: 250000,
+    fullName: 'Dr E2E Future',
+    spec: 'E2E Future Days',
+    active: true,
+    blocks: [futureOnlyDay()],
   });
   const Dc = await makeDoctor({
     email: EMAILS.cancelDoctor,
@@ -237,6 +237,7 @@ export async function seedAll() {
   return {
     doctorId: did,
     doctorEmail: EMAILS.doctor,
+    futureDoctorId: Dfuture.doctor.id,
     patientId: pid,
     patient2Id: patient2.id,
     adminId: admin.id,

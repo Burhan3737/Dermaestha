@@ -25,6 +25,12 @@ test('admin onboards a doctor → first login forces password change', async ({ 
   await adminPage.getByLabel('Consultation fee (PKR)').fill('3000');
   await adminPage.getByLabel('Bio').fill('Onboarded by E2E.');
   await adminPage.getByLabel('Initial password').fill(PASSWORD);
+  // ISSUE-6: a profile photo is now required to onboard. PNG magic bytes pass the server sniff.
+  await adminPage.getByLabel(/Profile photo/i).setInputFiles({
+    name: 'doctor.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  });
   await adminPage.getByRole('button', { name: 'Save doctor' }).click();
 
   await expect(adminPage.getByText('Dr Onboarded E2E')).toBeVisible();

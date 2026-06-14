@@ -131,6 +131,10 @@ export async function getForRole({ id, role, userId }) {
     slotStart: a.slotStart.toISOString(),
     slotEnd: a.slotEnd.toISOString(),
     state: a.state,
+    // Lets P-07 distinguish a released/expired lock (payment failed or abandoned) from a still-valid
+    // hold that is merely awaiting webhook confirmation — so the return page can show a terminal
+    // failure state instead of polling forever (doc 06 §3 P-07 states).
+    lockExpiresAt: a.lockExpiresAt ? a.lockExpiresAt.toISOString() : null,
     feeAtBooking: a.feeAtBooking,
     forSelf: a.forSelf,
     subjectName: a.subjectName,

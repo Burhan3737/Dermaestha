@@ -4,14 +4,15 @@ import { Link } from 'react-router-dom';
 import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.jsx';
 import { formatKarachi } from '../../../../lib/format/format.js';
 import { DoctorCancelModal } from '../../../appointment/components/DoctorCancelModal/DoctorCancelModal.jsx';
+import { stateLabel } from '../../../appointment/stateLabel.js';
 import { track } from '../../../../lib/analytics/track.js';
 import { useDoctor } from '../../useDoctor.js';
 
 const karachiDay = (iso) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date(iso));
 
-export function DoctorToday() {
-  const [tab, setTab] = useState('today');
+export function DoctorToday({ initialTab = 'today' }) {
+  const [tab, setTab] = useState(initialTab);
   const { appointments: list, cancelAppointment } = useDoctor({ appointmentsScope: tab });
   const [cancelId, setCancelId] = useState(null);
 
@@ -66,7 +67,7 @@ export function DoctorToday() {
                     Join Call
                   </button>
                 ))}
-              {tab === 'history' && <span className="badge">{a.state}</span>}
+              {tab === 'history' && <span className="badge badge--neutral">{stateLabel(a.state)}</span>}
               {(a.state === 'completed' || a.state === 'prescription_issued') && (
                 <Link className="btn btn--secondary" to={`/doctor/appointments/${a.id}/prescribe`}>
                   Write prescription

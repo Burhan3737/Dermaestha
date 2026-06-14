@@ -121,6 +121,20 @@ describe('D-02 DoctorToday', () => {
     expect(screen.getAllByText(/awaiting prescription/i)).toHaveLength(1); // only the unprescribed one
   });
 
+  it('history: renders friendly state labels, not raw enums (ISSUE-9)', async () => {
+    const old = new Date(Date.now() - 13 * 3600 * 1000).toISOString();
+    api.get.mockResolvedValue({
+      data: [
+        { id: 'h2', slotStart: old, slotEnd: old, state: 'cancelled_refunded', forSelf: true, subjectName: null, patientName: 'Past Q' },
+      ],
+    });
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    await waitFor(() => expect(screen.getByText('Past Q')).toBeTruthy());
+    expect(screen.getByText('Cancelled — refunded')).toBeTruthy();
+    expect(screen.queryByText('cancelled_refunded')).toBeNull();
+  });
+
   it('history: completed row <12h old shows no Awaiting badge', async () => {
     const recent = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
     api.get.mockResolvedValue({

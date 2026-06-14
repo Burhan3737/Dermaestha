@@ -1,16 +1,26 @@
 // @ts-check
 import { NavLink } from 'react-router-dom';
+import { api } from '../../lib/apiClient/apiClient.js';
 
-const DOCTOR_LINKS = [
+export const DOCTOR_LINKS = [
   { to: '/doctor', label: 'Today', end: true },
   { to: '/doctor/availability', label: 'Availability' },
   { to: '/doctor/history', label: 'History' },
 ];
 
 export function SidebarLayout({ links = DOCTOR_LINKS, children }) {
+  async function handleLogout() {
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      // Full reload clears client session state and re-bootstraps via /auth/me → /login.
+      window.location.assign('/login');
+    }
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <nav className="sidebar">
+      <nav className="sidebar" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="brand" style={{ marginBottom: 'var(--sp-6)' }}>
           <span className="brand__mark" />
           <span className="brand__word">Dermestha</span>
@@ -20,6 +30,22 @@ export function SidebarLayout({ links = DOCTOR_LINKS, children }) {
             {l.label}
           </NavLink>
         ))}
+        <button
+          type="button"
+          className="sidebar__link"
+          onClick={handleLogout}
+          style={{
+            marginTop: 'auto',
+            background: 'none',
+            border: 'none',
+            font: 'inherit',
+            textAlign: 'left',
+            cursor: 'pointer',
+            width: '100%',
+          }}
+        >
+          Log out
+        </button>
       </nav>
       <div className="content">{children}</div>
     </div>

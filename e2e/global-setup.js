@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default async function globalSetup() {
   await ensureSettings(prisma);
-  // Widen the bookable window for the J1 same-day slot (floor is 30 minutes per F14.01).
+  // Keep the lead time at its floor (30 min per F14.01) so near-term day-picker slots stay bookable.
   await prisma.settings.update({ where: { id: 1 }, data: { minBookingLeadMinutes: 30 } });
   await resetE2eData();
   const ids = await seedAll();

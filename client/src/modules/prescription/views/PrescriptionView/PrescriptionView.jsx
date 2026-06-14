@@ -64,6 +64,8 @@ export function PrescriptionView() {
     <PatientLayout>
       <h1>Prescriptions</h1>
       {prescriptions.isPending && <p className="help">Loading…</p>}
+      {/* Cross-tenant / unknown appointment 404s at the API (no leak) — show a message, not a blank page. */}
+      {prescriptions.isError && <p className="help">This prescription is not available.</p>}
       {prescriptions.data && rows.length === 0 && <p className="help">No prescriptions yet.</p>}
       {rows.map((p) => (
         <PrescriptionCard key={p.id} p={p} />

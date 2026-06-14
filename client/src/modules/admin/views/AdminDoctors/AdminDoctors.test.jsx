@@ -127,7 +127,7 @@ describe('AdminDoctors (A-01)', () => {
     fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Some bio' } });
     fireEvent.change(screen.getByLabelText('Initial password'), { target: { value: 'Pass123' } });
 
-    const photoInput = screen.getByLabelText('Profile photo (JPEG/PNG/WebP, max 2MB)');
+    const photoInput = screen.getByLabelText(/profile photo/i);
     fireEvent.change(photoInput, { target: { files: [new File(['x'], 'p.jpg', { type: 'image/jpeg' })] } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save doctor' }));

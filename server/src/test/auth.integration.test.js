@@ -90,6 +90,32 @@ describe('auth integration', () => {
     created.push(email);
   });
 
+  it('login ignores a mismatched body `role` — the stored role is authoritative (ISSUE-12)', async () => {
+    const email = uniq();
+    await request(app).post('/api/auth/signup').send({
+      fullName: 'Role P',
+      email,
+      phone: '03001234567',
+      password: 'password1',
+      tosAccepted: true,
+    });
+    // Patient account; a hostile/incorrect body role must NOT change the resolved role
+    // (enumeration-safety + F15.02 stored-role routing). doc 05 §1 documents `role` in the body,
+    // but it is accepted-and-ignored — this locks that contract.
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'password1', role: 'admin' });
+    expect(res.status).toBe(200);
+    expect(res.body.role).toBe('patient');
+    created.push(email);
+  });
+
+  it('GET /auth/me returns 200 with null for an anonymous caller (ISSUE-13 — no 401 console noise)', async () => {
+    const res = await request(app).get('/api/auth/me');
+    expect(res.status).toBe(200);
+    expect(res.body).toBeNull();
+  });
+
   it('forgot-password returns an identical 200 for unknown and known emails', async () => {
     const unknown = await request(app).post('/api/auth/forgot-password').send({ email: uniq() });
     expect(unknown.status).toBe(200);
