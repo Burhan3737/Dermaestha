@@ -5,8 +5,8 @@
 **Skill(s) used:** None (no available skill fit a setup-guide/convenience-script task; surfaced this to the user instead of activating one).
 **Ticket / issue:** None
 **Branch:** main
-**Commits / PR:** None (uncommitted working-tree additions)
-**Last updated:** 2026-06-16-0055
+**Commits / PR:** `10dd419` — committed and pushed to origin/main (user-approved)
+**Last updated:** 2026-06-16-0110
 **Tags:** #docs #infra
 
 ## Summary
