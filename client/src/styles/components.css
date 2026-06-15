@@ -3,6 +3,12 @@
 html, body { margin: 0; }
 body { font-family: var(--font-body); font-size: var(--fs-body); line-height: 1.55;
   color: var(--color-text-body); background: var(--color-bg); }
+/* Default for bare content links (e.g. admin "View", auth recovery links). Themed so they
+   stay on-brand and legible on every theme — incl. the dark one, where default browser blue
+   is unreadable. Class-styled links (.btn/.tab/.sidebar__link/.topnav__links a/.footer-links a)
+   all win on specificity, so this only touches otherwise-unstyled links. */
+a { color: var(--color-primary); }
+a:hover { color: var(--color-primary-hover); }
 .tnum { font-variant-numeric: tabular-nums; }
 
 /* Headings */
@@ -145,7 +151,11 @@ body { font-family: var(--font-body); font-size: var(--fs-body); line-height: 1.
    The .tab/.tab--active classes existed in the views with no CSS; styled here so they
    read as proper tabs and stay legible on every theme (incl. the dark Derma Noir). */
 .tabs { display: flex; gap: var(--sp-1); border-bottom: var(--border-1); margin-bottom: var(--sp-5); }
-.tab { padding: 10px 14px; font-size: var(--fs-body-sm); font-weight: 600; color: var(--color-text-muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+/* Works for both <a class="tab"> and <button class="tab"> — the control reset
+   (appearance/background/border/font) flattens native button chrome so they match. */
+.tab { appearance: none; -webkit-appearance: none; background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 10px 14px; font: inherit; font-size: var(--fs-body-sm); font-weight: 600; color: var(--color-text-muted);
+  text-decoration: none; margin-bottom: -1px; cursor: pointer; }
 .tab:hover { color: var(--color-text-strong); }
 .tab--active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 

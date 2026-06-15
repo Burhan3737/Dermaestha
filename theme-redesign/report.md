@@ -12,9 +12,11 @@ component inventory is shown per theme. All paths are relative to this
 - **Theming only.** No layout, copy, routing, or flow changes. Every screen is the
   same markup and structure as before; only the design tokens (colour palette, the
   display/heading font, and the corner-radius scale) change per theme. Body text stays
-  Hanken Grotesk in every theme for fast first paint. Plus one CSS-only completion — the
-  previously-unstyled `.tab` navigation component (P-08/P-09/D-02/A-04) was given
-  themeable styling; no view/markup or business-logic changes.
+  Hanken Grotesk in every theme for fast first paint. Plus two CSS-only completions (no
+  view/markup or business-logic changes): the previously-unstyled `.tab` navigation
+  component (P-08/P-09/D-02/A-04) was given themeable styling, and bare content links
+  (e.g. admin "View", auth recovery links) now use a themeable brand colour so they stay
+  legible on every theme — including the dark one, where default browser blue was unreadable.
 - **Four selectable themes** (chosen in the app under **Admin -> Appearance**; the
   choice is remembered per browser in `localStorage`):
   - **Ivory & Ink** — warm bone-and-ink editorial luxe, one burnt-amber accent, sharp
@@ -222,6 +224,10 @@ rendered in each theme.
   P-03, P-06, P-08, P-13) x 3 themes (18 PNGs).
 - Component inventory: 1440x1024 x 3 themes (3 PNGs).
 - The spruce BEFORE set in `before/` was captured previously and is reused unchanged.
-- A handful of list/tab classes (.tabs / .tab / .appt-row / .status-card /
-  .empty-state) have no CSS in the app and render as plain text in every theme; this is
-  the same honest-unstyled state as the BEFORE baseline, not a theming regression.
+- `.tabs`/`.tab` are now styled (this redesign completed them) and bare content links are
+  now brand-coloured. A few remaining list classes (`.appt-row` / `.status-card` /
+  `.empty-state`) still have no CSS in the app and render as plain — but legible,
+  themed-text — rows in every theme; this is the same honest-unstyled state as the BEFORE
+  baseline, not a theming regression. Styling them is a separate design task, out of this
+  theming scope. NOTE: the harness's D-02 reproduction shows the appt-row action buttons
+  less faithfully than the real app, which uses proper `.btn` components (see DoctorToday.jsx).
