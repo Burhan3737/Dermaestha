@@ -12,7 +12,9 @@ component inventory is shown per theme. All paths are relative to this
 - **Theming only.** No layout, copy, routing, or flow changes. Every screen is the
   same markup and structure as before; only the design tokens (colour palette, the
   display/heading font, and the corner-radius scale) change per theme. Body text stays
-  Hanken Grotesk in every theme for fast first paint.
+  Hanken Grotesk in every theme for fast first paint. Plus one CSS-only completion — the
+  previously-unstyled `.tab` navigation component (P-08/P-09/D-02/A-04) was given
+  themeable styling; no view/markup or business-logic changes.
 - **Four selectable themes** (chosen in the app under **Admin -> Appearance**; the
   choice is remembered per browser in `localStorage`):
   - **Ivory & Ink** — warm bone-and-ink editorial luxe, one burnt-amber accent, sharp

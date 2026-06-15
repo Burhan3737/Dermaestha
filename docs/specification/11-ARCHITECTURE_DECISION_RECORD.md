@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.17                                                                                               |
+| Version          | 1.18                                                                                               |
 | Last updated     | 2026-06-15                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -54,6 +54,7 @@
 39. [ADR-38 — Playwright E2E harness (root `e2e/`) against the mock adapters as the v1 launch gate](#adr-38--playwright-e2e-harness-root-e2e-against-the-mock-adapters-as-the-v1-launch-gate)
 40. [ADR-39 — Payment/appointment no-cascade release policy (refines ADR-23)](#adr-39--paymentappointment-no-cascade-release-policy-refines-adr-23)
 41. [ADR-40 — Centralized `test/` tree + `#src`/`#shared` aliases (supersedes ADR-26 test co-location)](#adr-40--centralized-test-tree--srcshared-aliases-supersedes-adr-26-test-co-location)
+42. [ADR-41 — Client-side runtime theming (`data-theme` + `localStorage`), layered tokens, multi-theme; no server-backed global theme in v1](#adr-41--client-side-runtime-theming-data-theme--localstorage-layered-tokens-multi-theme-no-server-backed-global-theme-in-v1)
 
 ---
 
@@ -596,6 +597,26 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-41 — Client-side runtime theming (`data-theme` + `localStorage`), layered tokens, multi-theme; no server-backed global theme in v1
+
+**Date:** 2026-06-15
+
+**Status:** Accepted
+
+**Context:** ADR-06 established a CSS-variable token system (`tokens.css` consumed by semantic classes in `components.css`; views reference classes, not raw colour). A visual redesign wanted several distinct, swappable themes — a boutique-teledermatology identity deliberately unlike the generalist Pakistani competitors — selectable at runtime without editing any screen, plus an admin surface to switch them. The mandate was **style-only, client-side, with no business-logic / flow / API / DB change.**
+
+**Decision:** Extend the existing token system into a **runtime-switchable multi-theme** system, entirely client-side:
+
+- **Layered tokens.** The invariant scale (spacing / type / layout / motion + the default "spruce" palette) stays in `tokens.css`; swappable palettes live in one new `client/src/styles/themes.css` as `:root[data-theme="<id>"]` blocks. A theme block has higher specificity than the base `:root`, so it always wins regardless of stylesheet order — and spruce, being the base, needs no block (selecting it clears the override). Each block carries the full colour set + extended role tokens + the radius scale + a `--font-display` heading serif.
+- **Runtime (`client/src/lib/theme/theme.js`).** Applies a theme by setting `data-theme` on `<html>` and persists the choice in `localStorage` (`dermestha.theme`); a pre-paint inline script in `index.html` applies it before first paint (no flash-of-wrong-theme). Display webfonts are lazy-loaded per active theme; the body font (Hanken Grotesk) is constant for 3G performance.
+- **Admin surface.** A scoped **A-06 Appearance** tab (`/admin/appearance`, feature F17) switches themes; cosmetic, no confirm gate (unlike the money-affecting A-05).
+- **No server state.** Persistence is per-browser. A globally-enforced (all-users) theme would require a platform setting (API + DB + config) — deliberately **out of scope** for a client-only, style-only change.
+- Three new themes ship — **Ivory & Ink** (live default), **Derma Noir** (dark), **Sage & Blush** — plus the original **Spruce** retained as a one-click fallback; all three new themes were independently verified WCAG 2.1 AA.
+
+**Consequences:** Any screen re-themes with **zero view changes** (every consumer already reads `var(--…)`); a theme is added/removed by editing one `themes.css` block + one `theme.js` registry entry. The residual raw literals in `components.css` were tokenized in the same pass, restoring ADR-06 / doc-06's "no raw hex in components.css" property; an intended-but-unstyled `.tab` component was also given (themeable) CSS so it stays legible on the dark theme. The default visitor experience changed (now Ivory & Ink) — fully reversible via the Appearance tab or by clearing the `localStorage` key. **Builds on ADR-06** (does not supersede it). Follow-ups: a server-backed global theme (when a backend setting is acceptable) and self-hosting/subsetting the display fonts. No schema / API / dependency change; client tests `135 → 141` (added a theme-runtime unit test).
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -618,3 +639,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-14 | Added ADR-36 (Sentry DSN-gated error tracking; `sendDefaultPii:false` + `beforeSend` PII scrub; parallel to the ADR-30 audit bridge, does not feed A3; `SENTRY_DSN` canonical) and ADR-37 (single zod@3 copy via `shared` workspace + root `overrides.zod`; transitive zod@4 collapsed; errorHandler ZodError duck-typing removed; override is a global constraint) | Slice H · S6 (launch foundation + hardening); two new architectural decisions |
 | 2026-06-14 | Added ADR-38 (Playwright E2E harness at root `e2e/` against the mock adapters; 6 Critical journeys J1–J6 as the v1 launch gate; living/extensible, one spec per journey + shared `support/`) and ADR-39 (payment/appointment no-cascade release policy — `Payment.appointment` is ON DELETE RESTRICT; `payment.failed`/reconcile-failed mark Payment failed + force-expire the lock, reclaim only `failed`/absent blockers, refundInFull force-expires; refines ADR-23) | Slice H · S7 (E2E QA + launch gate) + the four money-path fixes; two new architectural decisions |
 | 2026-06-15 | Added ADR-40 (centralized per-workspace `test/` tree — `unit/` mirrors `src/`, module `test.js`→`service.test.js`, integration `.integration` infix dropped; `#src`/`#shared` `resolve.alias`) superseding the test-co-location bullet of ADR-26 (pointer added); test move only, no behavior change | Server+shared+client test centralization; new architectural decision |
+| 2026-06-15 | Added ADR-41 (client-side runtime theming: layered tokens `tokens.css`/`themes.css`, `data-theme`+`localStorage` runtime, A-06 Appearance/F17, 3 new AA themes + spruce fallback, lazy display fonts; no server-backed global theme in v1; builds on ADR-06) | Client theme-system visual redesign (style-only) |

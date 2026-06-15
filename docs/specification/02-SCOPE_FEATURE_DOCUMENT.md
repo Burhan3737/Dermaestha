@@ -4,7 +4,7 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.4                                           |
+| Version          | 1.5                                           |
 | Last updated     | 2026-06-14                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
@@ -49,6 +49,7 @@ Each feature ID below maps to the PRD §2.2 user stories (and supporting §3.x s
 | `F14`      | Admin: platform settings                       | A6                        |
 | `F15`      | Doctor & admin authentication & roles          | DA1–DA6                   |
 | `F16`      | Legal content (ToS / Privacy)                  | P2, §3.6                  |
+| `F17`      | Admin: appearance / theme switcher (client)    | — (post-PRD; ADR-41)      |
 
 ---
 
@@ -347,6 +348,15 @@ One-line: hosted Terms of Service and Privacy Policy pages linked from sign-up; 
 
 ---
 
+### **F17 - Admin: appearance / theme switcher (client-side)**
+
+One-line: a scoped admin **Appearance** tab lets an administrator switch the app's visual theme at runtime; **style-only**, client-side, with no business-logic / flow / API / DB change (ADR-41). Not derived from the original PRD — added by the v1 client theme redesign.
+
+- **F17.01 - Theme runtime**: the active theme is applied by setting `data-theme` on `<html>` and remembered in this browser via `localStorage` (key `dermestha.theme`); a pre-paint bootstrap in `index.html` avoids a flash of the wrong theme. Persistence is **per-browser** — a server-backed global (all-users) theme is deliberately out of scope for this client-only change. Themes are CSS-variable palettes in `client/src/styles/themes.css`; switching one re-colours every screen with **no view change**.
+- **F17.02 - Selectable themes**: four themes ship — **Ivory & Ink** (live default), **Derma Noir**, **Sage & Blush**, and the original **Spruce** (one-click fallback). The three new themes are independently verified WCAG 2.1 AA. The admin **A-06 Appearance** view (`/admin/appearance`) presents them as preview cards plus a live component preview; selecting one applies + persists instantly (cosmetic — no confirm gate, unlike A-05).
+
+---
+
 ## 3. Appointment state machine
 
 The §4.3 appointment state machine, reproduced faithfully.
@@ -563,3 +573,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | 2026-06-13 | Added two PayFast-Pakistan alert sources to the F12.01 alert-feed enumeration: `payment.manual_review_required` (no gateway status-query API) + `payment.refund_manual_required` (no gateway refund API) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | F05.03: noted the KPI #3 emit points — `video_join_attempt` on the Join Call click (P9 + D2) and `video_join_success` on Daily `joined-meeting` (P5/D3) via the fire-and-forget client `lib/analytics/track.js` seam (doc 14 §6; ADR-34) | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | F16.01: legal pages built as a banner-marked structured DRAFT via the reusable `LegalPage` template (final lawyer copy = pre-launch gate); F03.03: noted the KPI #1 emit points — `landing_view` on P-01 mount + `booking_started` on slot-lock via the shared `lib/analytics/track.js` seam (`booking_confirmed` remains S6/server) | Slice H · S4 (public surface — landing + legal; ADR-35) |
+| 2026-06-15 | Added F17 (admin appearance / client-side theme switcher) + A-06 Appearance view: `data-theme`+`localStorage` runtime, 4 selectable themes (new AA default Ivory & Ink + Derma Noir + Sage & Blush + original Spruce); style-only, no schema/API; per-browser persistence (server-backed global theme out of scope). Post-PRD redesign feature; ADR-41 | Client theme-system visual redesign |

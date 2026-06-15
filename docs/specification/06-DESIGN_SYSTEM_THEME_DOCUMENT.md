@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.6                                                                                       |
+| Version          | 1.7                                                                                       |
 | Last updated     | 2026-06-15                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -20,6 +20,7 @@
 5. [Typography](#5-typography)
 6. [Spacing & layout](#6-spacing--layout)
 7. [Component behavior](#7-component-behavior)
+8. [Theming system (runtime themes)](#8-theming-system-runtime-themes)
 
 ---
 
@@ -107,9 +108,9 @@ Today — Availability (weekly grid) — History
 
 ### Admin sidebar links
 
-Doctors — Medicines — Records & audit — System health — Settings
+Doctors — Medicines — Records & audit — System health — Settings — Appearance
 
-`/admin` redirects to `/admin/doctors` — the Doctors list is the admin landing page.
+`/admin` redirects to `/admin/doctors` — the Doctors list is the admin landing page. **Appearance** (A-06) is the runtime theme switcher (F17, §8).
 
 **Sidebar logout.** Both the doctor and admin sidebars render a **Log out** control at the foot of the sidebar (`POST /api/auth/logout` then a full reload to `/login`); it is the doctor/admin equivalent of the patient's Profile-hosted logout. The `History` doctor link resolves to the D-02 history view (the history tab), not a separate screen.
 
@@ -141,8 +142,9 @@ Doctors — Medicines — Records & audit — System health — Settings
 | A-03      | Alert feed / system health               | Admin                    | A3           |
 | A-04      | Records & Audit Log                      | Admin                    | A5           |
 | A-05      | Settings                                 | Admin                    | A6           |
+| A-06      | Appearance — theme switcher (client)     | Admin                    | F17          |
 
-> **Note (canonical screen-ID registry).** The 24 rows above are the authoritative screen-ID registry — cite these IDs verbatim across the suite. The patient bottom-nav **Profile** destination (§2 navigation, below) is intentionally not a dedicated v1 screen: in v1 it routes to a minimal account view (logout + basic details); richer account management (account deletion / data-export → v1.1; family profiles → v1.2+) is deferred, so it carries no `P-NN` ID.
+> **Note (canonical screen-ID registry).** The 25 rows above are the authoritative screen-ID registry — cite these IDs verbatim across the suite. **A-06 Appearance** is a post-PRD addition (the v1 client theme redesign; F17 / ADR-41 / §8) — a style-only admin theme switcher. The patient bottom-nav **Profile** destination (§2 navigation, below) is intentionally not a dedicated v1 screen: in v1 it routes to a minimal account view (logout + basic details); richer account management (account deletion / data-export → v1.1; family profiles → v1.2+) is deferred, so it carries no `P-NN` ID.
 
 ---
 
@@ -586,6 +588,41 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 
 ---
 
+## 8. Theming system (runtime themes)
+
+Added by the v1 client theme redesign (style-only; F17, ADR-41). The §4–§7 token system is the single styling source; this section documents how it became **runtime-switchable across multiple themes** with no per-screen change.
+
+### Layered tokens
+
+- **Invariant scale** — `client/src/styles/tokens.css` (`:root`): spacing, type scale, layout, motion, radius defaults, and the **default ("spruce") palette**. The §4 colour table documents this default theme.
+- **Swappable palettes** — `client/src/styles/themes.css`: one `:root[data-theme="<id>"]` block per non-default theme, each a complete palette (the §4 colour set + the extended role tokens below + the §6 radius scale + a heading serif). A `[data-theme]` block outranks the base `:root` in specificity, so spruce needs no block (selecting it clears the override).
+- **Extended role tokens** (added so every literal is themeable — this restores §7's "no raw hex in components.css" property, now literally true): `--color-on-accent`, `--color-on-danger`, `--color-on-dark-strong`, `--color-text-disabled`, `--color-tab-inactive`, `--focus-ring`, `--focus-ring-soft`, `--backdrop`, and `--font-display` (the §5 heading font, now theme-variable; small UI labels keep `--font-head`).
+
+### Runtime
+
+`client/src/lib/theme/theme.js` applies a theme by setting `data-theme` on `<html>` and persists it in `localStorage` (`dermestha.theme`); a pre-paint inline script in `index.html` applies it before first paint (no flash-of-wrong-theme). Display webfonts are lazy-loaded per active theme; the body font stays Hanken Grotesk for 3G performance. Persistence is **per-browser** — a server-backed global (all-users) theme is out of scope for this client-only change (ADR-41).
+
+### Shipped themes
+
+| Theme                       | Pole               | Ground             | Brand          | Accent     | Radii    | Heading serif    |
+| --------------------------- | ------------------ | ------------------ | -------------- | ---------- | -------- | ---------------- |
+| **Ivory & Ink** *(default)* | light editorial    | warm bone          | near-black ink | burnt amber | 1/2/4px  | Fraunces         |
+| **Derma Noir**              | dark / immersive   | aubergine-charcoal | jade           | rose-gold  | 6/10/14px | DM Serif Display |
+| **Sage & Blush**            | warm spa           | greige             | sage           | clay-rose  | 8/12/16px | Newsreader       |
+| **Spruce** *(original)*     | clinical apothecary | cool porcelain     | deep spruce    | brass      | 3/4/6px  | Archivo          |
+
+The three new themes are independently verified **WCAG 2.1 AA** for all text + functional control-boundary pairs (`theme-redesign/verify-contrast.mjs`). The §4 discipline rules (accent is fill / large-bold / non-text only; status is colour + icon + label) hold across all themes.
+
+### Admin surface (A-06)
+
+`/admin/appearance` presents the themes as preview cards (swatches + tagline) plus a live component preview; selecting one applies + persists instantly (cosmetic — no confirm gate). The full design rationale lives in `docs/theme-redesign/THEME-DESIGN.md`.
+
+### New component since §7
+
+**Tab nav (`.tabs` / `.tab` / `.tab--active`).** The appointment dashboard (P-08/P-09), doctor Today/History (D-02), and admin Records & Audit (A-04) use a tab row that previously had **no CSS** (it fell back to default browser links — illegible on the dark theme). It is now a themeable underline-tab: inactive `var(--color-text-muted)`, active `var(--color-primary)` text + a 2 px `var(--color-primary)` bottom border, on a `var(--color-border)` baseline.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                                 |
@@ -597,3 +634,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-14 | Added a "Pre-call get-ready room (P-11)" note — P-11 has no app-managed camera-preview pane (Daily prejoin owns the device check; approved minor deviation from the mockup) — and noted that P-12 + D-04 are served by one shared role-aware `VideoRoom` (separate screen IDs retained) rendering a brand-themed Daily Prebuilt iframe | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | P-01 landing → Built: added the §2 public SPA route map (`/`→landing, listing P-02 relocated to `/browse`, logged-in-patient `/`→`/browse` redirect) and §3 "Landing (P-01)" (hero CTAs Browse + Sign-up, "How it works" anchor in the topnav, static featured-doctors grid) + "Legal pages (F16)" (reusable `LegalPage` DRAFT-banner pattern for `/legal/terms`,`/legal/privacy`) interaction notes | Slice H · S4 (public surface — landing + legal; ADR-35) |
 | 2026-06-15 | Flow-audit fixes: §2 sidebar **Log out** control (doctor/admin) + History-link-resolves note (ISSUE-2/4); §3 day-tabbed picker renders on P-03 (ISSUE-1); A-01 photo **required on add** (ISSUE-6); new "Medicine catalogue (A-02)" Edit note (ISSUE-7); P-07 as-built single "Payment not completed" terminal card + no-infinite-poll (ISSUE-3); "Not-found & cross-tenant states" (404 page ISSUE-8 + cross-tenant Rx message ISSUE-10); Landing featured cards display-only (ISSUE-5) | Three-role flow-audit fix session |
+| 2026-06-15 | Added §8 Theming system (layered tokens `tokens.css`/`themes.css`, extended role tokens incl. `--font-display`, `data-theme`+`localStorage` runtime, 4 themes — new AA default Ivory & Ink + Derma Noir + Sage & Blush + original Spruce); §2 admin sidebar +Appearance and screen registry +A-06 (24→25 rows); new `.tabs`/`.tab` tab-nav component. Style-only redesign; F17 / ADR-41 | Client theme-system visual redesign |

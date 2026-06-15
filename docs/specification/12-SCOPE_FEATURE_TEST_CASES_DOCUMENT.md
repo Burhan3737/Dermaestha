@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.7                                    |
+| Version          | 1.8                                    |
 | Last updated     | 2026-06-15                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
@@ -261,6 +261,13 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F16-001 | F16.01 Legal pages linked from sign-up | None                | 1. Open the sign-up consent checkbox label links.           | `/legal/terms` and `/legal/privacy` pages load and are linked from the consent checkbox. | Low      |
 | TC-F16-002 | F16.02 Consent record                  | A completed sign-up | 1. Sign up with consent ticked. 2. Inspect the user record. | A single mandatory acceptance with timestamp (`tos_accepted_at`) is recorded at sign-up. | Low      |
 
+### F17 — Admin: appearance / theme switcher (client)
+
+| ID         | Feature                                                   | Preconditions               | Steps                                                                                                  | Expected result                                                                                                                                                                                                 | Priority |
+| ---------- | --------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| TC-F17-001 | F17.01 Theme persists + re-colours without screen change  | Admin `A` logged in         | 1. Open Admin → Appearance. 2. Apply a non-default theme (e.g. Derma Noir). 3. Navigate screens; reload. | Every screen re-colours immediately with no layout/content change; the choice persists across reloads (`localStorage` `dermestha.theme`). The runtime unit test covers apply/persist/init/fallback.             | Low      |
+| TC-F17-002 | F17.02 Selectable themes + AA + one-click revert           | Admin `A` on A-06 Appearance | 1. Review the theme cards. 2. Apply each in turn. 3. Apply **Spruce**.                                  | Four themes are selectable (Ivory & Ink default + Derma Noir + Sage & Blush + Spruce); the three new themes meet WCAG AA (`theme-redesign/verify-contrast.mjs`); selecting Spruce restores the original look.    | Low      |
+
 ---
 
 ## 5. Security test cases
@@ -354,3 +361,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-13 | Added TC-F10-006 (admin weekly-template editor), TC-F12-004 (second-resend idempotency 409), TC-F12-005 (`system.unhandled_exception` alert source), TC-F13-004 (email-resend audit trail + 409), TC-F14-004 (settings floor + A-05 confirm gate) | Slice G as-built sweep |
 | 2026-06-14 | Added the §6 "S7 E2E QA cycle — execution record": Critical J1–J6 cases marked Verified (E2E + integration) + the assisted-manual UI cases (F02/F16/F10/F12/F13/F14) Verified; logged the 4 cycle defects (BUG-1 / FIX-A / FIX-B / BUG-2) as found-and-fixed with resolutions (ADR-39); pointed at the release recommendation | Slice H · S7 (E2E QA + launch gate) |
 | 2026-06-15 | Added TC-F03-010 (future-day picker), TC-F04-009 (payment-fail terminal UX), TC-F08-015 (cross-tenant Rx UI no-leak), TC-F10-007 (photo required on add), TC-F11-007 (medicine edit via A-02); added the §6 "Three-role flow-audit fix cycle" execution record (new j7/j8/j9 E2E specs; logout/404 covered there) | Three-role flow-audit fix session |
+| 2026-06-15 | Added the F17 test-case table (TC-F17-001 theme persists + re-colours without screen change; TC-F17-002 selectable themes + AA + one-click revert) for the client theme switcher (ADR-41) | Client theme-system visual redesign |
