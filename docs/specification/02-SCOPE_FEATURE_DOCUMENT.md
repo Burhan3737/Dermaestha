@@ -4,8 +4,8 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.4                                           |
-| Last updated     | 2026-06-14                                    |
+| Version          | 1.5                                           |
+| Last updated     | 2026-06-16                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
 
@@ -104,6 +104,7 @@ One-line: patient picks a future 30-minute slot within a doctor's availability, 
 - **F03.03 - Slot-lock & checkout handoff**
   - **Slot-Lock Rule**: on "Confirm & Pay", the slot is locked for 10 minutes while the patient completes the payment flow (policy #2). On payment failure or 10-minute lock expiry, the slot is released and no booking record persists.
   - **Single-Lock Rule**: a patient cannot hold multiple slot locks simultaneously.
+  - **Recoverable-Hold Rule**: an abandoned or in-progress hold is recoverable rather than an invisible dead-end — while live it surfaces in the patient's appointments as a "Payment pending" card with a "Complete payment" action, and the booking-page active-lock error links there. The Single-Lock Rule above is unchanged; the hold still expires after the 10-minute TTL if payment is not completed.
   - **No-Overlap Rule**: a patient cannot book overlapping slots with the same or different doctors.
   - **Double-Booking Rule (#1)**: slot double-booking is impossible at the storage layer; a second attempt to book the same `(doctor, slot-time)` fails at write time (§3.3 #1).
   - On confirm, the patient is redirected to the payment aggregator's hosted page (F04).
@@ -563,3 +564,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | 2026-06-13 | Added two PayFast-Pakistan alert sources to the F12.01 alert-feed enumeration: `payment.manual_review_required` (no gateway status-query API) + `payment.refund_manual_required` (no gateway refund API) | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | F05.03: noted the KPI #3 emit points — `video_join_attempt` on the Join Call click (P9 + D2) and `video_join_success` on Daily `joined-meeting` (P5/D3) via the fire-and-forget client `lib/analytics/track.js` seam (doc 14 §6; ADR-34) | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | F16.01: legal pages built as a banner-marked structured DRAFT via the reusable `LegalPage` template (final lawyer copy = pre-launch gate); F03.03: noted the KPI #1 emit points — `landing_view` on P-01 mount + `booking_started` on slot-lock via the shared `lib/analytics/track.js` seam (`booking_confirmed` remains S6/server) | Slice H · S4 (public surface — landing + legal; ADR-35) |
+| 2026-06-16 | Noted that an abandoned slot-lock hold is recoverable from patient appointments (Payment-pending / Complete payment); Single-Lock Rule unchanged | Pending-hold recovery feature (34f978d) |

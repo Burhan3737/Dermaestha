@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.7                                    |
-| Last updated     | 2026-06-15                             |
+| Version          | 1.8                                    |
+| Last updated     | 2026-06-16                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -107,6 +107,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F03-008 | F03.03 No-Overlap Rule                                  | `P` confirmed on a slot with `D`                  | 1. `P` attempts to book an overlapping slot with `D2`.                                              | `P` cannot book overlapping slots with the same or a different doctor; the overlapping attempt is rejected.                             | High     |
 | TC-F03-009 | F03.03 Active-Doctor Booking Rule (invariant #9, G2)   | `D` deactivated or unknown; `P` logged in         | 1. `P` attempts to lock a slot for a deactivated or non-existent doctor.                             | The lock is rejected with `404 NOT_FOUND` — the same answer as the public profile route, no existence leak; no `slot_locked` row is created; a deactivated/unknown doctor takes no new bookings (invariant #9). | High     |
 | TC-F03-010 | F03.01 Future-Day Picker (day tabs, P-03)              | `P` logged in; `D` available on a future weekday only | 1. Open `D`'s profile (P-03). 2. Note the "Today" tab has no slots. 3. Select a future day tab. 4. Pick a slot → book → pay. | The profile shows day tabs for upcoming days; selecting a future day fetches and shows that day's slots; a future-day slot books → pays → confirms. Booking is not locked to today (flow-audit ISSUE-1). | Critical |
+| TC-F03-011 | F03.03 Slot-Lock Rule (pending-hold recovery)         | `P` holds one active (unexpired) slot lock from an abandoned checkout (payment not completed) | 1. `P` abandons checkout, leaving the live lock. 2. `P` attempts a new booking. 3. Follow the "Go to your pending booking" link. 4. On `/appointments`, open the "Payment pending" card → "Complete payment". 5. Complete the (mock) payment. | The new-booking attempt is blocked with "Finish your current booking first." and a "Go to your pending booking" link to `/appointments`; the held slot surfaces there as a "Payment pending" card; "Complete payment" resumes checkout and the booking confirms — an abandoned hold is recoverable, not stranded. | Critical |
 
 ### F04 — Payment
 
@@ -354,3 +355,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-13 | Added TC-F10-006 (admin weekly-template editor), TC-F12-004 (second-resend idempotency 409), TC-F12-005 (`system.unhandled_exception` alert source), TC-F13-004 (email-resend audit trail + 409), TC-F14-004 (settings floor + A-05 confirm gate) | Slice G as-built sweep |
 | 2026-06-14 | Added the §6 "S7 E2E QA cycle — execution record": Critical J1–J6 cases marked Verified (E2E + integration) + the assisted-manual UI cases (F02/F16/F10/F12/F13/F14) Verified; logged the 4 cycle defects (BUG-1 / FIX-A / FIX-B / BUG-2) as found-and-fixed with resolutions (ADR-39); pointed at the release recommendation | Slice H · S7 (E2E QA + launch gate) |
 | 2026-06-15 | Added TC-F03-010 (future-day picker), TC-F04-009 (payment-fail terminal UX), TC-F08-015 (cross-tenant Rx UI no-leak), TC-F10-007 (photo required on add), TC-F11-007 (medicine edit via A-02); added the §6 "Three-role flow-audit fix cycle" execution record (new j7/j8/j9 E2E specs; logout/404 covered there) | Three-role flow-audit fix session |
+| 2026-06-16 | Added TC-F03-011 — pending-hold recovery (abandon → Payment-pending card → Complete payment → confirmed) | Pending-hold recovery feature (34f978d) |

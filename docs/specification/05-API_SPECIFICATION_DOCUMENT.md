@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.16                          |
-| Last updated     | 2026-06-15                    |
+| Version          | 1.17                          |
+| Last updated     | 2026-06-16                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -165,7 +165,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | --------------------------------------- | -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `POST /api/appointments/lock`           | patient              | Create `slot_locked` (10-min hold) + "who-for" (P3/P8)      | a concurrent 2nd lock fails via the partial unique index → 409 `SLOT_TAKEN` (#1); validation also returns 409 `ACTIVE_LOCK_EXISTS`/`OVERLAP` (single-lock / no-overlap) and 422 `SLOT_NOT_BOOKABLE` (non-bookable or expired-lock collision, ADR-23) |
 | `POST /api/appointments/:id/pay`        | patient              | Create idempotent payment intent → PayFast handoff URL (P3) | idempotent on `(patient, slot)` (#7); 409 `LOCK_EXPIRED` if hold gone  |
-| `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant; `?scope=history` returns terminal-state rows newest-first; list rows (both roles) include `hasPrescription` |
+| `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant; `?scope=history` returns terminal-state rows newest-first; list rows (both roles) include `hasPrescription`; patient active scope also surfaces a live `slot_locked` payment hold (row carries `lockExpiresAt`) — not just `confirmed`/`in_progress` — so an abandoned hold is recoverable (P-08 "Payment pending" recovery) |
 | `GET /api/appointments/:id`             | patient/doctor/admin | Detail, ownership-checked                                   | 404 (not 403) when not visible; detail adds `subjectAge`, `subjectRelation`, `patientName`, and `lockExpiresAt` (lets P-07 show a terminal Failure/Lock-expired state once a `slot_locked` hold is released/expired, instead of polling forever) |
 | `POST /api/appointments/:id/cancel`     | patient/doctor       | Cancel (P6/D5) → state transition + refund per policy       | see §5 transition table for ≥2h vs <2h vs doctor                       |
 | `POST /api/appointments/:id/dispute`    | admin                | Set/clear `disputed` flag (A5)                              | flag only — not a state transition; audit-logged                       |
@@ -348,3 +348,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-14 | `POST /api/analytics/events` row → **Built (Slice H · S6)**: public, rate-limited 60/min/IP, body validated against the closed doc 14 §6 catalog (unknown `type` → `400 VALIDATION_FAILED`), success `202 { ok: true }`, best-effort writer | Slice H · S6 (launch foundation + hardening) |
 | 2026-06-14 | `payment.failed` outcome corrected on the `POST /api/webhooks/payfast` row + the `slot_locked` state-machine row: marks the Payment `failed` + **releases the slot-lock (force-expire), no appointment delete** — was "row removed / released" (ADR-39) | Slice H · S7 (E2E QA + launch gate; ADR-39) |
 | 2026-06-15 | Flow-audit fixes: `POST /api/auth/login` body `role` clarified as accepted-but-ignored/non-authoritative (ISSUE-12); `GET /api/auth/me` anonymous → `200 null` not `401` (ISSUE-13); `GET /api/appointments/:id` detail adds `lockExpiresAt` for the P-07 terminal-state fix (ISSUE-3) | Three-role flow-audit fix session |
+| 2026-06-16 | GET /api/appointments active scope now also returns a live slot_locked hold (lockExpiresAt) | Pending-hold recovery feature (34f978d) |

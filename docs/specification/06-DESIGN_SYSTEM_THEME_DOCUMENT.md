@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.6                                                                                       |
-| Last updated     | 2026-06-15                                                                                |
+| Version          | 1.7                                                                                       |
+| Last updated     | 2026-06-16                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -180,6 +180,10 @@ Slots are grouped under day tabs. States:
 
 Minimum tap target: ≥ 44 px tall. Time labels use tabular numerics.
 
+### Active-lock guard (P-06)
+
+Submitting a booking while the patient already holds a live slot lock is rejected (`ACTIVE_LOCK_EXISTS`, doc 05) with the inline error "Finish your current booking first." Alongside the error, a **"Go to your pending booking"** link navigates to the appointments list (P-08), where the live hold surfaces as the payment-pending card (below).
+
 ### Confirmation dialogs (modals)
 
 Centered on a dimmed backdrop (`rgba(15,33,24,.45)`). A 4 px accent bar at the top is colored by intent: spruce for confirmations, danger red for cancellations and deactivation. Actions are right-aligned: ghost "cancel" + filled "confirm". Never left-aligned in a content column.
@@ -196,6 +200,10 @@ Returned as finished centered cards (~520 px, icon circle + title + body + singl
 - **Platform couldn't secure slot** — full refund message.
 
 As-built, because a failed payment force-expires the lock (ADR-39), the Failure and Lock-expired cases converge into one terminal **"Payment not completed"** card (the slot hold was released → pick another time). The return page keys this off the appointment's `lockExpiresAt` vs. `serverNow` (doc 05) and **stops polling** on a terminal outcome — it never shows an indefinite "Awaiting payment confirmation…" spinner.
+
+### Payment-pending hold card (P-08)
+
+While a slot lock is live (its hold has not expired), the patient's Upcoming list renders a **"Payment pending — hold expires <time>"** card with a **"Complete payment"** button that resumes the hosted checkout (P-07). The card appears only while the hold is live; once the hold expires it disappears.
 
 ### Not-found & cross-tenant states
 
@@ -597,3 +605,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-14 | Added a "Pre-call get-ready room (P-11)" note — P-11 has no app-managed camera-preview pane (Daily prejoin owns the device check; approved minor deviation from the mockup) — and noted that P-12 + D-04 are served by one shared role-aware `VideoRoom` (separate screen IDs retained) rendering a brand-themed Daily Prebuilt iframe | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | P-01 landing → Built: added the §2 public SPA route map (`/`→landing, listing P-02 relocated to `/browse`, logged-in-patient `/`→`/browse` redirect) and §3 "Landing (P-01)" (hero CTAs Browse + Sign-up, "How it works" anchor in the topnav, static featured-doctors grid) + "Legal pages (F16)" (reusable `LegalPage` DRAFT-banner pattern for `/legal/terms`,`/legal/privacy`) interaction notes | Slice H · S4 (public surface — landing + legal; ADR-35) |
 | 2026-06-15 | Flow-audit fixes: §2 sidebar **Log out** control (doctor/admin) + History-link-resolves note (ISSUE-2/4); §3 day-tabbed picker renders on P-03 (ISSUE-1); A-01 photo **required on add** (ISSUE-6); new "Medicine catalogue (A-02)" Edit note (ISSUE-7); P-07 as-built single "Payment not completed" terminal card + no-infinite-poll (ISSUE-3); "Not-found & cross-tenant states" (404 page ISSUE-8 + cross-tenant Rx message ISSUE-10); Landing featured cards display-only (ISSUE-5) | Three-role flow-audit fix session |
+| 2026-06-16 | Patient Upcoming gains a "Payment pending / Complete payment" card for live holds; Booking active-lock error gains a "Go to your pending booking" link | Pending-hold recovery feature (34f978d) |
