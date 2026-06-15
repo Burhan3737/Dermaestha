@@ -61,6 +61,8 @@ const pairs = [
   ['on-dark-muted / feature-bg', 'color-on-dark-muted', 'color-feature-bg', T_TEXT],
   ['on-dark / dark-bg (video)', 'color-on-dark', 'color-dark-bg', T_TEXT],
   ['tab-inactive / surface', 'color-tab-inactive', 'color-surface', T_TEXT],
+  ['active-tab primary / bg', 'color-primary', 'color-bg', T_TEXT],
+  ['muted (inactive tab) / bg', 'color-text-muted', 'color-bg', T_TEXT],
   // functional input/control boundary — WCAG 1.4.11 (3:1), enforced
   ['border-strong / surface (3:1)', 'color-border-strong', 'color-surface', T_LARGE],
   // decorative hairlines / elevation / disabled — reported as notes, NOT hard pass/fail

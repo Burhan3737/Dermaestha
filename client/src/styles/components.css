@@ -141,6 +141,14 @@ body { font-family: var(--font-body); font-size: var(--fs-body); line-height: 1.
 .table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .filters { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
 
+/* Tab nav (appointment dashboard P-08/P-09, doctor today D-02, admin records A-04).
+   The .tab/.tab--active classes existed in the views with no CSS; styled here so they
+   read as proper tabs and stay legible on every theme (incl. the dark Derma Noir). */
+.tabs { display: flex; gap: var(--sp-1); border-bottom: var(--border-1); margin-bottom: var(--sp-5); }
+.tab { padding: 10px 14px; font-size: var(--fs-body-sm); font-weight: 600; color: var(--color-text-muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.tab:hover { color: var(--color-text-strong); }
+.tab--active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+
 /* Form section card */
 .section-card { background: var(--color-surface); border: var(--border-1); border-radius: var(--r-md); padding: var(--sp-5); margin-bottom: var(--sp-4); }
 .section-card__title { margin-bottom: var(--sp-4); }
