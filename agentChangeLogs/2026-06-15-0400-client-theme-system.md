@@ -1,12 +1,12 @@
 # 2026-06-15-0400 — client-theme-system
 
-**Status:** Partial
+**Status:** Completed
 **Goal:** Introduce a centralized, runtime-switchable theming system for the client (style/theme only — no business logic, no flow changes), ship 2–3 distinctive themes for the boutique-teledermatology market, and expose a scoped admin "Appearance" tab to switch themes — with the least possible change to view code.
 **Skill(s) used:** superpowers:brainstorming (opted in, run autonomously per user delegation); frontend-design (opted in); deep-research / web (planned for palette exploration)
 **Ticket / issue:** None
 **Branch:** feature/client-theme-system
-**Commits / PR:** (in progress — committing on branch; NOT pushing per CLAUDE.md)
-**Last updated:** 2026-06-15-0430
+**Commits / PR:** 11 commits on `feature/client-theme-system` (dae1acc…HEAD); NOT pushed/merged per CLAUDE.md — awaiting user
+**Last updated:** 2026-06-15-0555
 **Tags:** #refactor #frontend #design #theming
 
 ## Summary
@@ -36,6 +36,12 @@ User requested a full design/theme refactor, client-side only, with themes livin
 | `theme-redesign/METHOD.md`, `theme-redesign/before/**` | Created (subagent) | Before-state baseline: 24 desktop + 6 mobile + component inventory + 6 live public screens |
 | `client/src/modules/admin/views/AdminAppearance/AdminAppearance.jsx` | Created | A-06 Appearance view: theme cards (swatches + tagline) + live component preview; pure client (setTheme) |
 | `client/src/modules/admin/admin.routes.jsx` | Modified | Register AdminAppearance: import + `ADMIN_LINKS` "Appearance" entry + `/admin/appearance` route |
+| `client/src/styles/components.css` (3rd) | Modified | Added `.tabs`/`.tab`/`.tab--active` themeable tab-nav (was unstyled → illegible on dark) with a control reset so `<button class=tab>` matches `<a class=tab>`; global `a {}` themes bare content links (admin "View", auth recovery) to a brand colour (default browser blue is unreadable on dark). CSS-only — no view edits |
+| `client/test/unit/lib/theme/theme.test.js` | Created | 6 unit tests for the theme runtime (apply/persist/init/fallback/registry) — client 135→141 |
+| `docs/specification/02,06,11,12,13` | Modified | Spec sweep (applied at END, surgical, version-bumped + revision footers): F17 (02 v1.5); §8 Theming + A-06 registry + `.tabs` (06 v1.7); ADR-41 (11 v1.18); TC-F17-001/002 (12 v1.8); F17/A-06 Built status (13 v1.22) |
+| `docs/theme-redesign/THEME-DESIGN.md` | Created | Authoritative theming-system + redesign rationale (architecture, themes, AA, perf, how-to-extend, follow-ups) |
+| `theme-redesign/report.md`, `theme-redesign/after/**` | Created (subagents + controller) | Before/after visual report + 3-theme after captures (24 desktop + responsive mobile + component inventory per theme) |
+| `client/__theme_preview__/gallery.html` (2nd) | Modified (subagents + controller) | Load the 3 display serifs; cache-bust params for after-pass re-captures |
 
 ## Dependencies / config / schema
 None yet. (Plan: no new runtime dependencies; theme persistence is client-side `localStorage` only — no schema/env/API change.)
@@ -56,28 +62,33 @@ None yet. (Plan: no new runtime dependencies; theme persistence is client-side `
 - **Integration gap caught during implementation (not in the design brief):** Derma Noir's `--color-danger` is a *light* coral (correct as danger text on dark), but the app fills `.btn--danger`/video-leave with it under white text → AA fail. Fixed by adding a themed `--color-on-danger` (dark for Derma Noir, white elsewhere). The token contract sent to the design workflow lacked an `on-danger` slot — recorded so future contracts include it.
 - **`--font-head` is overloaded** (headings AND 11px labels/badges/table-headers). Swapping it wholesale to a serif would ruin small-label legibility, so a dedicated `--font-display` token was introduced for true headings only.
 - Independent contrast check found the design director's "0 failures" was optimistic about the decorative `primary-border` hairline; confirmed it's non-critical (slots are identified by label + selected state).
+- **Visual QA (after-capture) caught two real defects the dark theme exposed**, both pre-existing unstyled markup made visible by Derma Noir: (1) `<button class="tab">` (D-02/A-04) showed native UA button chrome — my first `.tab` rule only set `border-bottom`; fixed with a control reset (`appearance/background/border/font`) so `<button>` and `<a>` tabs match. (2) Bare content links (admin "View", auth recovery) rendered default browser-blue — illegible on the dark surface; fixed with a global themeable `a { color: var(--color-primary) }` (class-styled links unaffected by specificity). Both CSS-only, no view edits, required for the dark theme to be correct.
 
 ## Verification
 - Foundation pass (spruce-identical): build clean; **135/135 client tests passed**; components.css free of theme-coupled raw hex.
 - Full theme system: `npm --workspace client run build` clean (CSS 23.4 kB, +1.1 kB gzip for 3 palettes); **135/135 tests still pass**.
 - **Independent WCAG-AA contrast verification** (`theme-redesign/verify-contrast.mjs`, parses the real CSS): **Ivory & Ink / Derma Noir / Sage & Blush = 0 hard failures** across all text + functional control-boundary pairs. Spruce (unmodified original) shows 4 pre-existing sub-threshold pairs (brass-on-accent, warning-on-tint, tab-inactive, border-strong) — documented in doc-06 §4, out of scope. The only sub-3:1 value in the new themes is the *decorative* `primary-border` slot hairline (by design; the functional `border-strong` passes 3:1 in all three).
-- Pending: before/after visual capture across themes + visual sanity review.
+- **Final state (all green):** `npm --workspace client run build` clean; **141/141 client tests pass**; `node theme-redesign/verify-contrast.mjs` → **new themes 0 AA hard failures** (spruce's 4 are pre-existing/original).
+- **Visual confirmation (controller, via Playwright + the harness):** Derma Noir D-02 and Ivory & Ink A-04 reviewed directly; computed-style checks confirmed the `.tab` control-reset (both `<a>`/`<button>` flat, jade/ink underline) and that bare "View" links now resolve to the theme primary (jade on dark), not browser-blue. After-captures refreshed for the 5 affected screens × 3 themes.
 
 ## Risk / rollback
 Low. Additive + default-unchanged. Rollback = delete branch. No server/data changes.
 
 ## Open items / next session
-**Remaining work (gated on design-exploration workflow output):**
-- Append the 3 finalist theme palettes to `themes.css` + 3 entries to the `THEMES` registry in `theme.js`.
-- Decide live default: keep spruce, or flip `DEFAULT_THEME` (+ index.html bootstrap default) to the recommended new theme (one-click revert preserved either way).
-- After-capture across all themes (reuse `client/__theme_preview__/gallery.html` via `?theme=<id>`) → `theme-redesign/after/` + a before/after `report.md`.
-- Per-theme WCAG AA contrast double-check.
-- Write the design rationale doc (`docs/theme-redesign/THEME-DESIGN.md` or similar).
+**This session is complete.** All code committed on `feature/client-theme-system` (11 commits); NOT pushed/merged (awaiting user per CLAUDE.md). The themeable token system, the 3 new themes + spruce fallback, the admin Appearance tab, the `.tab`/bare-link completions, the before/after report, the design rationale doc, and the spec sweep are all done and verified.
 
-**Doc-impact running list (track now; apply surgically at END after code committed, with version bumps + revision footers per doc-00 change protocol). Anchors verified: next ADR = ADR-41; next feature = F17; new screen = A-06.**
-1. **Doc 02 (Scope/Feature):** add **F17 — Appearance / theme switcher** (admin-selectable client-side theme; style-only; no DB/API). Change-impact matrix "new feature → 02, then 04/05/12/13" — 04/05 N/A (no schema/API); 12 optional TC; 13 status.
-2. **Doc 06 (Design System & Theme):** §2 admin sidebar + screen inventory → add **A-06 Appearance**; new section documenting the layered token architecture (invariant `tokens.css` scale vs swappable `themes.css` palettes), the 8 extended role tokens, the `data-theme`+localStorage runtime, the available themes + recommended default; note components.css is now fully tokenized (the doc's "no raw hex" claim is now literally true). §4 palette gets a note that listed values are the DEFAULT (spruce) theme.
-3. **Doc 11 (ADR):** add **ADR-41 — client-side theming (data-theme + localStorage), layered tokens, no server-backed global theme in v1 (scope/cost; client-only, style-only mandate)**.
-4. **Doc 13 (Product Status Tracker):** record theming capability + A-06 Appearance as built.
-5. **Doc 15 (Config Reference):** brief note of the `dermestha.theme` localStorage key + default-theme id as a client tunable (decide at end).
-6. **Doc 12 (Test cases):** optional TC for F17 (theme selection persists + re-colours without screen change).
+**Doc-impact verdict — APPLIED.** Tracked updates were applied at the END (after all code was committed), surgically per the doc-00 change protocol (version bumps + revision footers), under the user's explicit autonomous-decision delegation:
+- **Doc 02** → F17 (admin appearance/theme switcher, post-PRD) + ID map. v1.4→**1.5**.
+- **Doc 06** → §8 Theming system + A-06 in the screen registry (24→25) + Appearance sidebar link + new `.tabs` component. v1.6→**1.7**.
+- **Doc 11** → ADR-41 (client-side runtime theming; builds on ADR-06) + index. v1.17→**1.18**.
+- **Doc 12** → TC-F17-001/002. v1.7→**1.8**.
+- **Doc 13** → F17/A-06 Built status row + admin-views checklist. v1.21→**1.22**.
+- **Doc 15** → **NOT changed** (theme constants are client UI, documented in doc 06 — not a server tunable/env var; defensible scope call).
+Mid-build decisions/edge-cases that fed the spec (per CLAUDE.md, the common drift source): the `--color-on-danger` dark-theme fix, the `--font-display` heading-serif split, and the `.tab`/bare-link completions — all reflected in ADR-41 + doc 06 §8.
+
+**Follow-ups (out of scope here — for the user to weigh):**
+- **Server-backed GLOBAL theme** (all users, not per-browser) — needs API + DB column + config (backend; intentionally excluded from this client-only, style-only change). The runtime is structured to read a server value later.
+- **Self-host + subset** the 3 display serifs to `latin` + pin variable axes — biggest 3G payload win; removes the Google Fonts dependency.
+- **Style the remaining pre-existing unstyled** `.appt-row`/`.status-card`/`.empty-state` (legible but plain in all themes incl. original spruce) — a design-polish task beyond theming.
+- **Default theme choice** — keep Ivory & Ink live, or revert to Spruce (one line each in `theme.js` `DEFAULT_THEME` + the `index.html` bootstrap).
+- **Push/merge** the branch (held per CLAUDE.md).
