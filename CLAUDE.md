@@ -7,6 +7,7 @@
 - After you fully understand the request, recommend the best-fit skill(s) for the task and let the user choose whether to use them.
 - Before activating any skill, STOP: tell the user which skill you are about to use and why, and let them decline. Never activate a skill silently.
 - If the user proposes a skill that does not fit the current task, tell them it is unsuitable before doing anything else.
+- If no best-fit skill is found, do NOT create or download a new skill. Instead, delegate to a sub agent using the `/findSkills` skill to locate the best-fit skill, then load it only after the user approves.
 
 ### Specs
 
