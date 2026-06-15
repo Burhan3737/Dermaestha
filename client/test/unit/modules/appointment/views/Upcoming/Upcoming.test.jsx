@@ -181,4 +181,36 @@ describe('P-08 Upcoming', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancel & refund/i }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/appointments/a1/cancel', {}));
   });
+
+  it('renders a pending slot_locked hold and resumes checkout on Complete payment', async () => {
+    const orig = window.location;
+    delete window.location;
+    window.location = { href: '' };
+    const future = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    api.get.mockResolvedValue({
+      data: [
+        {
+          id: 'h1',
+          slotStart: '2099-01-04T13:00:00.000Z',
+          slotEnd: '2099-01-04T13:30:00.000Z',
+          state: 'slot_locked',
+          lockExpiresAt: future,
+          feeAtBooking: 250000,
+          forSelf: true,
+          subjectName: null,
+          doctorName: 'Dr A',
+          specialization: 'Acne',
+          doctorPhotoUrl: null,
+        },
+      ],
+    });
+    api.post.mockResolvedValue({ redirectUrl: '/dev/checkout?ref=mock_h1' });
+    setup();
+    await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
+    expect(screen.getByText(/payment pending/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /complete payment/i }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/appointments/h1/pay'));
+    await waitFor(() => expect(window.location.href).toBe('/dev/checkout?ref=mock_h1'));
+    window.location = orig;
+  });
 });

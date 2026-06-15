@@ -76,6 +76,7 @@ describe('appointment.listForRole', () => {
       slotStart: '2099-01-04T13:00:00.000Z',
       slotEnd: '2099-01-04T13:30:00.000Z',
       state: 'confirmed',
+      lockExpiresAt: null,
       feeAtBooking: 250000,
       forSelf: true,
       subjectName: null,
@@ -86,9 +87,52 @@ describe('appointment.listForRole', () => {
     });
     expect(prisma.appointment.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { patientUserId: 'u1', state: { in: ['confirmed', 'in_progress'] } },
+        where: {
+          patientUserId: 'u1',
+          OR: [
+            { state: { in: ['confirmed', 'in_progress'] } },
+            { state: 'slot_locked', lockExpiresAt: { gt: expect.any(Date) } },
+          ],
+        },
       }),
     );
+  });
+
+  it('patient active list includes a still-live slot_locked hold with lockExpiresAt', async () => {
+    const future = new Date(Date.now() + 5 * 60 * 1000);
+    prisma.appointment.findMany.mockResolvedValue([
+      {
+        id: 'hold1',
+        slotStart: new Date('2099-01-04T13:00:00Z'),
+        slotEnd: new Date('2099-01-04T13:30:00Z'),
+        state: 'slot_locked',
+        lockExpiresAt: future,
+        feeAtBooking: 250000,
+        forSelf: true,
+        subjectName: null,
+        doctor: { id: 'd1', specialization: 'Acne', photoUrl: null, user: { fullName: 'Dr A' } },
+        _count: { prescriptions: 0 },
+      },
+    ]);
+    const out = await listForRole({ role: 'patient', userId: 'u1' });
+    expect(out[0].state).toBe('slot_locked');
+    expect(out[0].lockExpiresAt).toBe(future.toISOString());
+    // The query asks for a live hold (lockExpiresAt > now) — expired holds are filtered by the DB.
+    const where = prisma.appointment.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([
+      { state: { in: ['confirmed', 'in_progress'] } },
+      { state: 'slot_locked', lockExpiresAt: { gt: expect.any(Date) } },
+    ]);
+  });
+
+  it('patient active list excludes an expired slot_locked hold (DB filter, not returned)', async () => {
+    // An expired hold fails the lockExpiresAt > now predicate, so prisma never returns it.
+    prisma.appointment.findMany.mockResolvedValue([]);
+    const out = await listForRole({ role: 'patient', userId: 'u1' });
+    expect(out).toEqual([]);
+    const where = prisma.appointment.findMany.mock.calls[0][0].where;
+    const holdClause = where.OR.find((c) => c.state === 'slot_locked');
+    expect(holdClause.lockExpiresAt.gt).toBeInstanceOf(Date);
   });
 });
 

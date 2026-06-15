@@ -26,5 +26,13 @@ export function useAppointment(opts = {}) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
   });
 
-  return { list, detail, cancel };
+  // Resume a pending payment hold from the appointments list: re-initiate hosted checkout
+  // (idempotent server-side). On error (e.g. the hold just expired) refresh the list so the
+  // stale pending card drops off.
+  const resumePayment = useMutation({
+    mutationFn: (id) => api.post(`/appointments/${id}/pay`),
+    onError: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+  });
+
+  return { list, detail, cancel, resumePayment };
 }

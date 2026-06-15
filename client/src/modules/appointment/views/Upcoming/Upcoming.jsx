@@ -9,7 +9,7 @@ import { useAppointment } from '../../useAppointment.js';
 
 export function Upcoming() {
   const [cancelId, setCancelId] = useState(null);
-  const { list, detail, cancel: cancelMut } = useAppointment({ detailId: cancelId });
+  const { list, detail, cancel: cancelMut, resumePayment } = useAppointment({ detailId: cancelId });
 
   const rows = list.data?.data ?? [];
 
@@ -34,37 +34,60 @@ export function Upcoming() {
             </Link>
           </div>
         )}
-        {rows.map((a) => (
-          <div key={a.id} className="appt-row">
-            <strong>{a.doctorName}</strong> — {a.specialization}
-            <div>{formatKarachi(a.slotStart)}</div>
-            {!a.forSelf && <div>for: {a.subjectName}</div>}
-            <div>{formatPkr(a.feeAtBooking)}</div>
-            {(() => {
-              const opensAt = new Date(a.slotStart).getTime() - 10 * 60 * 1000;
-              const closesAt = new Date(a.slotEnd).getTime() + 5 * 60 * 1000;
-              const active = Date.now() >= opensAt && Date.now() <= closesAt;
-              return active ? (
-                <Link
-                  className="btn btn--secondary"
-                  to={`/video/${a.id}/ready`}
-                  onClick={() => track('video_join_attempt', { appointmentId: a.id, role: 'patient' })}
-                >
-                  Join Call
-                </Link>
-              ) : (
-                <button type="button" className="btn btn--secondary" disabled>
-                  Join Call
-                </button>
-              );
-            })()}
-            {a.state === 'confirmed' && (
-              <button type="button" className="btn btn--ghost" onClick={() => setCancelId(a.id)}>
-                Cancel
+        {rows.map((a) =>
+          a.state === 'slot_locked' ? (
+            <div key={a.id} className="appt-row">
+              <strong>{a.doctorName}</strong> — {a.specialization}
+              <div>{formatKarachi(a.slotStart)}</div>
+              {!a.forSelf && <div>for: {a.subjectName}</div>}
+              <div className="help">Payment pending — hold expires {formatKarachi(a.lockExpiresAt)}</div>
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={resumePayment.isPending}
+                onClick={() =>
+                  resumePayment.mutate(a.id, {
+                    onSuccess: (d) => {
+                      window.location.href = d.redirectUrl;
+                    },
+                  })
+                }
+              >
+                Complete payment
               </button>
-            )}
-          </div>
-        ))}
+            </div>
+          ) : (
+            <div key={a.id} className="appt-row">
+              <strong>{a.doctorName}</strong> — {a.specialization}
+              <div>{formatKarachi(a.slotStart)}</div>
+              {!a.forSelf && <div>for: {a.subjectName}</div>}
+              <div>{formatPkr(a.feeAtBooking)}</div>
+              {(() => {
+                const opensAt = new Date(a.slotStart).getTime() - 10 * 60 * 1000;
+                const closesAt = new Date(a.slotEnd).getTime() + 5 * 60 * 1000;
+                const active = Date.now() >= opensAt && Date.now() <= closesAt;
+                return active ? (
+                  <Link
+                    className="btn btn--secondary"
+                    to={`/video/${a.id}/ready`}
+                    onClick={() => track('video_join_attempt', { appointmentId: a.id, role: 'patient' })}
+                  >
+                    Join Call
+                  </Link>
+                ) : (
+                  <button type="button" className="btn btn--secondary" disabled>
+                    Join Call
+                  </button>
+                );
+              })()}
+              {a.state === 'confirmed' && (
+                <button type="button" className="btn btn--ghost" onClick={() => setCancelId(a.id)}>
+                  Cancel
+                </button>
+              )}
+            </div>
+          ),
+        )}
       </section>
       {cancelId &&
         detail.data &&

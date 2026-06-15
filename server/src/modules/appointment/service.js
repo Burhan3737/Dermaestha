@@ -38,6 +38,7 @@ function toPatientRow(a) {
     slotStart: a.slotStart.toISOString(),
     slotEnd: a.slotEnd.toISOString(),
     state: a.state,
+    lockExpiresAt: a.lockExpiresAt ? a.lockExpiresAt.toISOString() : null,
     feeAtBooking: a.feeAtBooking,
     forSelf: a.forSelf,
     subjectName: a.subjectName,
@@ -54,7 +55,15 @@ export async function listForRole({ role, userId, scope = 'active' }) {
       where:
         scope === 'history'
           ? { patientUserId: userId, state: { in: TERMINAL } }
-          : { patientUserId: userId, state: { in: UPCOMING } },
+          : {
+              patientUserId: userId,
+              // Active = confirmed/in_progress PLUS a still-live payment hold, so a patient who left
+              // checkout can find and complete it instead of hitting an invisible 10-min dead-end.
+              OR: [
+                { state: { in: UPCOMING } },
+                { state: 'slot_locked', lockExpiresAt: { gt: new Date() } },
+              ],
+            },
       orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
       include: {
         doctor: {

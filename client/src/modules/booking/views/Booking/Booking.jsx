@@ -1,6 +1,6 @@
 // @ts-check
 import { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { PatientLayout } from '../../../../layouts/PatientLayout/PatientLayout.jsx';
 import { formatPkr, formatKarachi } from '../../../../lib/format/format.js';
 import { useBooking } from '../../useBooking.js';
@@ -13,16 +13,21 @@ export function Booking() {
   const [subject, setSubject] = useState({ name: '', age: '', relation: '' });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [lockBlocked, setLockBlocked] = useState(false);
 
   const { doctor, confirmAndPay: startPayment } = useBooking({ doctorId: id });
 
   async function confirmAndPay() {
     setError(null);
+    setLockBlocked(false);
     setBusy(true);
     try {
       const redirectUrl = await startPayment({ doctorId: id, slotStart, forSelf, subject });
       window.location.href = redirectUrl;
     } catch (e) {
+      // An existing live hold blocks a new booking (Single-Lock). Point the patient to the pending
+      // booking in their appointments so they can complete it (instead of a dead-end message).
+      if (e.code === 'ACTIVE_LOCK_EXISTS') setLockBlocked(true);
       setError(e.message ?? 'Could not start payment.');
       setBusy(false);
     }
@@ -75,6 +80,11 @@ export function Booking() {
           </div>
         )}
         {error && <p className="error-text">{error}</p>}
+        {lockBlocked && (
+          <Link className="btn btn--secondary" to="/appointments">
+            Go to your pending booking
+          </Link>
+        )}
         <button
           type="button"
           className="btn btn--primary"
