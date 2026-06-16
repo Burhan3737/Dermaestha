@@ -15,6 +15,7 @@ services:
 
   app:
     build: .
+    image: dermestha-app
     depends_on:
       db: { condition: service_healthy }
     environment:
