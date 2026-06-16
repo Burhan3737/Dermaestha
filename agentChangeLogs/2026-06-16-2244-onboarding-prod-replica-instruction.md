@@ -18,7 +18,8 @@ The existing `onboarding/instructions.md` is comprehensive but explanatory (run/
 ## Files changed
 | File | Action | What & why |
 |---|---|---|
-| `onboarding/instruction.md` | Created, then Modified | New concise prod-replica runbook (Docker compose → host migrate → host seed → verify). Follow-up edit added the alternative full-flow baseline seed (`prisma/scripts/seed-baseline.js`, `Test123!`, destructive wipe). |
+| `onboarding/instruction.md` | Created, then Modified (x2) | New concise prod-replica runbook (Docker compose → host migrate → host seed → verify). Edit 2 added the alternative full-flow baseline seed (`prisma/scripts/seed-baseline.js`, `Test123!`, destructive wipe). Edit 3 added a "Local testing (hot reload)" section: Postgres in Docker + app on host (Vite HMR), server run via `node --env-file=.env.example.dev`, browse `:5173`. |
+| `.env.example.dev` | Created (by user) | Dev env template with `NODE_ENV=development` + mock providers (`PAYMENT_PROVIDER=mock`, `VIDEO_PROVIDER=mock`, `EMAIL_PROVIDER=console`); used by the host server in the hot-reload flow. To be committed alongside the doc. |
 | `agentChangeLogs/2026-06-16-2244-onboarding-prod-replica-instruction.md` | Created | This session log (per CLAUDE.md Agent Logs rule). |
 | `agentChangeLogs/index.md` | Modified | Added the one-line session entry. |
 | `docker-compose.yml` | Modified | Added explicit `image: dermestha-app` to the `app` service so the built image has a defined name instead of the auto-derived `<project>-<service>`. |

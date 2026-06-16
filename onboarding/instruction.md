@@ -92,6 +92,60 @@ node --env-file=.env prisma/scripts/seed-baseline.js
 
 ---
 
+## Local testing (hot reload)
+
+For day-to-day development with **hot module reload**, run **Postgres in Docker** but the **app on your
+host** — and use **`.env.example.dev`** (mock providers + `NODE_ENV=development`) for the server.
+
+> **Why the app moves to the host:** hot reload needs the Vite dev server, which is **not** in the
+> production image (it ships only the built bundle). Docker keeps running the database.
+
+> **Why a separate dev env file:** `NODE_ENV=development` turns the session cookie's `Secure` flag **off**,
+> so login works over plain `http://localhost`. The prod replica's `NODE_ENV=production` makes the cookie
+> HTTPS-only, so login silently 401s over http. `.env.example.dev` also sets `PAYMENT_PROVIDER=mock` /
+> `VIDEO_PROVIDER=mock` / `EMAIL_PROVIDER=console`, so payment/video/email flows work without real vendors.
+
+**Prereqs:** host deps installed (`npm install`), Prisma client generated (`npx prisma generate`), and the
+DB migrated + seeded (steps 3–4 above). Optionally set `SESSION_SECRET` in `.env.example.dev` to any long
+random string.
+
+### 1. Start Postgres only
+
+```powershell
+docker compose up -d db
+```
+
+If the full prod stack is already up, stop just the app container first (keeps the DB + data running):
+
+```powershell
+docker compose stop app
+```
+
+### 2. Start the API on the host (terminal 1)
+
+```powershell
+node --env-file=.env.example.dev server/src/index.js
+```
+
+Wait for `Dermestha listening on :3000`.
+
+### 3. Start the Vite dev server (terminal 2)
+
+```powershell
+npm run dev:client
+```
+
+### 4. Open the app
+
+Open the URL Vite prints (usually **`http://localhost:5173`**) — **not** `:3000` — and log in with a
+seeded account.
+
+> 💡 Browse `:5173`, not `:3000`. Vite serves the hot-reloading UI on `:5173` and proxies `/api` to the
+> API on `:3000`. No `build:client` needed — Vite serves from source and reloads on save.
+> To return to the production replica: stop both host processes (Ctrl-C), then `docker compose up -d app`.
+
+---
+
 ## Stop / reset
 
 ```powershell
