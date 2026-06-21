@@ -1,6 +1,6 @@
 // @ts-check
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session/session.jsx';
 import { useVideo } from '../../useVideo.js';
 import { useDailyCall } from '../../useDailyCall.js';
@@ -13,6 +13,7 @@ function mmss(ms) {
 
 export function VideoRoom() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { session } = useSession();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -35,6 +36,8 @@ export function VideoRoom() {
   const ended = hardCutoff != null && now >= hardCutoff;
   const msToEnd = slotEnd != null ? slotEnd - now : null;
   const isDoctor = session?.role === 'doctor';
+  const leaveTo = isDoctor ? '/doctor' : `/video/${id}/ready`;
+  const leave = () => navigate(leaveTo, { replace: true });
   const peerJoined = detail.data?.peerJoined;
   const ready = !token.isError && !token.isPending && !detail.isPending;
 
@@ -46,7 +49,7 @@ export function VideoRoom() {
     containerRef,
     appointmentId: id,
     role: session?.role,
-    onLeave: () => window.history.back(),
+    onLeave: leave,
   });
 
   if (token.isError)
@@ -69,7 +72,7 @@ export function VideoRoom() {
           <p style={{ color: 'var(--color-on-dark)' }}>This session has ended.</p>
         </div>
         <div className="video-controls">
-          <button type="button" className="video-ctrl video-ctrl--leave" onClick={() => window.history.back()}>
+          <button type="button" className="video-ctrl video-ctrl--leave" onClick={leave}>
             Leave
           </button>
         </div>
@@ -92,7 +95,9 @@ export function VideoRoom() {
             {peerJoined ? (
               <p style={{ color: 'var(--color-on-dark)' }}>● Live — connected</p>
             ) : (
-              <p style={{ color: 'var(--color-on-dark)' }}>Doctor will be with you shortly…</p>
+              <p style={{ color: 'var(--color-on-dark)' }}>
+                {isDoctor ? 'Waiting for the patient to join…' : 'Doctor will be with you shortly…'}
+              </p>
             )}
             <div className="video-self" />
           </>
@@ -100,7 +105,7 @@ export function VideoRoom() {
       </div>
       {isMock && (
         <div className="video-controls">
-          <button type="button" className="video-ctrl video-ctrl--leave" onClick={() => window.history.back()}>
+          <button type="button" className="video-ctrl video-ctrl--leave" onClick={leave}>
             Leave
           </button>
         </div>

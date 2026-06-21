@@ -57,7 +57,7 @@ export function DoctorToday({ initialTab = 'today' }) {
                 (active ? (
                   <Link
                     className="btn btn--secondary"
-                    to={`/video/${a.id}/ready`}
+                    to={`/video/${a.id}`}
                     onClick={() => track('video_join_attempt', { appointmentId: a.id, role: 'doctor' })}
                   >
                     Join Call

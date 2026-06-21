@@ -84,7 +84,7 @@ describe('D-02 DoctorToday', () => {
     );
   });
 
-  it('routes the active Join Call through the waiting room and emits video_join_attempt', async () => {
+  it('routes the active Join Call straight into the call and emits video_join_attempt', async () => {
     const noon = karachiNoonMs();
     const start = new Date(Date.now() + 5 * 60 * 1000); // inside the 10-min window
     api.get.mockResolvedValue({
@@ -103,7 +103,7 @@ describe('D-02 DoctorToday', () => {
     setup();
     await waitFor(() => expect(screen.getByText('Parent P')).toBeTruthy());
     const join = screen.getByRole('link', { name: /join call/i });
-    expect(join.getAttribute('href')).toBe('/video/a1/ready');
+    expect(join.getAttribute('href')).toBe('/video/a1');
     join.click();
     expect(track).toHaveBeenCalledWith('video_join_attempt', {
       appointmentId: 'a1',

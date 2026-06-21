@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { VideoRoom } from '#src/modules/video/views/VideoRoom/VideoRoom.jsx';
 import { api } from '#src/lib/apiClient/apiClient.js';
@@ -52,6 +52,10 @@ function mock({ peerJoined, endOffsetMs, mockMode = false } = {}) {
       : Promise.resolve(detailResp({ peerJoined, endOffsetMs })),
   );
 }
+// Probe renders the current pathname so tests can assert where leave navigated to.
+function LocationProbe() {
+  return <div data-testid="location">{useLocation().pathname}</div>;
+}
 function setup() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -59,7 +63,10 @@ function setup() {
       <MemoryRouter initialEntries={['/video/a1']}>
         <Routes>
           <Route path="/video/:id" element={<VideoRoom />} />
+          <Route path="/video/:id/ready" element={<div>waiting room</div>} />
+          <Route path="/doctor" element={<div>doctor dashboard</div>} />
         </Routes>
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -78,6 +85,14 @@ describe('VideoRoom', () => {
     setup();
     await waitFor(() => expect(screen.getByText(/will be with you shortly/i)).toBeTruthy());
     expect(h.createFrame).not.toHaveBeenCalled();
+  });
+
+  it('mock mode: doctor sees a patient-perspective waiting message before the peer joins', async () => {
+    h.role = 'doctor';
+    mock({ peerJoined: false, mockMode: true });
+    setup();
+    await waitFor(() => expect(screen.getByText(/waiting for the patient to join/i)).toBeTruthy());
+    expect(screen.queryByText(/will be with you shortly/i)).toBeNull();
   });
 
   it('mock mode: shows the live stage once the peer has joined', async () => {
@@ -129,5 +144,24 @@ describe('VideoRoom', () => {
     mock({ peerJoined: true, endOffsetMs: 3 * 60 * 1000 });
     setup();
     await waitFor(() => expect(screen.getByText(/5 minutes remaining/i)).toBeTruthy());
+  });
+
+  // --- role-aware leave navigation ---
+  it('patient leave returns to the waiting room (/video/:id/ready)', async () => {
+    h.role = 'patient';
+    mock({ peerJoined: false, mockMode: true });
+    setup();
+    const leave = await screen.findByRole('button', { name: /leave/i });
+    fireEvent.click(leave);
+    expect(screen.getByTestId('location').textContent).toBe('/video/a1/ready');
+  });
+
+  it('doctor leave returns to the dashboard (/doctor)', async () => {
+    h.role = 'doctor';
+    mock({ peerJoined: false, mockMode: true });
+    setup();
+    const leave = await screen.findByRole('button', { name: /leave/i });
+    fireEvent.click(leave);
+    expect(screen.getByTestId('location').textContent).toBe('/doctor');
   });
 });
