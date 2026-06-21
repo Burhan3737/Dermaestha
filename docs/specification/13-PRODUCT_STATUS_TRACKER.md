@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Document ID      | `13-PRODUCT_STATUS_TRACKER`                                                                                                                           |
 | Status           | Canonical                                                                                                                                             |
-| Version          | 1.22                                                                                                                                                   |
-| Last updated     | 2026-06-16                                                                                                                                            |
+| Version          | 1.23                                                                                                                                                   |
+| Last updated     | 2026-06-21                                                                                                                                            |
 | Sources absorbed | `server/src + client/src inspection; agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md; ARCHITECTURE.md §5b; docs/specification/02; PRD §5.1` |
 | Related docs     | 02, 03, 05                                                                                                                                            |
 
@@ -281,7 +281,7 @@ This section is the v1 build backlog (baseline 2026-06-01), reconciled as each s
 - [x] Landing page (public-facing patient acquisition surface) — Slice H · S4 (P-01 at `/`; listing relocated to `/browse`; logged-in-patient `/`→`/browse` redirect; KPI #1 `landing_view`/`booking_started` emits; ADR-35)
 - [x] Legal content: `/legal/terms` and `/legal/privacy` pages — Slice H · S4 (reusable `LegalPage` banner-marked structured DRAFT; final lawyer copy is a pre-launch gate)
 - [x] Admin views (client): A-01 Doctors (list / add / edit / deactivate — add-doctor and doctor-detail/edit are sub-views of A-01), A-02 Medicines, A-03 System health, A-04 Records & audit, A-05 Settings — Slice G (no A-06/A-07)
-- [x] Doctor views (client): D-02 today's-appointments base view (incl. History, 10-min Join gate, write-Rx action, awaiting badge), D-04 video consultation, D-06 cancel appointment modal — all built (D-02/D-06 prior; D-04 + D-02 Join→`/ready` redirect & `video_join_attempt` emit in Slice H · S3)
+- [x] Doctor views (client): D-02 today's-appointments base view (incl. History, 10-min Join gate, write-Rx action, awaiting badge), D-04 video consultation, D-06 cancel appointment modal — all built (D-02/D-06 prior; D-04 + D-02 Join→`/video/:id` direct route (the earlier `/ready` redirect was a bug fixed 2026-06-21) & `video_join_attempt` emit in Slice H · S3)
 - [~] Patient views (client): P-11 pre-call get-ready room ✓, P-12 video consultation ✓ (Slice H · S3); P-01 landing ✓ (Slice H · S4); patient Profile tab (doc 06 §2 nav destination; no dedicated screen-inventory ID) still pending. Refund status shows within the P-08/P-09 dashboards (doc 02 §F04), not a standalone screen
 - [x] Full E2E QA pass — Slice H · S7 launch gate: Playwright `e2e/` harness, 6 Critical journeys J1–J6 (11/11) vs mock adapters (ADR-38) + 3 new money-path integration tests; FK-`RESTRICT` crash class fixed (ADR-39); 320 server / 123 client / 11 e2e; verdict **Conditional-Go** (report under `docs/superpowers/reports/`). Remaining: human UAT sign-off + the vendor live-delivery gates (doc 07 §3/§10)
 
@@ -314,3 +314,4 @@ This section is the v1 build backlog (baseline 2026-06-01), reconciled as each s
 | 2026-06-15 | Three-role flow-audit fix cycle recorded in the §2 M4 snapshot: 13 navigable-flow issues fixed test-first; suite raised to **322 server / 135 client / 17 e2e** (+j7/j8/j9 E2E specs) | Three-role flow-audit fix session (v1.20) |
 | 2026-06-15 | Re-pointed two test-file inventory paths to the centralized tree: `audit.service.test.js` → `server/test/unit/services/audit/`; the 3 money-path integration tests → `server/test/integration/` (ADR-40) | Test centralization (ADR-40); paths only, no count change |
 | 2026-06-16 | F03/Slot & booking note: pending-hold recovery (Payment-pending card + Complete payment + booking-page recovery link) | Pending-hold recovery feature (34f978d) |
+| 2026-06-21 | D-02 doctor-views line: corrected doctor Join→`/video/:id` direct route (earlier `/ready` redirect was a bug fixed 2026-06-21) | Role-aware doctor video-join bug fix |

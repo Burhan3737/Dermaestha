@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.8                                    |
-| Last updated     | 2026-06-16                             |
+| Version          | 1.9                                    |
+| Last updated     | 2026-06-21                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -143,6 +143,7 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F05-014 | §5 Evaluation worker: `in_progress→completed` at slot-end+5m | `CA` in `in_progress`; both parties have joined | 1. Let slot-end+5m arrive. 2. The evaluation worker ticks. | Appointment transitions to `completed`; no appointment remains in `in_progress` past slot-end+5m (hard guarantee per ADR-25). | Critical |
 | TC-F05-015 | §3 Zero-join-data at cutoff → non-penalizing terminal + admin alert | `CA` in `in_progress`; no join-event data recorded when slot-end+5m arrives | 1. Let slot-end+5m arrive with `doctorJoinedAt` and `patientJoinedAt` both null. | Appointment resolves to `doctor_no_show` (non-penalizing, doctor-absence-precedence for missing data per ADR-12); an `evaluation_data_gap` admin alert is raised; the appointment does NOT remain in `in_progress`. | Critical |
 | TC-F05-016 | F05.02 Doctor Today-Scope Rule (G3) | Doctor `D` has appointments today and on future days | 1. `D` opens the default appointments view. | The default doctor scope returns only `confirmed`/`in_progress` appointments within the current `Asia/Karachi` day; future-day and past appointments are excluded; history remains a separate scope. | High |
+| TC-F05-017 | F05.03 Role-aware waiting copy | `CA`; both parties eligible to join | 1. `D` joins the video room before `P`. 2. Separately, `P` joins before `D`. | When the doctor joins first, the waiting screen reads "Waiting for the patient to join…" (NOT "Doctor will be with you shortly"); when the patient joins first, the waiting screen reads "Doctor will be with you shortly". | High |
 
 ### F06 — Cancellation & refund
 
@@ -356,3 +357,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-14 | Added the §6 "S7 E2E QA cycle — execution record": Critical J1–J6 cases marked Verified (E2E + integration) + the assisted-manual UI cases (F02/F16/F10/F12/F13/F14) Verified; logged the 4 cycle defects (BUG-1 / FIX-A / FIX-B / BUG-2) as found-and-fixed with resolutions (ADR-39); pointed at the release recommendation | Slice H · S7 (E2E QA + launch gate) |
 | 2026-06-15 | Added TC-F03-010 (future-day picker), TC-F04-009 (payment-fail terminal UX), TC-F08-015 (cross-tenant Rx UI no-leak), TC-F10-007 (photo required on add), TC-F11-007 (medicine edit via A-02); added the §6 "Three-role flow-audit fix cycle" execution record (new j7/j8/j9 E2E specs; logout/404 covered there) | Three-role flow-audit fix session |
 | 2026-06-16 | Added TC-F03-011 — pending-hold recovery (abandon → Payment-pending card → Complete payment → confirmed) | Pending-hold recovery feature (34f978d) |
+| 2026-06-21 | Added TC-F05-017 — role-aware video waiting copy (doctor-first "Waiting for the patient to join…" vs patient-first "Doctor will be with you shortly") | Role-aware video waiting-screen copy |

@@ -1,11 +1,11 @@
 # 2026-06-17-0158 — video-call-flow-bugfixes
 
-**Status:** Partial
+**Status:** Completed
 **Goal:** Root-cause and fix the bugs the user hits while live-testing the patient/doctor video-call flow at localhost:5173 (mock mode).
 **Skill(s) used:** superpowers:systematic-debugging (invoked via /superpowers:systematic-debugging)
 **Ticket / issue:** None
 **Branch:** main
-**Commits / PR:** None yet
+**Commits / PR:** 46e7530 (on main, not pushed)
 **Last updated:** 2026-06-21-1901
 **Tags:** #bugfix
 
@@ -23,6 +23,10 @@ User is running the app at localhost:5173 with a patient (default browser) and d
 | `client/src/modules/video/views/VideoRoom/VideoRoom.jsx` | Modified | Bug B: replaced 3 role-blind `window.history.back()` leave sites with role-aware `navigate(leaveTo, { replace: true })` — doctor → `/doctor`, patient → `/video/:id/ready`. Added `useNavigate` import + `navigate`/`leaveTo`/`leave`. **Bug C:** made the mock-mode `!peerJoined` waiting copy role-aware — doctor sees "Waiting for the patient to join…", patient still sees "Doctor will be with you shortly…". |
 | `client/test/unit/modules/doctor/views/DoctorToday/DoctorToday.test.jsx` | Modified | Updated the Join-Call-target assertion from `/video/a1/ready` to `/video/a1` (new Option-B contract). |
 | `client/test/unit/modules/video/views/VideoRoom/VideoRoom.test.jsx` | Modified | Added a `useLocation` probe + two role-aware leave tests (doctor → `/doctor`, patient → `/video/:id/ready`); added a doctor-waiting-copy test ("Waiting for the patient to join…"). |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | ADR-34: doctor Join routes direct to `/video/:id` (not `/ready`); appended dev `/dev`-proxy standing constraint. v1.17→1.18. (Applied at task end, user-approved.) |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | Corrected D-02 doctor Join → `/video/:id` direct route (earlier `/ready` redirect was a bug). v1.22→1.23. |
+| `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md` | Modified | §F05.03: added doctor-first waiting copy "Waiting for the patient to join…". v1.5→1.6. |
+| `docs/specification/12-SCOPE_FEATURE_TEST_CASES_DOCUMENT.md` | Modified | Added TC-F05-017 (role-aware video waiting copy). v1.8→1.9. |
 | `agentChangeLogs/2026-06-17-0158-video-call-flow-bugfixes.md` | Created | This session log. |
 | `agentChangeLogs/index.md` | Modified | Add this session's index line. |
 

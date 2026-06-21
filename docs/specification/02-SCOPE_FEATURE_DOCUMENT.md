@@ -4,8 +4,8 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.5                                           |
-| Last updated     | 2026-06-16                                    |
+| Version          | 1.6                                           |
+| Last updated     | 2026-06-21                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
 
@@ -144,6 +144,7 @@ One-line: the confirmed appointment progresses through the §4.3 state machine; 
   - Tested on Chrome (Android 10+) and Safari (iOS 14+) over 3G; doctor side tested on desktop Chrome/Firefox/Safari and Android Chrome.
   - Pre-call lighting prompt (patient): "Find a well-lit area; sit facing a window or lamp if possible".
   - If the patient joins before the doctor: waiting screen "Doctor will be with you shortly".
+  - If the doctor joins before the patient: waiting screen "Waiting for the patient to join…".
   - **Room-Isolation Rule**: room identity is appointment-scoped — patient and doctor share the same room ID and cannot join the wrong room (§3.4); tokens are time-bound (slot-start − 10 min through slot-end + 5 min).
   - **Hard-Cutoff Rule**: the session has a hard cutoff at slot-end + 5 minutes (room expires); a soft warning is shown to the doctor at 5 minutes remaining.
   - **KPI #3 telemetry (video-join success by network type)**: the client emits `video_join_attempt` on the "Join Call" click (patient upcoming P9 + doctor today D2) and `video_join_success` on the Daily `joined-meeting` event once media is up (patient video room P5, doctor video room D3), through the fire-and-forget client seam `lib/analytics/track.js` → `POST /api/analytics/events` (doc 14 §6; ADR-34). The emit is best-effort and no-ops until the analytics route ships (S6); `networkType` rides the envelope (sibling of `meta`) and backs the 3G-success KPI.
@@ -565,3 +566,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | 2026-06-14 | F05.03: noted the KPI #3 emit points — `video_join_attempt` on the Join Call click (P9 + D2) and `video_join_success` on Daily `joined-meeting` (P5/D3) via the fire-and-forget client `lib/analytics/track.js` seam (doc 14 §6; ADR-34) | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | F16.01: legal pages built as a banner-marked structured DRAFT via the reusable `LegalPage` template (final lawyer copy = pre-launch gate); F03.03: noted the KPI #1 emit points — `landing_view` on P-01 mount + `booking_started` on slot-lock via the shared `lib/analytics/track.js` seam (`booking_confirmed` remains S6/server) | Slice H · S4 (public surface — landing + legal; ADR-35) |
 | 2026-06-16 | Noted that an abandoned slot-lock hold is recoverable from patient appointments (Payment-pending / Complete payment); Single-Lock Rule unchanged | Pending-hold recovery feature (34f978d) |
+| 2026-06-21 | F05.03: added the doctor-first waiting copy ("Waiting for the patient to join…") alongside the existing patient-first copy | Role-aware video waiting-screen copy |
