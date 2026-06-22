@@ -24,3 +24,22 @@ const KHI_TABLE = new Intl.DateTimeFormat('en-PK', {
 
 /** Dense table-cell variant of formatKarachi (admin tables). */
 export const formatKarachiTable = (iso) => (iso ? KHI_TABLE.format(new Date(iso)) : '');
+
+const KHI_TIME = new Intl.DateTimeFormat('en-PK', {
+  timeZone: 'Asia/Karachi',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+/** Time-only variant in Asia/Karachi ("1:00 PM") — the doctor Today time column. */
+export const formatKarachiTime = (iso) => (iso ? KHI_TIME.format(new Date(iso)) : '');
+
+/** "Ayesha Khan" → "AK": first letters of the first two words, for avatar fallbacks. */
+export const initials = (name) =>
+  (name ?? '')
+    .split(' ')
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
