@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.9                                                                                       |
+| Version          | 1.10                                                                                      |
 | Last updated     | 2026-06-22                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -253,6 +253,8 @@ Each catalogue row exposes **Edit** (alongside Deactivate / Reactivate). Edit re
 | `awaiting_prescription` (derived)     | Awaiting prescription               | warning                                    |
 | `disputed` (admin only)               | Disputed                            | danger outline marker, orthogonal to state |
 
+This badge renders on **every row** of the patient Upcoming (P-08), patient Past (P-09), and doctor D-02 lists (the patient Upcoming previously omitted it). The state→variant mapping is applied via `stateBadge(state)`, alongside the F08.01 labels in `client/src/modules/appointment/stateLabel.js`.
+
 ### System banner
 
 Full-width strip below the nav for system states (payment-aggregator outage, video-provider outage). Uses `warning`/`danger` tint. Dismissible where safe.
@@ -454,6 +456,7 @@ Variants, sizes, and states from `components.css`:
 | `.btn--secondary`               | `var(--color-surface)`        | `var(--color-primary)`    | inset 1 px `var(--color-border-strong)` |
 | `.btn--ghost`                   | transparent                   | `var(--color-primary)`    | none                                    |
 | `.btn--danger`                  | `var(--color-danger)`         | `#fff`                    | none                                    |
+| `.btn--danger-ghost`            | transparent                   | `var(--color-danger)`     | none (hover → `var(--color-danger-deep)`) |
 | `.btn--brass`                   | `var(--color-accent)`         | `#fff`                    | none                                    |
 | `[disabled]` / `.btn--disabled` | `var(--color-surface-sunken)` | `#9AA69E`                 | none                                    |
 
@@ -588,6 +591,19 @@ Grid `1.05fr 1fr`, min-height 100 vh. Brand panel: `var(--color-feature-bg)` bg,
 
 Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 40 × 40 px, `var(--color-border-strong)` color. Message + primary CTA follow.
 
+### In-page tabs (`.tabs`)
+
+The shared dashboard toggle behind the patient Upcoming/Past (P-08/P-09) and doctor Today/History (D-02) views. Container (`.tabs`): flex row, `gap: var(--sp-1)`, 1 px bottom border (`var(--border-1)`), `margin-bottom: var(--sp-5)`. Tab (`.tab`): Archivo 700, `var(--fs-body-sm)`, `10px var(--sp-4)` padding, 2 px transparent bottom border, `var(--color-text-muted)` text; hover → `var(--color-text-strong)`. Active (`.tab--active`): `var(--color-primary)` text + 2 px spruce bottom border. The tabs are route `<Link>`s, so the active tab is derived from the URL (ADR-42).
+
+### Appointment row card (`.appt-row`) — signature component
+
+The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`.appt-list`): vertical flex, `gap: var(--sp-3)`. Each row is a `.card` + `.appt-row`: flex, `align-items: flex-start`, `gap: var(--sp-4)`, `var(--sp-4) var(--sp-5)` padding.
+
+- **Leading element** — a fixed 76 px tabular time column (`.appt-time`, doctor Today) **or** a `.avatar--lg` doctor avatar (`.appt-avatar`, patient; photo when present, initials fallback).
+- **Meta** (`.appt-meta`, `flex: 1`): a head row (`.appt-head`, `justify-content: space-between`) with the name (`.appt-name`, Archivo 700, `var(--color-text-strong)`) + muted sub-lines (`.appt-sub`, `var(--fs-body-sm)`: specialization / "for: …" and tabular time · fee) on the left, and the status `.badge` on the right; below it an actions row (`.appt-actions`: flex-wrap, `gap: var(--sp-2)`, `margin-top: var(--sp-3)`) of `.btn--sm` controls.
+- `.appt-row--active` tints a joinable row (`var(--color-primary-tint)` fill + `var(--color-primary-border)`).
+- Below 640 px the row wraps and the time column spans full width.
+
 ### Card utility (`.card`)
 
 `background: var(--color-surface)`, `border: var(--border-1)`, `border-radius: var(--r-md)`. The base card primitive used by section cards, doctor cards, and form containers.
@@ -608,3 +624,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-16 | Patient Upcoming gains a "Payment pending / Complete payment" card for live holds; Booking active-lock error gains a "Go to your pending booking" link | Pending-hold recovery feature (34f978d) |
 | 2026-06-22 | §2: clarified the doctor `History` link resolves to the D-02 history view at `/doctor/history` (route-derived; D-02 has no in-page tabs; sidebar is the sole toggle; ADR-41) | Doctor History sidebar-link desync bug fix |
 | 2026-06-22 | §2: doctor sidebar simplified to Appointments · Availability; D-02 regains in-page Today/History tabs (route-driven; ADR-42, supersedes ADR-41) | Doctor appointments page redesign (in-page tabs) |
+| 2026-06-22 | §7: documented the shared in-page tab control (`.tabs`/`.tab`), the appointment row-card component (`.appt-row` family), and the `.btn--danger-ghost` button variant; §3: noted the status badge now renders on every patient/doctor appointment row via `stateBadge` | Appointment list-page redesign (ported mockup design into components.css) |

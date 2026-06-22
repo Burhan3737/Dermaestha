@@ -5,7 +5,7 @@
 **Skill(s) used:** systematic-debugging (invoked, then set aside — this is a design task, not a bug hunt); frontend-design context (design is locked to the existing system, so implemented directly)
 **Ticket / issue:** None
 **Branch:** main (no new branch — per CLAUDE.md, will not branch without approval)
-**Commits / PR:** None yet
+**Commits / PR:** 1678f02 (code), + doc-06 spec-update commit
 **Last updated:** 2026-06-22-1500
 **Tags:** #frontend #ux #design-system
 
@@ -33,7 +33,9 @@ theming/shared-component conventions and keep styles consolidated in one place.
 | `client/src/modules/appointment/stateLabel.js` | Modified | Added active-state labels (Confirmed/In progress/Payment pending) as a fallback + `stateBadge` state→variant map (doc 06 §3) |
 | `client/src/modules/appointment/views/Upcoming/Upcoming.jsx` | Modified | Restructured rows into avatar + meta + status badge + compact actions; proper `.empty` state |
 | `client/src/modules/appointment/views/Past/Past.jsx` | Modified | Same row-card structure; status badge now state-mapped (was always neutral) |
+| `client/src/modules/appointment/components/DoctorAvatar/DoctorAvatar.jsx` | Created | Shared doctor-avatar (photo or initials) for the patient appointment rows |
 | `client/src/modules/doctor/views/DoctorToday/DoctorToday.jsx` | Modified | Time-led row cards for Today, meta-led for History; status badge on every row; compact actions |
+| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified | v1.10 — §7 documents `.tabs`/`.appt-row`/`.btn--danger-ghost`; §3 status-badge note; revision footer |
 
 ## Dependencies / config / schema
 None.
@@ -66,6 +68,8 @@ Low blast radius: presentation-only changes to 3 views + additive CSS/util/label
 change. Revert = restore these files. New CSS classes are additive (no existing rule modified).
 
 ## Open items / next session
-- Run client tests + build; confirm green.
-- Doc-impact (track, apply only after code committed + approval): doc 06 §7 (new `.appt-row` + `.tabs`
-  components, `btn--danger-ghost` button variant), doc 06 §3 (patient Upcoming now renders a status badge).
+- DONE: client tests + build green.
+- DONE: doc-impact applied (user-approved) — doc 06 v1.10, §7 (new `.appt-row` + `.tabs` components,
+  `.btn--danger-ghost` variant) + §3 (status badge on every row).
+- Optional: visual screenshot pass on the running app (not done this session).
+- Not pushed (per CLAUDE.md, awaiting explicit approval to push).
