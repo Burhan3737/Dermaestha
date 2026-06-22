@@ -62,9 +62,11 @@ describe('P-13 prescription view', () => {
     setup();
     await waitFor(() => expect(screen.getByText('Adapalene Gel')).toBeTruthy());
     expect(api.get).toHaveBeenCalledWith('/appointments/a1/prescriptions');
-    expect(screen.getByText(/^\(not priced\)$/i)).toBeTruthy();
-    expect(screen.getByText(/total/i).textContent).toContain('Rs 300');
-    expect(screen.getByText(/1 item\(s\) not priced/i)).toBeTruthy();
+    // Redesign (P-13 paper): unpriced item carries a "Not priced" tag + an em-dash price;
+    // the total is its own row; the not-priced count is summarised in the caption.
+    expect(screen.getByText(/^not priced$/i)).toBeTruthy();
+    expect(screen.getByText('Total').parentElement.textContent).toContain('Rs 300');
+    expect(screen.getByText(/1 item not priced/i)).toBeTruthy();
   });
 
   it('Download PDF renders bytes through the boundary and triggers the anchor download', async () => {

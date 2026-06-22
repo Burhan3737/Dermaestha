@@ -52,9 +52,10 @@ beforeEach(() => {
 describe('D-05 prescription builder', () => {
   it('shows the read-only patient-ID header (third-party identity, never typed)', async () => {
     setup();
+    // Redesign: identity renders as one band line "Ali · Age 9 · Son" (relation cased).
     await waitFor(() => expect(screen.getByText(/Ali/)).toBeTruthy());
-    expect(screen.getByText(/age 9/)).toBeTruthy();
-    expect(screen.getByText(/son/)).toBeTruthy();
+    expect(screen.getByText(/age 9/i)).toBeTruthy();
+    expect(screen.getByText(/son/i)).toBeTruthy();
   });
 
   it('catalogue pick shows price + running total; free-text shows "not priced"', async () => {
@@ -67,7 +68,8 @@ describe('D-05 prescription builder', () => {
       expect(screen.getByRole('option', { name: /adapalene gel/i })).toBeTruthy(),
     );
     fireEvent.click(screen.getByRole('option', { name: /adapalene gel/i }));
-    expect(screen.getByText(/total/i).textContent).toContain('Rs 300');
+    // Redesign: the running total is its own row (label span + amount span).
+    expect(screen.getByText(/total \(priced items\)/i).parentElement.textContent).toContain('Rs 300');
 
     fireEvent.change(screen.getByPlaceholderText(/search medicine/i), {
       target: { value: 'Custom Balm' },
@@ -76,7 +78,7 @@ describe('D-05 prescription builder', () => {
       expect(screen.getByRole('option', { name: /add "Custom Balm" as free text/i })).toBeTruthy(),
     );
     fireEvent.click(screen.getByRole('option', { name: /add "Custom Balm" as free text/i }));
-    expect(screen.getByText(/1 item\(s\) not priced/i)).toBeTruthy();
+    expect(screen.getByText(/1 item not priced/i)).toBeTruthy();
   });
 
   it('submit requires the immutability confirm, then POSTs the right body', async () => {
