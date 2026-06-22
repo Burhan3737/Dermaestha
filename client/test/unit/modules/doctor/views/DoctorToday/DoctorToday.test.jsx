@@ -25,11 +25,11 @@ function karachiNoonMs() {
   return new Date(`${todayKarachi}T07:00:00.000Z`).getTime();
 }
 
-function setup() {
+function setup(route = '/doctor') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[route]}>
         <DoctorToday />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -38,6 +38,15 @@ function setup() {
 beforeEach(() => vi.clearAllMocks());
 
 describe('D-02 DoctorToday', () => {
+  it('renders no in-page Today/History tabs — navigation is sidebar-only', async () => {
+    api.get.mockResolvedValue({ data: [] });
+    setup('/doctor');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /today/i })).toBeTruthy());
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^today$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^history$/i })).toBeNull();
+  });
+
   it('lists today appointments with the patient name', async () => {
     const noon = karachiNoonMs();
     api.get.mockResolvedValue({
@@ -111,7 +120,7 @@ describe('D-02 DoctorToday', () => {
     });
   });
 
-  it('switches to the History tab and requests the history scope', async () => {
+  it('the /doctor/history route shows history and requests the history scope', async () => {
     api.get.mockImplementation((path) =>
       path.includes('scope=history')
         ? Promise.resolve({
@@ -129,8 +138,7 @@ describe('D-02 DoctorToday', () => {
           })
         : Promise.resolve({ data: [] }),
     );
-    setup();
-    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('Past P')).toBeTruthy());
     expect(api.get).toHaveBeenCalledWith('/appointments?scope=history');
   });
@@ -161,8 +169,7 @@ describe('D-02 DoctorToday', () => {
         },
       ],
     });
-    setup();
-    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('P One')).toBeTruthy());
     const links = screen.getAllByRole('link', { name: /write prescription/i });
     expect(links).toHaveLength(2); // completed AND prescription_issued (corrections)
@@ -185,8 +192,7 @@ describe('D-02 DoctorToday', () => {
         },
       ],
     });
-    setup();
-    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('Past Q')).toBeTruthy());
     expect(screen.getByText('Cancelled — refunded')).toBeTruthy();
     expect(screen.queryByText('cancelled_refunded')).toBeNull();
@@ -208,8 +214,7 @@ describe('D-02 DoctorToday', () => {
         },
       ],
     });
-    setup();
-    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('P New')).toBeTruthy());
     expect(screen.queryByText(/awaiting prescription/i)).toBeNull();
   });

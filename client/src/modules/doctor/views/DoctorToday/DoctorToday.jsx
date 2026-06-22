@@ -1,6 +1,6 @@
 // @ts-check
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.jsx';
 import { formatKarachi } from '../../../../lib/format/format.js';
 import { DoctorCancelModal } from '../../../appointment/components/DoctorCancelModal/DoctorCancelModal.jsx';
@@ -11,8 +11,11 @@ import { useDoctor } from '../../useDoctor.js';
 const karachiDay = (iso) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date(iso));
 
-export function DoctorToday({ initialTab = 'today' }) {
-  const [tab, setTab] = useState(initialTab);
+export function DoctorToday() {
+  // The sidebar (Today / History links) is the single navigation control; the active view is
+  // derived from the route so it can never drift out of sync with the URL (was ISSUE-4 desync).
+  const { pathname } = useLocation();
+  const tab = pathname.endsWith('/history') ? 'history' : 'today';
   const { appointments: list, cancelAppointment } = useDoctor({ appointmentsScope: tab });
   const [cancelId, setCancelId] = useState(null);
 
@@ -23,22 +26,6 @@ export function DoctorToday({ initialTab = 'today' }) {
   return (
     <SidebarLayout>
       <section className="section-card">
-        <div className="tabs" role="tablist">
-          <button
-            type="button"
-            className={`tab${tab === 'today' ? ' tab--active' : ''}`}
-            onClick={() => setTab('today')}
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            className={`tab${tab === 'history' ? ' tab--active' : ''}`}
-            onClick={() => setTab('history')}
-          >
-            History
-          </button>
-        </div>
         <h1>{tab === 'history' ? 'Appointment history' : 'Today’s appointments'}</h1>
         {list.isPending && <p className="help">Loading…</p>}
         {list.data && rows.length === 0 && (

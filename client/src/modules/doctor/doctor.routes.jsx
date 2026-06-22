@@ -24,7 +24,7 @@ export const doctorRoutes = (session) => [
     path: '/doctor/history',
     element: (
       <RoleRoute session={session} role="doctor">
-        <DoctorToday initialTab="history" />
+        <DoctorToday />
       </RoleRoute>
     ),
   },
