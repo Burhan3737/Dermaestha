@@ -34,6 +34,17 @@ const KHI_TIME = new Intl.DateTimeFormat('en-PK', {
 /** Time-only variant in Asia/Karachi ("1:00 PM") — the doctor Today time column. */
 export const formatKarachiTime = (iso) => (iso ? KHI_TIME.format(new Date(iso)) : '');
 
+const KHI_DATE = new Intl.DateTimeFormat('en-PK', {
+  timeZone: 'Asia/Karachi',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+/** Date-only variant in Asia/Karachi with year ("Thu, 29 May 2026") — prescription document header/footer. */
+export const formatKarachiDate = (iso) => (iso ? KHI_DATE.format(new Date(iso)) : '');
+
 /** "Ayesha Khan" → "AK": first letters of the first two words, for avatar fallbacks. */
 export const initials = (name) =>
   (name ?? '')
