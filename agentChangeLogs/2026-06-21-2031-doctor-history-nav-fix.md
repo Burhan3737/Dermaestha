@@ -35,10 +35,10 @@ confirmed the sidebar-only direction, which requires tracked spec wording update
 | `client/src/modules/doctor/doctor.routes.jsx` | Modified | Both `/doctor` and `/doctor/history` render `<DoctorToday />`; drop `initialTab` prop. |
 | `client/src/layouts/SidebarLayout/SidebarLayout.jsx` | Modified | Doctor sidebar: removed the `History` link (now an in-page tab) and renamed `Today`→`Appointments`; sidebar is Appointments · Availability. |
 | `client/test/unit/modules/doctor/views/DoctorToday/DoctorToday.test.jsx` | Modified | History driven via route; FINAL: assert Today/History tabs render as route links with the active one marked. |
-| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | Added ADR-41 (sidebar-only); v1.18→1.19. PENDING re-edit: ADR-42 (in-page tabs, supersedes ADR-41). |
-| `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md` | Modified | F05.02 reworded (v1.6→1.7). PENDING re-edit back to in-page tabs. |
-| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified | §2 reworded (v1.7→1.8). PENDING re-edit back to in-page tabs. |
-| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | §6 D-02 note (v1.23→1.24). PENDING re-edit back to in-page tabs. |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | ADR-41 (v1.19) then ADR-42 added + ADR-41 marked Superseded; v1.19→1.20. |
+| `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md` | Modified | F05.02 → in-page "History" tab on D-02 (ADR-42); v1.7→1.8. |
+| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified | §2 sidebar → Appointments·Availability + in-page tabs note (ADR-42); v1.8→1.9. |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | §6 D-02 → in-page tabs reinstated (ADR-42); v1.24→1.25. |
 
 ## Dependencies / config / schema
 None.
@@ -81,8 +81,9 @@ Low blast radius: doctor module only. Revert the three files to restore prior be
 API, or config changes.
 
 ## Open items / next session
-- Spec updates: ADR-41 + the 02/06/13 sidebar-only wording were committed (commit 6e15d27). The pivot
-  to in-page tabs now needs a follow-up spec pass (PENDING user approval): add ADR-42 (in-page tabs,
-  supersedes ADR-41; mark ADR-41 Superseded), and re-update doc 02 F05.02 / doc 06 §2 / doc 13 §6 to
-  describe the in-page Today/History tabs + the Appointments·Availability sidebar.
-- Nothing pushed (per project rules); commits are local on `main`.
+- Spec updates DONE (user-approved): ADR-41 (committed 6e15d27) then ADR-42 added + ADR-41 marked
+  Superseded; doc 02 F05.02 / doc 06 §2 / doc 13 §6 reworded to the in-page Today/History tabs +
+  Appointments·Availability sidebar. Version footers bumped (02 1.8, 06 1.9, 11 1.20, 13 1.25).
+- Optional: verify in a running browser (clicking the in-page tabs + writing a prescription from
+  History) — not done this session.
+- Nothing pushed (per project rules); commits are local on `main` (fd84bab, 6e15d27, a52b168, + specs).

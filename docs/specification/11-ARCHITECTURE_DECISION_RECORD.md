@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.19                                                                                               |
+| Version          | 1.20                                                                                               |
 | Last updated     | 2026-06-22                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -55,6 +55,7 @@
 40. [ADR-39 — Payment/appointment no-cascade release policy (refines ADR-23)](#adr-39--paymentappointment-no-cascade-release-policy-refines-adr-23)
 41. [ADR-40 — Centralized `test/` tree + `#src`/`#shared` aliases (supersedes ADR-26 test co-location)](#adr-40--centralized-test-tree--srcshared-aliases-supersedes-adr-26-test-co-location)
 42. [ADR-41 — Doctor Today/History navigation is sidebar-only (route-derived view)](#adr-41--doctor-todayhistory-navigation-is-sidebar-only-route-derived-view)
+43. [ADR-42 — Doctor appointments page: in-page Today/History tabs (supersedes ADR-41)](#adr-42--doctor-appointments-page-in-page-todayhistory-tabs-supersedes-adr-41)
 
 ---
 
@@ -601,13 +602,27 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-06-22
 
-**Status:** Accepted
+**Status:** Superseded by ADR-42 (2026-06-22) — the route-derived-view core was kept, but in-page tabs were reinstated to mirror the patient page.
 
 **Context:** The doctor D-02 screen carried two parallel controls for the same Today/History toggle: in-page tab buttons holding local `useState`, and the sidebar `Today`/`History` links holding the URL. The ISSUE-4 fix added the `/doctor/history` route (and a test asserting every sidebar link has a route), but `DoctorToday` seeded its tab from `useState(initialTab)` — read only on first mount. Both routes render the same component at the same tree position, so navigation never remounts it; the `initialTab` prop change was dropped and the sidebar `History` link appeared to do nothing. Two unsynchronized sources of truth for one piece of state.
 
 **Decision:** Make the doctor Today/History navigation **sidebar-only**, with the URL as the single source of truth. The in-page tab buttons are removed; `DoctorToday` derives the active view from `useLocation()` (`/doctor/history` → history, otherwise today). Both `/doctor` and `/doctor/history` render the same prop-less `<DoctorToday />`. This mirrors the route-driven pattern the patient Upcoming/Past views already use (`<Link className="tab" to="/appointments/history">`) at the data-flow level, while the doctor surface keeps a single navigation affordance (the sidebar) rather than duplicating it in-page.
 
 **Consequences:** The sidebar `History` link works and the view is bookmarkable/refresh-safe; the desync class of bug is eliminated because the active view is derived, not stored. The doctor D-02 screen no longer renders in-page Today/History tabs (the `.tabs`/`.tab` styles remain in use by AdminRecords and the patient appointment views). Verified by the D-02 unit suite driving history via the route; full client suite 141/141 green. No API, schema, or dependency change. Updates the "tab" wording in doc 02 §F05.02 and doc 06 §2 in the same pass.
+
+---
+
+## ADR-42 — Doctor appointments page: in-page Today/History tabs (supersedes ADR-41)
+
+**Date:** 2026-06-22
+
+**Status:** Accepted
+
+**Context:** ADR-41 made the doctor Today/History navigation sidebar-only (in-page tabs removed). On reviewing the patient appointments page — which presents Upcoming/Past as in-page route-driven `<Link>` tabs on a single page (`/appointments`, `/appointments/history`) — the doctor surface was changed to mirror that pattern for cross-role consistency rather than stay tab-less. A proposal to drop the History view entirely was rejected: completed appointments are terminal and only appear under the doctor's `scope=history` query (`server/src/modules/appointment/service.js`), and "Write prescription" renders only on `completed`/`prescription_issued` rows — so History is the sole entry point to the F08.02 prescription-writing flow (and the edge-case #26 12h reminder). Removing it would break prescriptions.
+
+**Decision:** The doctor D-02 page renders **in-page Today/History tabs** as route `<Link>`s (`/doctor` → Today, `/doctor/history` → History), mirroring the patient Upcoming/Past page. The active tab is still **derived from the route** via `useLocation()` (keeping ADR-41's root-cause fix — no `useState`-vs-URL desync). The doctor sidebar is simplified to a single **`Appointments`** link (→ `/doctor`, exact-match active) plus `Availability`; the standalone sidebar `History` link is removed (History is now an in-page tab). The History tab is retained as the prescription entry point.
+
+**Consequences:** Supersedes ADR-41 (sidebar-only). The doctor appointments UX matches the patient page; prescriptions for past completed appointments stay reachable. The `.tabs`/`.tab` styles are in use again on D-02 (also AdminRecords + patient views). Sidebar `Appointments` keeps `end:true` (exact match) because all doctor pages share the `/doctor` prefix, so a prefix-match link would wrongly highlight on `/doctor/availability`; the in-page tab carries the active indicator on the history sub-route. Verified by the D-02 unit suite (tabs render as route links with the active one marked; history scope requested); full client suite 141/141 green. No API, schema, or dependency change. Re-updates wording in doc 02 §F05.02, doc 06 §2 (incl. the doctor sidebar-links list), and doc 13 §6.
 
 ---
 
@@ -635,3 +650,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-15 | Added ADR-40 (centralized per-workspace `test/` tree — `unit/` mirrors `src/`, module `test.js`→`service.test.js`, integration `.integration` infix dropped; `#src`/`#shared` `resolve.alias`) superseding the test-co-location bullet of ADR-26 (pointer added); test move only, no behavior change | Server+shared+client test centralization; new architectural decision |
 | 2026-06-21 | ADR-34: doctor Join routes direct to `/video/:id` (not `/ready`); added dev `/dev`-proxy standing constraint | Role-aware doctor video-join bug fix + dev-proxy fix |
 | 2026-06-22 | Added ADR-41 (doctor Today/History navigation is sidebar-only; in-page tabs removed; active view derived from the route, single source of truth) | Doctor History sidebar-link desync bug fix; new architectural decision |
+| 2026-06-22 | Added ADR-42 (doctor appointments page = in-page Today/History tabs mirroring the patient page; History retained as the prescription entry point) and marked ADR-41 Superseded | Doctor appointments page redesign (in-page tabs); supersedes ADR-41 |

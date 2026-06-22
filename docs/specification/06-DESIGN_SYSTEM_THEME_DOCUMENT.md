@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.8                                                                                       |
+| Version          | 1.9                                                                                       |
 | Last updated     | 2026-06-22                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -103,7 +103,7 @@ flowchart LR
 
 ### Doctor sidebar links
 
-Today — Availability (weekly grid) — History
+Appointments — Availability (weekly grid)
 
 ### Admin sidebar links
 
@@ -111,7 +111,7 @@ Doctors — Medicines — Records & audit — System health — Settings
 
 `/admin` redirects to `/admin/doctors` — the Doctors list is the admin landing page.
 
-**Sidebar logout.** Both the doctor and admin sidebars render a **Log out** control at the foot of the sidebar (`POST /api/auth/logout` then a full reload to `/login`); it is the doctor/admin equivalent of the patient's Profile-hosted logout. The `History` doctor link resolves to the D-02 history view at `/doctor/history` (the same screen, route-derived — D-02 has no in-page tabs; the sidebar Today/History links are the sole toggle; ADR-41), not a separate screen.
+**Sidebar logout.** Both the doctor and admin sidebars render a **Log out** control at the foot of the sidebar (`POST /api/auth/logout` then a full reload to `/login`); it is the doctor/admin equivalent of the patient's Profile-hosted logout. The doctor sidebar's single `Appointments` link opens the D-02 page, whose in-page Today/History tabs (route links to `/doctor` and `/doctor/history`) toggle today vs past appointments — route-derived, so the active tab always matches the URL (ADR-42, mirrors the patient Upcoming/Past page).
 
 ### Screen-to-route inventory
 
@@ -607,3 +607,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-15 | Flow-audit fixes: §2 sidebar **Log out** control (doctor/admin) + History-link-resolves note (ISSUE-2/4); §3 day-tabbed picker renders on P-03 (ISSUE-1); A-01 photo **required on add** (ISSUE-6); new "Medicine catalogue (A-02)" Edit note (ISSUE-7); P-07 as-built single "Payment not completed" terminal card + no-infinite-poll (ISSUE-3); "Not-found & cross-tenant states" (404 page ISSUE-8 + cross-tenant Rx message ISSUE-10); Landing featured cards display-only (ISSUE-5) | Three-role flow-audit fix session |
 | 2026-06-16 | Patient Upcoming gains a "Payment pending / Complete payment" card for live holds; Booking active-lock error gains a "Go to your pending booking" link | Pending-hold recovery feature (34f978d) |
 | 2026-06-22 | §2: clarified the doctor `History` link resolves to the D-02 history view at `/doctor/history` (route-derived; D-02 has no in-page tabs; sidebar is the sole toggle; ADR-41) | Doctor History sidebar-link desync bug fix |
+| 2026-06-22 | §2: doctor sidebar simplified to Appointments · Availability; D-02 regains in-page Today/History tabs (route-driven; ADR-42, supersedes ADR-41) | Doctor appointments page redesign (in-page tabs) |
