@@ -12,8 +12,8 @@ const karachiDay = (iso) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date(iso));
 
 export function DoctorToday() {
-  // The sidebar (Today / History links) is the single navigation control; the active view is
-  // derived from the route so it can never drift out of sync with the URL (was ISSUE-4 desync).
+  // In-page Today/History tabs (mirrors the patient Upcoming/Past page). The tabs are route links,
+  // so the active view is derived from the URL and can never drift out of sync with it (ADR-42).
   const { pathname } = useLocation();
   const tab = pathname.endsWith('/history') ? 'history' : 'today';
   const { appointments: list, cancelAppointment } = useDoctor({ appointmentsScope: tab });
@@ -26,6 +26,14 @@ export function DoctorToday() {
   return (
     <SidebarLayout>
       <section className="section-card">
+        <div className="tabs" role="tablist">
+          <Link className={`tab${tab === 'today' ? ' tab--active' : ''}`} to="/doctor">
+            Today
+          </Link>
+          <Link className={`tab${tab === 'history' ? ' tab--active' : ''}`} to="/doctor/history">
+            History
+          </Link>
+        </div>
         <h1>{tab === 'history' ? 'Appointment history' : 'Today’s appointments'}</h1>
         {list.isPending && <p className="help">Loading…</p>}
         {list.data && rows.length === 0 && (

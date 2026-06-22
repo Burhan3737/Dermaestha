@@ -1,21 +1,24 @@
 # 2026-06-21-2031 — doctor-history-nav-fix
 
 **Status:** Completed
-**Goal:** Fix the doctor's broken History sidebar navigation and remove the duplicate in-page Today/History tabs (sidebar-only navigation).
+**Goal:** Fix the doctor's broken History navigation, then (after a design pivot) rebuild the doctor
+appointments page as an in-page Today/History tab page mirroring the patient Upcoming/Past page.
 **Skill(s) used:** superpowers:systematic-debugging (user-invoked), superpowers:test-driven-development
 **Ticket / issue:** None (user-reported bug)
 **Branch:** main
 **Commits / PR:** None
-**Last updated:** 2026-06-21-2031
+**Last updated:** 2026-06-22-2105
 **Tags:** #bugfix #frontend
 
 ## Summary
 The doctor's sidebar "History" link did nothing: `/doctor/history` rendered the same `DoctorToday`
 component as `/doctor`, and the component's active tab came from `useState(initialTab)`, which only
 reads the prop on first mount — so navigating between the two routes never changed the visible tab.
-The page also carried in-page Today/History tabs that duplicated the sidebar links with a separate,
-unsynced state source. Fix (user-approved direction "Sidebar-only"): remove the in-page tabs and
-derive the view purely from the route, leaving the sidebar links as the single navigation mechanism.
+Root cause fixed by deriving the active view from the route. The page layout went through two
+user-chosen designs: first sidebar-only (in-page tabs removed, ADR-41), then — after the user reviewed
+the patient page — a pivot to mirror it: in-page Today/History tabs as route `<Link>`s, with the
+doctor sidebar simplified to Appointments · Availability (ADR-42, supersedes ADR-41). The History tab
+is retained because it is the only place a doctor can write prescriptions for completed appointments.
 
 ## Context / why
 User report: "On the today page there are two tabs today and appointment but these two tabs are also
@@ -28,22 +31,28 @@ confirmed the sidebar-only direction, which requires tracked spec wording update
 ## Files changed
 | File | Action | What & why |
 |---|---|---|
-| `client/src/modules/doctor/views/DoctorToday/DoctorToday.jsx` | Modified | Derive active tab from route (`useLocation`); remove in-page tab buttons + `initialTab` prop. |
+| `client/src/modules/doctor/views/DoctorToday/DoctorToday.jsx` | Modified | Active tab derived from route (`useLocation`); FINAL: in-page Today/History tabs as route `<Link>`s (patient-style); removed the old `initialTab` prop + local-state tab buttons. |
 | `client/src/modules/doctor/doctor.routes.jsx` | Modified | Both `/doctor` and `/doctor/history` render `<DoctorToday />`; drop `initialTab` prop. |
-| `client/test/unit/modules/doctor/views/DoctorToday/DoctorToday.test.jsx` | Modified | Drive history via route, not button click; assert no in-page tab buttons. |
-| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | Added ADR-41 (sidebar-only doctor nav, route-derived view); v1.18→1.19. |
-| `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md` | Modified | F05.02 "History tab" → sidebar History view at `/doctor/history`; v1.6→1.7. |
-| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified | §2 History-link note → route-derived, no in-page tabs; v1.7→1.8. |
-| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | §6 D-02 note → Today/History sidebar-only; v1.23→1.24. |
+| `client/src/layouts/SidebarLayout/SidebarLayout.jsx` | Modified | Doctor sidebar: removed the `History` link (now an in-page tab) and renamed `Today`→`Appointments`; sidebar is Appointments · Availability. |
+| `client/test/unit/modules/doctor/views/DoctorToday/DoctorToday.test.jsx` | Modified | History driven via route; FINAL: assert Today/History tabs render as route links with the active one marked. |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | Added ADR-41 (sidebar-only); v1.18→1.19. PENDING re-edit: ADR-42 (in-page tabs, supersedes ADR-41). |
+| `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md` | Modified | F05.02 reworded (v1.6→1.7). PENDING re-edit back to in-page tabs. |
+| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified | §2 reworded (v1.7→1.8). PENDING re-edit back to in-page tabs. |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | §6 D-02 note (v1.23→1.24). PENDING re-edit back to in-page tabs. |
 
 ## Dependencies / config / schema
 None.
 
 ## Decisions
-- Sidebar-only navigation (user-approved): in-page Today/History tabs removed; URL is the single
-  source of truth for which view shows. Resolves both the dead-link bug and the duplication.
 - Root cause was `useState(initialTab)` ignoring prop changes on route navigation (no remount because
-  both routes render the same component at the same tree position).
+  both routes render the same component at the same tree position). Fixed by deriving the active view
+  from the route — kept across both designs below.
+- DESIGN PIVOT (mid-session): the first approved direction was sidebar-only (in-page tabs removed,
+  ADR-41). After the user reviewed the patient appointments page, they chose instead to mirror it:
+  bring the in-page tabs back as route-driven `<Link>`s, keep labels Today/History, and simplify the
+  doctor sidebar to a single `Appointments` item (History becomes an in-page tab). This supersedes
+  ADR-41 with ADR-42.
+- The `History` tab is KEPT (the user asked whether it was needed): it is load-bearing — see findings.
 
 ## Notable findings
 - The prior ISSUE-4 fix (commit f6dbe8b) added the `/doctor/history` route and a test asserting every
@@ -51,24 +60,29 @@ None.
   behind a green test (symptom fix, not root cause).
 - The Explore sub-agent initially mis-stated the in-page tab label as "Appointment" and claimed a
   `DoctorToday.test.jsx` that did not exist at the reported path — verified against ground truth.
+- HISTORY IS LOAD-BEARING (verified in `server/src/modules/appointment/service.js:88-95`): the doctor
+  default scope returns `state IN (confirmed,in_progress)` for TODAY only; history returns `state IN
+  TERMINAL` (completed, prescription_issued, no-shows, cancelled). A `completed` appointment is
+  terminal, so it leaves the today view immediately and only appears under history. "Write
+  prescription" renders only on completed/prescription_issued rows → the History view is the SOLE
+  entry point to the prescription-writing flow (spec F08.02 completed-gate + edge case #26). Removing
+  it would break prescriptions. Hence it is kept as the second tab.
 
 ## Verification
-- TDD red: 3 new-contract tests failed before the fix (no-tabs, /doctor/history scope, ISSUE-9
-  labels) — confirming the component ignored the route.
-- TDD green: `npx vitest run` (client) — 40 files / 141 tests all pass after the fix, incl. the
-  DoctorToday, doctor.routes, and SidebarLayout suites.
-- Confirmed `.tabs`/`.tab` CSS is NOT orphaned (still used by AdminRecords + patient Upcoming/Past).
+- TDD (sidebar-only phase): 3 new-contract tests went red→green.
+- TDD (in-page tabs pivot): 2 tab tests went red (tabs as route links + active state) then green.
+- Final: `npx vitest run` (client) — 40 files / 141 tests all pass, incl. DoctorToday, doctor.routes,
+  and SidebarLayout suites.
 - Not yet verified in a running browser (unit tests render the real component through a router and
-  assert route → history scope → content, which covers the root cause).
+  assert tabs → route hrefs → active state → history scope → content).
 
 ## Risk / rollback
 Low blast radius: doctor module only. Revert the three files to restore prior behavior. No schema,
 API, or config changes.
 
 ## Open items / next session
-- Spec updates DONE (user-approved): ADR-41 added (doc 11); doc 02 F05.02, doc 06 §2, doc 13 §6
-  reworded from "History tab" to the sidebar-driven route-derived History view. Version footers bumped.
-- Optional future consideration: the patient Upcoming/Past views still use in-page route-tabs while
-  the doctor side is now sidebar-only — a deliberate divergence, revisit only if cross-role
-  consistency is wanted.
+- Spec updates: ADR-41 + the 02/06/13 sidebar-only wording were committed (commit 6e15d27). The pivot
+  to in-page tabs now needs a follow-up spec pass (PENDING user approval): add ADR-42 (in-page tabs,
+  supersedes ADR-41; mark ADR-41 Superseded), and re-update doc 02 F05.02 / doc 06 §2 / doc 13 §6 to
+  describe the in-page Today/History tabs + the Appointments·Availability sidebar.
 - Nothing pushed (per project rules); commits are local on `main`.

@@ -38,13 +38,16 @@ function setup(route = '/doctor') {
 beforeEach(() => vi.clearAllMocks());
 
 describe('D-02 DoctorToday', () => {
-  it('renders no in-page Today/History tabs — navigation is sidebar-only', async () => {
+  it('renders Today/History in-page tabs as route links, marking the active one', async () => {
     api.get.mockResolvedValue({ data: [] });
     setup('/doctor');
     await waitFor(() => expect(screen.getByRole('heading', { name: /today/i })).toBeTruthy());
-    expect(screen.queryByRole('tablist')).toBeNull();
-    expect(screen.queryByRole('button', { name: /^today$/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^history$/i })).toBeNull();
+    const todayTab = screen.getByRole('link', { name: /^today$/i });
+    const historyTab = screen.getByRole('link', { name: /^history$/i });
+    expect(todayTab.getAttribute('href')).toBe('/doctor');
+    expect(historyTab.getAttribute('href')).toBe('/doctor/history');
+    expect(todayTab.className).toContain('tab--active');
+    expect(historyTab.className).not.toContain('tab--active');
   });
 
   it('lists today appointments with the patient name', async () => {
@@ -141,6 +144,7 @@ describe('D-02 DoctorToday', () => {
     setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('Past P')).toBeTruthy());
     expect(api.get).toHaveBeenCalledWith('/appointments?scope=history');
+    expect(screen.getByRole('link', { name: /^history$/i }).className).toContain('tab--active');
   });
 
   it('history: completed row gets Write prescription + Awaiting badge after 12h', async () => {

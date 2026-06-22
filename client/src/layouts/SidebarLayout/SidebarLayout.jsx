@@ -3,9 +3,9 @@ import { NavLink } from 'react-router-dom';
 import { api } from '../../lib/apiClient/apiClient.js';
 
 export const DOCTOR_LINKS = [
-  { to: '/doctor', label: 'Today', end: true },
+  // Single appointments section (Today/History live as in-page tabs on the page, ADR-42).
+  { to: '/doctor', label: 'Appointments', end: true },
   { to: '/doctor/availability', label: 'Availability' },
-  { to: '/doctor/history', label: 'History' },
 ];
 
 export function SidebarLayout({ links = DOCTOR_LINKS, children }) {
