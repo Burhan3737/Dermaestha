@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.18                                                                                               |
-| Last updated     | 2026-06-21                                                                                         |
+| Version          | 1.19                                                                                               |
+| Last updated     | 2026-06-22                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -54,6 +54,7 @@
 39. [ADR-38 — Playwright E2E harness (root `e2e/`) against the mock adapters as the v1 launch gate](#adr-38--playwright-e2e-harness-root-e2e-against-the-mock-adapters-as-the-v1-launch-gate)
 40. [ADR-39 — Payment/appointment no-cascade release policy (refines ADR-23)](#adr-39--paymentappointment-no-cascade-release-policy-refines-adr-23)
 41. [ADR-40 — Centralized `test/` tree + `#src`/`#shared` aliases (supersedes ADR-26 test co-location)](#adr-40--centralized-test-tree--srcshared-aliases-supersedes-adr-26-test-co-location)
+42. [ADR-41 — Doctor Today/History navigation is sidebar-only (route-derived view)](#adr-41--doctor-todayhistory-navigation-is-sidebar-only-route-derived-view)
 
 ---
 
@@ -596,6 +597,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-41 — Doctor Today/History navigation is sidebar-only (route-derived view)
+
+**Date:** 2026-06-22
+
+**Status:** Accepted
+
+**Context:** The doctor D-02 screen carried two parallel controls for the same Today/History toggle: in-page tab buttons holding local `useState`, and the sidebar `Today`/`History` links holding the URL. The ISSUE-4 fix added the `/doctor/history` route (and a test asserting every sidebar link has a route), but `DoctorToday` seeded its tab from `useState(initialTab)` — read only on first mount. Both routes render the same component at the same tree position, so navigation never remounts it; the `initialTab` prop change was dropped and the sidebar `History` link appeared to do nothing. Two unsynchronized sources of truth for one piece of state.
+
+**Decision:** Make the doctor Today/History navigation **sidebar-only**, with the URL as the single source of truth. The in-page tab buttons are removed; `DoctorToday` derives the active view from `useLocation()` (`/doctor/history` → history, otherwise today). Both `/doctor` and `/doctor/history` render the same prop-less `<DoctorToday />`. This mirrors the route-driven pattern the patient Upcoming/Past views already use (`<Link className="tab" to="/appointments/history">`) at the data-flow level, while the doctor surface keeps a single navigation affordance (the sidebar) rather than duplicating it in-page.
+
+**Consequences:** The sidebar `History` link works and the view is bookmarkable/refresh-safe; the desync class of bug is eliminated because the active view is derived, not stored. The doctor D-02 screen no longer renders in-page Today/History tabs (the `.tabs`/`.tab` styles remain in use by AdminRecords and the patient appointment views). Verified by the D-02 unit suite driving history via the route; full client suite 141/141 green. No API, schema, or dependency change. Updates the "tab" wording in doc 02 §F05.02 and doc 06 §2 in the same pass.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -619,3 +634,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-14 | Added ADR-38 (Playwright E2E harness at root `e2e/` against the mock adapters; 6 Critical journeys J1–J6 as the v1 launch gate; living/extensible, one spec per journey + shared `support/`) and ADR-39 (payment/appointment no-cascade release policy — `Payment.appointment` is ON DELETE RESTRICT; `payment.failed`/reconcile-failed mark Payment failed + force-expire the lock, reclaim only `failed`/absent blockers, refundInFull force-expires; refines ADR-23) | Slice H · S7 (E2E QA + launch gate) + the four money-path fixes; two new architectural decisions |
 | 2026-06-15 | Added ADR-40 (centralized per-workspace `test/` tree — `unit/` mirrors `src/`, module `test.js`→`service.test.js`, integration `.integration` infix dropped; `#src`/`#shared` `resolve.alias`) superseding the test-co-location bullet of ADR-26 (pointer added); test move only, no behavior change | Server+shared+client test centralization; new architectural decision |
 | 2026-06-21 | ADR-34: doctor Join routes direct to `/video/:id` (not `/ready`); added dev `/dev`-proxy standing constraint | Role-aware doctor video-join bug fix + dev-proxy fix |
+| 2026-06-22 | Added ADR-41 (doctor Today/History navigation is sidebar-only; in-page tabs removed; active view derived from the route, single source of truth) | Doctor History sidebar-link desync bug fix; new architectural decision |

@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.7                                                                                       |
-| Last updated     | 2026-06-16                                                                                |
+| Version          | 1.8                                                                                       |
+| Last updated     | 2026-06-22                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -111,7 +111,7 @@ Doctors — Medicines — Records & audit — System health — Settings
 
 `/admin` redirects to `/admin/doctors` — the Doctors list is the admin landing page.
 
-**Sidebar logout.** Both the doctor and admin sidebars render a **Log out** control at the foot of the sidebar (`POST /api/auth/logout` then a full reload to `/login`); it is the doctor/admin equivalent of the patient's Profile-hosted logout. The `History` doctor link resolves to the D-02 history view (the history tab), not a separate screen.
+**Sidebar logout.** Both the doctor and admin sidebars render a **Log out** control at the foot of the sidebar (`POST /api/auth/logout` then a full reload to `/login`); it is the doctor/admin equivalent of the patient's Profile-hosted logout. The `History` doctor link resolves to the D-02 history view at `/doctor/history` (the same screen, route-derived — D-02 has no in-page tabs; the sidebar Today/History links are the sole toggle; ADR-41), not a separate screen.
 
 ### Screen-to-route inventory
 
@@ -606,3 +606,4 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 | 2026-06-14 | P-01 landing → Built: added the §2 public SPA route map (`/`→landing, listing P-02 relocated to `/browse`, logged-in-patient `/`→`/browse` redirect) and §3 "Landing (P-01)" (hero CTAs Browse + Sign-up, "How it works" anchor in the topnav, static featured-doctors grid) + "Legal pages (F16)" (reusable `LegalPage` DRAFT-banner pattern for `/legal/terms`,`/legal/privacy`) interaction notes | Slice H · S4 (public surface — landing + legal; ADR-35) |
 | 2026-06-15 | Flow-audit fixes: §2 sidebar **Log out** control (doctor/admin) + History-link-resolves note (ISSUE-2/4); §3 day-tabbed picker renders on P-03 (ISSUE-1); A-01 photo **required on add** (ISSUE-6); new "Medicine catalogue (A-02)" Edit note (ISSUE-7); P-07 as-built single "Payment not completed" terminal card + no-infinite-poll (ISSUE-3); "Not-found & cross-tenant states" (404 page ISSUE-8 + cross-tenant Rx message ISSUE-10); Landing featured cards display-only (ISSUE-5) | Three-role flow-audit fix session |
 | 2026-06-16 | Patient Upcoming gains a "Payment pending / Complete payment" card for live holds; Booking active-lock error gains a "Go to your pending booking" link | Pending-hold recovery feature (34f978d) |
+| 2026-06-22 | §2: clarified the doctor `History` link resolves to the D-02 history view at `/doctor/history` (route-derived; D-02 has no in-page tabs; sidebar is the sole toggle; ADR-41) | Doctor History sidebar-link desync bug fix |

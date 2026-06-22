@@ -1,6 +1,6 @@
 # 2026-06-21-2031 — doctor-history-nav-fix
 
-**Status:** Completed (code); spec updates + commit pending user approval
+**Status:** Completed
 **Goal:** Fix the doctor's broken History sidebar navigation and remove the duplicate in-page Today/History tabs (sidebar-only navigation).
 **Skill(s) used:** superpowers:systematic-debugging (user-invoked), superpowers:test-driven-development
 **Ticket / issue:** None (user-reported bug)
@@ -31,6 +31,10 @@ confirmed the sidebar-only direction, which requires tracked spec wording update
 | `client/src/modules/doctor/views/DoctorToday/DoctorToday.jsx` | Modified | Derive active tab from route (`useLocation`); remove in-page tab buttons + `initialTab` prop. |
 | `client/src/modules/doctor/doctor.routes.jsx` | Modified | Both `/doctor` and `/doctor/history` render `<DoctorToday />`; drop `initialTab` prop. |
 | `client/test/unit/modules/doctor/views/DoctorToday/DoctorToday.test.jsx` | Modified | Drive history via route, not button click; assert no in-page tab buttons. |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | Added ADR-41 (sidebar-only doctor nav, route-derived view); v1.18→1.19. |
+| `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md` | Modified | F05.02 "History tab" → sidebar History view at `/doctor/history`; v1.6→1.7. |
+| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified | §2 History-link note → route-derived, no in-page tabs; v1.7→1.8. |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | §6 D-02 note → Today/History sidebar-only; v1.23→1.24. |
 
 ## Dependencies / config / schema
 None.
@@ -62,5 +66,9 @@ Low blast radius: doctor module only. Revert the three files to restore prior be
 API, or config changes.
 
 ## Open items / next session
-- Spec wording updates to track for end-of-task approval: doc 02 F05.02 and doc 06 §2 both say
-  "History tab"; with tabs removed they should describe the sidebar-driven History view instead.
+- Spec updates DONE (user-approved): ADR-41 added (doc 11); doc 02 F05.02, doc 06 §2, doc 13 §6
+  reworded from "History tab" to the sidebar-driven route-derived History view. Version footers bumped.
+- Optional future consideration: the patient Upcoming/Past views still use in-page route-tabs while
+  the doctor side is now sidebar-only — a deliberate divergence, revisit only if cross-role
+  consistency is wanted.
+- Nothing pushed (per project rules); commits are local on `main`.

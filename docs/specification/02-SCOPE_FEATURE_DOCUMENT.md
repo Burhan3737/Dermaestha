@@ -4,8 +4,8 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.6                                           |
-| Last updated     | 2026-06-21                                    |
+| Version          | 1.7                                           |
+| Last updated     | 2026-06-22                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
 
@@ -137,7 +137,7 @@ One-line: the confirmed appointment progresses through the §4.3 state machine; 
   - After slot completion the appointment moves out of "Upcoming" into the "Past appointments" view (F08.01).
   - **Empty-State Rule**: shows "No upcoming appointments — Browse doctors" linking to the public doctor listing (F02).
 - **F05.02 - Doctor today view (D2)**
-  - Doctor dashboard default view shows today's appointments sorted by slot time; past appointments live under a separate "History" tab.
+  - Doctor dashboard default view shows today's appointments sorted by slot time; past appointments are shown in a separate History view reached from the doctor sidebar's "History" link (`/doctor/history`) — D-02 has no in-page tabs (ADR-41).
   - Row columns: **slot time**, **patient name** (and **"for: [actual patient]"** if booked-for-someone-else), **reason/notes if any**, **"Join Call" button**.
 - **F05.03 - Video consultation (P5, D3)**
   - **Join-Activation Rule**: the "Join Call" button activates 10 minutes before slot start (matching P5, D2, and P9). It opens the video room in the current browser tab — no app install.
@@ -567,3 +567,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | 2026-06-14 | F16.01: legal pages built as a banner-marked structured DRAFT via the reusable `LegalPage` template (final lawyer copy = pre-launch gate); F03.03: noted the KPI #1 emit points — `landing_view` on P-01 mount + `booking_started` on slot-lock via the shared `lib/analytics/track.js` seam (`booking_confirmed` remains S6/server) | Slice H · S4 (public surface — landing + legal; ADR-35) |
 | 2026-06-16 | Noted that an abandoned slot-lock hold is recoverable from patient appointments (Payment-pending / Complete payment); Single-Lock Rule unchanged | Pending-hold recovery feature (34f978d) |
 | 2026-06-21 | F05.03: added the doctor-first waiting copy ("Waiting for the patient to join…") alongside the existing patient-first copy | Role-aware video waiting-screen copy |
+| 2026-06-22 | F05.02: doctor today/history is sidebar-only — past appointments are a separate History view at `/doctor/history` (no in-page tabs; ADR-41) | Doctor History sidebar-link desync bug fix |
