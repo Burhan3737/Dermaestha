@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.10                                                                                      |
-| Last updated     | 2026-06-22                                                                                |
+| Version          | 1.11                                                                                      |
+| Last updated     | 2026-06-23                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -225,6 +225,10 @@ P-12 (patient) and D-04 (doctor) are served by **one shared, role-aware `VideoRo
 ### Prescription immutability (D-05)
 
 "Submit" makes the prescription immutable. Corrections require a new prescription; all prescriptions are shown chronologically, each downloadable.
+
+### Prescription presentation (P-13 / D-05)
+
+The patient view (P-13) renders each prescription as a **document "paper"** (§6 `.rx-paper`, §7): brass top-accent, clinic lockup (the shared `.brand` mark), a read-only patient-ID band, styled `.rx-item` lines (unpriced items carry a `tag-unpriced` chip and an em-dash price, excluded from the total), an optional notes block, a follow-up row, and a doctor signature footer. The signature uses an **initials `.avatar`** — the immutable `doctorSnapshot` carries no photo, so no live photo is pulled into the document. Where one appointment has multiple (correction) prescriptions, they render **most-recent first**, each later one preceded by an "Earlier prescription" divider; each paper offers **Download PDF** (client-rendered, §3.5) and **Print** (a print stylesheet hides the nav chrome, actions, and back-link). The doctor builder (D-05) mirrors the language: the read-only patient-ID band, a "Medicines" form-card whose rows pair the medicine name with a Dosage/Duration/Instructions field grid and a right-aligned price + danger-ghost Remove, a running total + unpriced caption, and a read-only "Previously submitted" list of compact `.rx-prev` cards (newest-first, `Submitted` badge).
 
 ### Doctor profile-photo upload (A-01)
 
@@ -551,6 +555,10 @@ Full-width, `border-collapse: collapse`, white background, `var(--border-1)`, ra
 
 A dense table-cell datetime formatter: Asia/Karachi, medium-date + short-time, with no weekday. It is distinct from `formatKarachi` (which includes the weekday) and is used in the A-03 / A-04 table cells where horizontal space is tight. Lives in `client/src/lib/format/format.js`.
 
+### Datetime formatting — `formatKarachiDate(iso)`
+
+A date-only Asia/Karachi formatter with the **year** (weekday + day + month + year, no time) — e.g. "Thu, 29 May 2026". It is distinct from `formatKarachi` (which adds the time but omits the year) and backs the prescription document header, follow-up date, and the doctor issued-stamp (paired with `formatKarachiTime`) on P-13 / D-05. Lives in `client/src/lib/format/format.js`.
+
 ### Pagination (`shared/Pagination/`)
 
 Shared page-envelope navigator: a **Previous** control, a "Page X of Y" indicator, and a **Next** control, each disabled at its bound (Previous on the first page, Next on the last). It reads the house `{ number, size, total }` page envelope and is used beneath the A-04 records & audit tables. Lives at `client/src/shared/Pagination/`.
@@ -567,9 +575,17 @@ Flex row, gap `var(--sp-2)`, `margin-bottom: var(--sp-5)`. Step number: 22 × 22
 
 - Row: `justify-content: space-between`, `padding: var(--sp-3) 0`, bottom border.
 - Left: medicine name (`.rx-item__name`, weight 700, `var(--color-text-strong)`) + dosage/duration/instructions (`.rx-item__detail`, 13 px, muted).
-- Right: price (`.rx-item__price`, tabular, weight 700, `var(--color-text-strong)`).
+- Right: price (`.rx-item__price`, tabular, weight 700, `var(--color-text-strong)`, `white-space: nowrap` so money never wraps).
 - Unpriced tag (`.tag-unpriced`): neutral tint background + neutral text, 11 px 700, `2 px 7 px` padding, radius `var(--r-sm)`.
 - Total row (`.rx-total`): Archivo 800, `var(--color-primary)`, `padding-top: var(--sp-3)`.
+
+### Prescription document "paper" (`.rx-paper`) — P-13
+
+The patient prescription document (§6 layout pattern). Container (`.rx-page`): `max-width: 920px`, centered. Card (`.rx-paper`): white surface, `var(--border-1)`, `var(--r-md)`, `overflow: hidden`; a 3 px brass top-accent (`.rx-paper__accent`) and `var(--sp-8)` body padding (`.rx-paper__body`, `var(--sp-5)` on mobile). Document header (`.rx-doc-header`): the shared `.brand` lockup on the left, a right block (`.rx-doc-right`) with an uppercase label-case type (`.rx-doc-type`) over the issue date (`.rx-doc-date`). Patient-ID band (`.rx-patient-band`): `var(--color-primary-tint)` fill, `var(--color-primary-border)` border, with an uppercase spruce label (`.rx-patient-label`) over the identity line (`.rx-patient-line`). Section eyebrow (`.rx-section`) for "General notes"; notes block (`.rx-notes`): canvas fill + border, `1.65` line-height. Follow-up row (`.rx-followup`): calendar glyph + label + spruce date (`.rx-followup-date`) + optional "(N weeks)". Signature footer (`.rx-doc-footer`): an initials `.avatar--lg`, name (`.rx-doc-name`) with an inline PMC badge (`.pmc-badge--inline`), a muted stamp (`.rx-stamp`), and the action row (`.rx-footer-actions`: Download PDF + Print, full-width on mobile). Multiple prescriptions are separated by a centered "Earlier prescription" label (`.older-label`). A back link (`.rx-back`) sits above the page. A `@media print` rule hides the nav chrome, actions, and back-link so the on-screen paper prints cleanly.
+
+### Prescription builder rows (`.rx-builder-item`) — D-05
+
+The doctor builder's editable medicine row. Row (`.rx-builder-item`): flex, `align-items: flex-start`, `var(--sp-4)` gap, `var(--sp-3) 0` padding, bottom border. Left (`.rx-builder-item__left`, `flex: 1`): medicine name (`.rx-builder-item__name`, weight 700, optional `tag-unpriced` chip) over a three-column field grid (`.rx-builder-item__fields`, `1fr 1fr 2fr`; collapses to `1fr 1fr` ≤ 640 px) of compact `.mini-field`s (10 px uppercase label + a padded-down `.input`). Right aside (`.rx-builder-item__aside`, column, end-aligned): the price (`.rx-builder-item__price`, tabular, nowrap) over a `btn--danger-ghost btn--sm` Remove. The form's notes use a full-width `<textarea>` (`textarea.input { resize: vertical }`) inside a `.field--wide` (the `.field` max-width cap removed). Previously-issued prescriptions render as read-only summary cards (`.rx-prev`): same brass accent + body, a header (`.rx-prev-header`) pairing "Prescription for …" + an issued stamp with a `badge--success` "Submitted", then read-only `.rx-item` lines + total.
 
 ### Video chrome — stage, self-tile, controls
 
@@ -625,3 +641,4 @@ The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`
 | 2026-06-22 | §2: clarified the doctor `History` link resolves to the D-02 history view at `/doctor/history` (route-derived; D-02 has no in-page tabs; sidebar is the sole toggle; ADR-41) | Doctor History sidebar-link desync bug fix |
 | 2026-06-22 | §2: doctor sidebar simplified to Appointments · Availability; D-02 regains in-page Today/History tabs (route-driven; ADR-42, supersedes ADR-41) | Doctor appointments page redesign (in-page tabs) |
 | 2026-06-22 | §7: documented the shared in-page tab control (`.tabs`/`.tab`), the appointment row-card component (`.appt-row` family), and the `.btn--danger-ghost` button variant; §3: noted the status badge now renders on every patient/doctor appointment row via `stateBadge` | Appointment list-page redesign (ported mockup design into components.css) |
+| 2026-06-23 | §7: documented the prescription document "paper" family (`.rx-paper`…) and the builder families (`.rx-builder-item`/`.rx-prev`/`.field--wide`/`textarea.input`), added `.rx-item__price` nowrap, and the `formatKarachiDate` formatter; §3: added the P-13/D-05 presentation note (document paper, initials signature, newest-first + "Earlier/Previously" dividers, Print) | Prescription view + builder redesign (ported mockup design into components.css) |
