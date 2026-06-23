@@ -243,6 +243,19 @@ textarea.input { resize: vertical; min-height: 92px; }
   .rx-builder-item__fields { grid-template-columns: 1fr 1fr; }
 }
 
+/* Medicine search combobox — doctor D-05 */
+.med-search__control { position: relative; }
+.med-search__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; }
+.med-search__input.input { padding-left: 34px; }
+.listbox { position: absolute; top: calc(100% + var(--sp-1)); left: 0; right: 0; z-index: 20; margin: 0; padding: var(--sp-1); list-style: none; background: var(--color-surface); border: var(--border-1); border-radius: var(--r-md); box-shadow: var(--shadow-overlay); max-height: 280px; overflow-y: auto; }
+.option { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-body-sm); }
+.option:hover, .option--active { background: var(--color-primary-tint); }
+.option__name { color: var(--color-text-strong); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.option__generic { color: var(--color-text-muted); font-weight: 400; }
+.option__price { color: var(--color-text-strong); font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.option--freetext { margin-top: var(--sp-1); padding-top: var(--sp-3); border-top: var(--border-1); color: var(--color-text-muted); }
+.option--freetext strong { color: var(--color-text-strong); }
+
 /* Video chrome */
 .video-stage { background: var(--color-dark-bg); border-radius: var(--r-lg); aspect-ratio: 16/9; position: relative; display: flex; align-items: center; justify-content: center; color: var(--color-on-dark); }
 .video-self { position: absolute; bottom: 12px; right: 12px; width: 120px; aspect-ratio: 4/3; background: var(--color-dark-surface); border-radius: var(--r-md); border: 1px solid var(--color-dark-border); }
