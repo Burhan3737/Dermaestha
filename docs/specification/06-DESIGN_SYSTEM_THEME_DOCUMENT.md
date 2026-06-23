@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.11                                                                                      |
+| Version          | 1.12                                                                                      |
 | Last updated     | 2026-06-23                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -479,6 +479,8 @@ Size modifiers: `.btn--sm` (`8 px 14 px`), default (`11 px 18 px`), `.btn--lg` (
 
 Native-styled `<select>` for simple cases; custom keyboard-navigable listbox for medicine search (D-05) and day/slot selection (P-06).
 
+The D-05 medicine search (`.med-search`) is a combobox: a full-width input with a leading magnifier glyph (`.med-search__icon`) and a helper line. Its results render as a **floating popover** (`.listbox`): a surface card with `var(--border-1)`, `var(--r-md)`, and `var(--shadow-overlay)`, absolutely positioned just under the input (`top: calc(100% + var(--sp-1))`), so it overlays following content rather than displacing it. Each row (`.option`) is a flex line — bold medicine name (`.option__name`) + muted generic (`.option__generic`) on the left, right-aligned tabular price (`.option__price`) — with a `var(--color-primary-tint)` fill on hover and on the keyboard-active row (`.option--active`). A separated free-text fallback row (`.option--freetext`, top hairline) lets the doctor add an off-catalogue medicine as unpriced text (`tag-unpriced`).
+
 ### Checkbox & radio (`.choice`)
 
 `display: flex`, 18 × 18 px input, `accent-color: var(--color-primary)`. Checkbox (3 px radius): mandatory ToS/Privacy consent (P-04). Radio (circular): "Who is this consultation for?" (P-06).
@@ -642,3 +644,4 @@ The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`
 | 2026-06-22 | §2: doctor sidebar simplified to Appointments · Availability; D-02 regains in-page Today/History tabs (route-driven; ADR-42, supersedes ADR-41) | Doctor appointments page redesign (in-page tabs) |
 | 2026-06-22 | §7: documented the shared in-page tab control (`.tabs`/`.tab`), the appointment row-card component (`.appt-row` family), and the `.btn--danger-ghost` button variant; §3: noted the status badge now renders on every patient/doctor appointment row via `stateBadge` | Appointment list-page redesign (ported mockup design into components.css) |
 | 2026-06-23 | §7: documented the prescription document "paper" family (`.rx-paper`…) and the builder families (`.rx-builder-item`/`.rx-prev`/`.field--wide`/`textarea.input`), added `.rx-item__price` nowrap, and the `formatKarachiDate` formatter; §3: added the P-13/D-05 presentation note (document paper, initials signature, newest-first + "Earlier/Previously" dividers, Print) | Prescription view + builder redesign (ported mockup design into components.css) |
+| 2026-06-23 | §7 Select/picker: documented the D-05 medicine combobox (`.med-search` + leading magnifier) and its floating `.listbox` popover (`--shadow-overlay`) of `.option` rows (name/generic/price, hover/`--active` tint, separated `--freetext` fallback) | Medicine search combobox restyle (classes were referenced but never defined in components.css) |
