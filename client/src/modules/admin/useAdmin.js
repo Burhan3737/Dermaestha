@@ -12,7 +12,7 @@ const qs = (obj) => {
 
 /**
  * Admin module data/mutations (house pattern: one hook per module, enabled-gated queries).
- * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null, recordDetailId?: string|null, alerts?: boolean, settings?: boolean }} [opts]
+ * @param {{ medicines?: boolean, medicinesSearch?: string, doctors?: boolean, recordsFilters?: object|null, auditFilters?: object|null, recordDetailId?: string|null, alerts?: boolean, settings?: boolean, pendingReview?: boolean }} [opts]
  */
 export function useAdmin(opts = {}) {
   const {
@@ -24,6 +24,7 @@ export function useAdmin(opts = {}) {
     recordDetailId = null,
     alerts: alertsEnabled = false,
     settings: settingsEnabled = false,
+    pendingReview: pendingReviewEnabled = false,
   } = opts;
   const qc = useQueryClient();
 
@@ -132,6 +133,30 @@ export function useAdmin(opts = {}) {
     onSuccess: invalidateRecord,
   });
 
+  /** Manual-payment review queue: `pending` appointments awaiting admin verification (design §7.2). */
+  const pendingReview = useQuery({
+    queryKey: ['admin-pending-review'],
+    queryFn: () => api.get('/admin/records?state=pending'),
+    enabled: pendingReviewEnabled,
+  });
+
+  const invalidateReview = () => {
+    qc.invalidateQueries({ queryKey: ['admin-pending-review'] });
+    qc.invalidateQueries({ queryKey: ['admin-alerts'] });
+  };
+
+  /** Accept a pending payment → `confirmed`. @param {string} id */
+  const acceptAppointment = useMutation({
+    mutationFn: (id) => api.post(`/admin/appointments/${id}/accept`),
+    onSuccess: invalidateReview,
+  });
+
+  /** Reject a pending payment → `cancelled` (frees the slot). @param {string} id */
+  const rejectAppointment = useMutation({
+    mutationFn: (id) => api.post(`/admin/appointments/${id}/reject`),
+    onSuccess: invalidateReview,
+  });
+
   /** Platform-wide tunable settings (F14). */
   const settings = useQuery({
     queryKey: ['admin-settings'],
@@ -153,5 +178,6 @@ export function useAdmin(opts = {}) {
     records, auditEntries,
     recordDetail, resendEmail, setDisputed,
     settings, saveSettings,
+    pendingReview, acceptAppointment, rejectAppointment,
   };
 }
