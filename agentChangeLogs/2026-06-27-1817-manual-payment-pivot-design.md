@@ -6,7 +6,7 @@
 **Ticket / issue:** None
 **Branch:** main (no code changes yet; design + changelog only)
 **Commits / PR:** None
-**Last updated:** 2026-06-27-1817
+**Last updated:** 2026-06-27-1925
 **Tags:** #feature #refactor #design
 
 ## Summary
@@ -27,6 +27,8 @@ plan — removing no-show tracking removes that dependency.
 | File | Action | What & why |
 |---|---|---|
 | `docs/superpowers/specs/2026-06-27-manual-payment-pivot-design.md` | Created | Approved design for the manual-payment pivot (scope, data model, state machine, flows, cron, testing, doc-impact) |
+| `docs/superpowers/plans/2026-06-27-manual-payment-pivot-backend.md` | Created | Plan 1 of 2 — backend TDD implementation plan (15 tasks: tag/ADR, schema migration, 4-state machine, lock+fee, /pay reference, admin accept/reject, cancel, prescription gate, slim cron, notifications, deletions, e2e) |
+| `docs/superpowers/plans/2026-06-27-manual-payment-pivot-frontend.md` | Created | Plan 2 of 2 — frontend TDD plan (11 tasks: backend UI-support, booking confirm-no-redirect, patient payment-instructions screen, pending card, cancel modal, admin records cleanup, admin review queue + accept/reject, editable bank settings, gateway-return removal, green sweep) — doc 06 conformance enforced |
 | `agentChangeLogs/2026-06-27-1817-manual-payment-pivot-design.md` | Created | This session changelog |
 | `agentChangeLogs/index.md` | Modified | Added this session's index line |
 | `.env.daily` | Created (earlier this session) | Git-ignored dedicated env for the (blocked) live Daily Tier-2 test |
@@ -56,6 +58,7 @@ fields added to admin settings. Config to remove later: `PAYFAST_*`, `PAYMENT_PR
   (`prescription/service.js:35`). Kept `completed`; only the refund side-effect and join-based
   detection are removed.
 - The scheduler is in-process `node-cron` (no external infra/cost); the pivot deletes 2 of its 4 jobs.
+- Review pass on both plans surfaced gaps now patched: (backend) missing deletions of `reconcileRefund`/`paymentFailed`/`reclaimSafety` integration tests + `doubleBooking`/`admin` test updates; `seed-baseline.js` rewrite (Task 16); explicit env/PAYFAST cleanup (Task 17); orphaned Settings fallback-fee columns (Task 18); `booking_confirmed` analytics moved to admin-accept. (frontend) `AdminRecordDetail.jsx` refund/dispute removal (F12); `DoctorToday.jsx` `canWriteRx` → `completed` only (F13); `Past.jsx`/dead-`appointmentStatus` verification (F14).
 
 ## Verification
 Not verified (design only; no code changed). Build/tests to run during implementation.
