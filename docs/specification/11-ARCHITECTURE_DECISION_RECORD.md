@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.20                                                                                               |
-| Last updated     | 2026-06-22                                                                                         |
+| Version          | 1.21                                                                                               |
+| Last updated     | 2026-06-28                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -56,6 +56,7 @@
 41. [ADR-40 — Centralized `test/` tree + `#src`/`#shared` aliases (supersedes ADR-26 test co-location)](#adr-40--centralized-test-tree--srcshared-aliases-supersedes-adr-26-test-co-location)
 42. [ADR-41 — Doctor Today/History navigation is sidebar-only (route-derived view)](#adr-41--doctor-todayhistory-navigation-is-sidebar-only-route-derived-view)
 43. [ADR-42 — Doctor appointments page: in-page Today/History tabs (supersedes ADR-41)](#adr-42--doctor-appointments-page-in-page-todayhistory-tabs-supersedes-adr-41)
+44. [ADR-43 — Manual offline payment + 3-state appointment model (supersedes the PayFast/refund/no-show subsystems)](#adr-43--manual-offline-payment--3-state-appointment-model-supersedes-the-payfastrefundno-show-subsystems)
 
 ---
 
@@ -197,6 +198,8 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-05-30
 
+**Status:** Superseded by ADR-43 (2026-06-28). The entire refund subsystem was removed in the manual-payment pivot — there is no refund math, no `gateway_fee`, no `fallback_fee*` settings, and no `Payment` table. Cancelling forfeits; any money movement is handled offline by the admin.
+
 **Context:** PRD policy #5 defines that patient refunds are calculated net of the gateway fee, not at the full payment amount. The gateway fee is reported by PayFast on the payment record; when not reported, a fallback fee model (percentage + fixed, configurable via Settings A6) is used. This is a business unit-economics decision recorded in the PRD. (ARCHITECTURE.md §8, §12)
 
 **Decision:** The refund logic (in `modules/appointment/service.js` since the ADR-26 restructure) computes the refund amount as `payment.amount − gateway_fee`. When `gateway_fee` is not reported by PayFast, the Settings `fallback_fee_pct` + `fallback_fee_fixed` (admin-configurable, A6) apply. The gateway-reported fee is captured on the `payments` record at booking time and drives the refund amount, the cancellation-modal estimate, and the dashboard breakdown identically.
@@ -208,6 +211,8 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 ## ADR-12 — Doctor-absence precedence in no-show resolution
 
 **Date:** 2026-05-30
+
+**Status:** Superseded by ADR-43 (2026-06-28). The no-show lifecycle was removed entirely with the manual-payment pivot: the appointment model has no `in_progress`/`patient_no_show`/`doctor_no_show` states and Daily runs webhook-free (no participant-join data), so there is no no-show resolution to arbitrate.
 
 **Context:** The appointment-evaluation worker must resolve the no-show state when a slot lapses without both participants joining. Two outcomes are possible: `doctor_no_show` (doctor never joined — full refund net of fee + apology to patient) or `patient_no_show` (doctor joined, patient did not — no refund). When participant join-event data is ambiguous or missing, neither outcome is safe to assert blindly. PRD §4.3 states the resolution rule. (ARCHITECTURE.md §10)
 
@@ -244,6 +249,8 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 ## ADR-15 — Vendor selection: PayFast, Daily.co, Resend
 
 **Date:** 2026-05-30
+
+**Status:** Partially superseded by ADR-43 (2026-06-28). PayFast is no longer a vendor — payment is offline bank transfer (no gateway). Daily.co is retained but on the **free tier** (room + token only, no paid participant webhooks). Resend (email) is unchanged.
 
 **Context:** Three integration categories require vendor picks: payments, video consultation, and transactional email. Each must fit the Pakistan market, the v1 budget, and the §3.4 functional requirements. (ARCHITECTURE.md §3, §12)
 
@@ -333,6 +340,8 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-06-04
 
+**Status:** Superseded by ADR-43 (2026-06-28). With no payment gateway there is no IPN to simulate — the `payfast.mock` provider, the `/dev/checkout` simulator, and the `PAYMENT_PROVIDER` switch were removed. The dev/CI offline path for payment is now the patient submitting a bank reference + the admin accept/reject endpoints.
+
 **Context:** Slice C builds the booking↔payment interlock (F03/F04), but there is no live PayFast merchant account in the dev/CI environment, and the concrete network adapter is not yet wired (the `payfast.stub` throws `NOT_IMPLEMENTED`). The webhook-as-source-of-truth design (doc 05 §5, F04.02) makes the signed IPN — not the browser redirect — the authoritative confirmation. A simulation that shortcuts the redirect→out-of-band-signed-callback split would test a different architecture than the one shipped. (docs/superpowers/specs/2026-06-03-slice-c-booking-payment-design.md)
 
 **Decision:** Add a dev-only mock `PaymentProvider` (`server/src/integrations/payment/payfast.mock.js`) implementing the same `@typedef` contract (ADR-10). `createCheckout` returns a redirect to an app-served, env-guarded hosted-checkout page (`/dev/checkout`, mounted only when `PAYMENT_PROVIDER=mock`); its "Pay"/"Fail" action builds a **real HMAC-signed IPN** (`signParams`/`buildSignedIpn`, keyed on `PAYFAST_PASSPHRASE`) and runs it through the **same** `verifyWebhook` + atomic-commit path as production. Selection is via the `PAYMENT_PROVIDER` switch (default `stub`); the throwing stub remains the production default until the concrete adapter is wired.
@@ -344,6 +353,8 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 ## ADR-23 — Lazy slot-lock expiry (no background worker)
 
 **Date:** 2026-06-04
+
+**Status:** Partially superseded by ADR-43 (2026-06-28). There is no 10-minute `lockExpiresAt` auto-expiry any more: booking creates a `pending` appointment whose slot frees only when a human acts (patient/doctor/admin cancel, or admin reject). The `lockExpiresAt` column and the lazy read/write reclaim mechanism were removed; the `uniq_active_slot` partial index (over the active states `pending`/`confirmed`) still provides the no-double-booking guarantee.
 
 **Context:** A `slot_locked` appointment carries a 10-minute `lockExpiresAt`; when it lapses, the slot must become bookable and reappear in the picker. The `uniq_active_slot` partial index (ADR-07) counts `slot_locked` as occupying, and slot generation excludes `slot_locked`, so an expired-but-present lock row would otherwise keep a slot both hidden and unbookable. ADR-08 anticipated in-process `node-cron` workers for time-based jobs, but a periodic sweep polling the DB every minute is standing overhead, and an in-memory per-lock `setTimeout` is not durable across restarts. (docs/superpowers/specs/2026-06-03-slice-c-booking-payment-design.md)
 
@@ -357,6 +368,8 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-06-05
 
+**Status:** Superseded by ADR-43 (2026-06-28). No-show resolution and the Daily participant webhook were removed, so there is no `POST /api/webhooks/daily`, no `recordJoinFromDailyEvent`, no `/dev/video/*` join simulator, and no `joinSimUrl` join recording. Daily is room + token only; `video-token` is issued for `confirmed` appointments and the SPA joins directly.
+
 **Context:** Slice D builds F05 video, but there is no live Daily.co account in dev/CI and the concrete network adapter is unwired (`daily.stub` throws `NOT_IMPLEMENTED`). No-show resolution depends on participant-join data Daily would post to `POST /api/webhooks/daily`. A simulation that bypassed the webhook→worker path would test a different architecture than the one shipped (same rationale as ADR-22 for payments).
 
 **Decision:** Add a dev-only mock `VideoProvider` (`server/src/integrations/video/daily.mock.js`) implementing the same `@typedef` (ADR-10): `createRoom` returns a deterministic `appt_<id>` room; `issueToken` returns an HMAC-signed (keyed on `VIDEO_MOCK_SECRET`) opaque dev token bounded by the slot window. The real `POST /api/webhooks/daily` handler records first-join timestamps via `recordJoinFromDailyEvent`; a dev-only, env-guarded simulator (`/dev/video/*`, mounted only when `VIDEO_PROVIDER=mock`) emits the documented Daily participant payload through that same handler, and the SPA records its join via a server-provided `joinSimUrl`. Selection is via the `VIDEO_PROVIDER` switch (default `stub`); `stub` and `daily` resolve to the throwing stub until the concrete `daily.js` adapter is wired.
@@ -368,6 +381,8 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 ## ADR-25 — Appointment-evaluation worker: in-process node-cron (realizing ADR-08)
 
 **Date:** 2026-06-05
+
+**Status:** Superseded by ADR-43 (2026-06-28). The lifecycle transitions this worker drove (`confirmed→in_progress`, `in_progress→completed`, no-show resolution) no longer exist in the 3-state model, so `evaluateDueAppointments` and its cron job were removed. The only remaining cron job is `notification-dispatch` (ADR-27's dispatch worker, also slimmed). The clock-injected, `transition()`-only-writer worker pattern this ADR established is still in use by the dispatch worker.
 
 **Context:** The non-payment lifecycle transitions (`confirmed→in_progress` at slot start, `in_progress→completed` at slot-end+5m, no-show resolution at slot+15m) fire as push side-effects (refund + apology email) even when no one reads the appointment — so the lazy approach used for lock-expiry (ADR-23) is insufficient here. ADR-08 anticipated in-process `node-cron` workers; Slice D builds the first one.
 
@@ -401,7 +416,7 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-06-11
 
-**Status:** Accepted
+**Status:** Partially superseded by ADR-43 (2026-06-28). The transactional outbox (`notification_jobs`) and the `dispatchDueNotifications` worker remain the single email path. The refund-retry (`retryDueRefunds`) and reconciliation (`reconcileUnconfirmed`) workers were removed with the refund/gateway subsystems, leaving exactly one cron job (`notification-dispatch`). The producer set changed (manual-payment emails replace the refund emails — doc 14 §5).
 
 **Context:** Slice E realizes the two deferred workers ADR-08/ADR-25 anticipated (notification dispatch F07, reconciliation F04.03) and completes the refund-retry safety net (F06.03). Three coupling problems had to be solved together: (1) Slice C/D sent appointment emails as a post-commit, fire-and-forget `emailProvider.send()` — a crash between the committed state change and the send loses the email, and the PayFast IPN ack waited on a send it shouldn't; (2) reminders (F07.02) must fire at slot−24h / slot−1h but be suppressed if the appointment leaves `confirmed`/`in_progress` before then (F07.03), which a fire-once send cannot express; (3) a failed refund was previously near-silent. A simple "sent-flags on the appointment" approach was considered and rejected — boolean flags cannot carry retry/backoff state, a suppression outcome, or a per-trigger schedule, and they fail the F07.03 retry rule. (docs/superpowers/specs/2026-06-11-slice-e-m1-m2-closure-design.md)
 
@@ -471,7 +486,7 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-06-13
 
-**Status:** Accepted
+**Status:** Superseded by ADR-43 (2026-06-28). All in-app payment integration was removed in the manual-payment pivot — there is no PayFast adapter, no `verifyWebhook`/`verifyReturn`, no gateway refund/reconcile path, and no `PAYFAST_*` config. Payment is offline bank transfer verified manually by the admin. Retained for revival reference (a future gateway re-adds a second confirmation trigger to the unchanged `pending → confirmed` spine).
 
 **Context:** Slice H · S1 wires the first concrete `PaymentProvider` network adapter (`server/src/integrations/payment/payfast.js`), the production target replacing the throwing stub. The vendor is PayFast **Pakistan** (payfast.pk / APPS IPG), whose public documentation is thin: the init flow (`GetAccessToken`→`PostTransaction`), the signature field list/order, the `CHECKOUT_URL` callback contract, and even the amount unit are inferred from community SDKs, not an official spec. PayFast PK also appears to expose **no** refund API and **no** payment-status-query API — unlike the South-Africa PayFast that earlier contract drafts (doc 14, doc 15 `PAYFAST_MERCHANT_KEY`) assumed. Two confirmation channels exist — a server callback (`CHECKOUT_URL`) and the browser return (`SUCCESS_URL` / `FAILURE_URL`) — and either may arrive first.
 
@@ -485,7 +500,7 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-06-14
 
-**Status:** Accepted
+**Status:** Superseded by ADR-43 (2026-06-28). The Daily participant webhook was removed with the no-show lifecycle: there is no `POST /api/webhooks/daily`, no `verifyWebhook`, no join recording, and no `DAILY_WEBHOOK_SECRET`. Daily now runs on the free tier as room + time-bound token only (`createRoom` + `issueToken`); the adapter is otherwise unchanged.
 
 **Context:** Slice H · S2 wires the first concrete `VideoProvider` network adapter (`server/src/integrations/video/daily.js`), the production target replacing the throwing stub (ADR-24 anticipated this as a future file-swap). Three decisions had to be settled. (1) **Where verification + normalization live.** The real Daily webhook must be authenticated (it is a public route — authenticity comes from the signature, not a cookie) and its versioned envelope normalized before the join-recording service runs. (2) **How participant role is determined.** ADR-24's dev mock inferred role from `user_name` and explicitly flagged that "the real adapter must map role from `is_owner`/a stable participant id." Daily's current envelope exposes `payload.owner` (boolean) — but a doctor is the room owner and a patient is not, which is fragile, and tokenless/knocking participants have no reliable identity. (3) **Webhook delivery durability.** Daily's default webhook `retryType` is `circuit-breaker`, which DISABLES the webhook after 3 consecutive delivery failures — a silent single-point loss of all no-show data.
 
@@ -569,7 +584,7 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-06-14
 
-**Status:** Accepted
+**Status:** Partially superseded by ADR-43 (2026-06-28). The `Payment` table was dropped, so the FK-`RESTRICT` crash class this ADR addressed no longer exists and the `markFailedAndReleaseLock` / `refundInFull` / lazy-reclaim force-expire paths were removed. `Prescription.appointment` remains `ON DELETE RESTRICT`, but appointments are no longer deleted to free a slot — a slot frees by a human transitioning the appointment to `cancelled` (excluded from `uniq_active_slot`).
 
 **Context:** The S7 E2E gate (ADR-38), driving the real DB, surfaced a **class** of pre-existing crash the mocked-Prisma unit suite could not see: deleting a `slot_locked` appointment that a `Payment` row FK-references. `Payment.appointment` (and `Prescription.appointment`) are **`ON DELETE RESTRICT`** (no cascade — `prisma/schema.prisma`), so such a delete raises `P2003`. Three money-path sites deleted (or could delete) such an appointment to free its slot: the `payment.failed` webhook + reconcile-failed paths, `createWithReclaim`'s lazy reclaim (ADR-23), and `refundInFull` (edge #6a — after the money was already refunded).
 
@@ -626,6 +641,29 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-43 — Manual offline payment + 3-state appointment model (supersedes the PayFast/refund/no-show subsystems)
+
+**Date:** 2026-06-28
+
+**Status:** Accepted
+
+**Context:** A client decision for phase 1 removed all in-app payment integration and the entire refund subsystem, and shed the paid Daily.co plan dependency. The prior design carried heavy machinery — a PayFast Pakistan gateway adapter (ADR-32), a net-of-fee refund subsystem (ADR-11) with retry/reconciliation workers (ADR-27), a no-show lifecycle (ADR-12) driven by an evaluation worker (ADR-25) over Daily participant webhooks (ADR-24/ADR-33), a 10-state appointment enum, a `Payment` table, and `slot_locked` lock-expiry (ADR-23/ADR-39) — all of which existed to make online money movement and attendance verification safe. None of that is needed when payment is an offline bank transfer the admin verifies by hand. (docs/superpowers/specs/2026-06-27-manual-payment-pivot-design.md)
+
+**Decision:** Pivot to a **manual offline payment** model on a **3-state** appointment machine (`pending → confirmed`, plus `cancelled` from either):
+
+1. **Lock on click.** Booking a slot immediately creates a `pending` appointment (the `uniq_active_slot` partial index now covers `pending`/`confirmed`), snapshotting `feeAtBooking` **at lock time** (it is needed for the payment instructions) rather than on confirm. No 10-minute auto-expiry — the slot frees only when a human cancels/rejects.
+2. **No proof image, bank details from settings.** Admin-editable Settings hold `bankName`/`bankAccountName`/`bankAccountNumber`/`bankInstructions`; `GET /api/appointments/:id` returns these as `paymentInstructions { amountDue, bankName, bankAccountName, bankAccountNumber, bankInstructions }` for an owned `pending` appointment.
+3. **Reference matching.** `POST /api/appointments/:id/pay` is repurposed (no gateway): it sets `paymentReference` + `paymentSubmittedAt`, stays `pending`, and enqueues an admin alert + `payment_submitted_admin` email.
+4. **Admin review.** `GET /api/admin/records?state=pending` is the review queue; `POST /api/admin/appointments/:id/accept` → `pending → confirmed` (enqueues `booking_confirmation`, fires the `booking_confirmed` analytics event), `POST /api/admin/appointments/:id/reject` → `pending → cancelled` (frees the slot, enqueues `payment_not_received`).
+5. **No refunds, no disputes.** Paid is paid; cancelling forfeits. All money movement (including any goodwill) is handled offline. The `disputed` flag and the dispute endpoint are removed.
+6. **Prescriptions gate on `confirmed`.** A doctor may prescribe any time after confirmation (there is no `completed` state and no time gate); prescriptions are child records that do not change appointment state.
+7. **Daily free tier.** `createRoom` + `issueToken` only, no participant webhook, no join columns. `video-token` is `confirmed`-only.
+8. **One cron job.** Only `notification-dispatch` remains (the completion, refund-retry, and reconciliation jobs are gone).
+
+**Consequences:** The appointment lifecycle collapses from ten states to three; the `Payment` table, `disputed`/`lockExpiresAt`/`*JoinedAt` columns, and the `PAYFAST_*`/`PAYMENT_PROVIDER`/`REFUND_*`/`RECONCILIATION_*`/`NO_SHOW_GRACE_MIN`/`DAILY_WEBHOOK_SECRET` config are dropped (docs 04, 15). Payment data is now low-sensitivity free text (a bank reference) rather than gateway-signed callbacks, simplifying the security surface (doc 08). The booking → `pending` → `confirmed` spine is unchanged, so a future online gateway re-adds a second confirmation trigger (a webhook) to a transition that already exists — revival is a diff, not a rewrite (a `pre-manual-payment-pivot` git tag and the deprecated `docs/engineering/*` contracts preserve the old design). This decision **supersedes** ADR-11, ADR-12, ADR-22, ADR-24, ADR-25, ADR-32, ADR-33 and **partially supersedes** ADR-15 (PayFast is no longer a vendor; Daily drops to the free tier), ADR-23, ADR-27, and ADR-39 (see each ADR's Status line). The trade-off is real admin operational toil — a human reconciles every payment against the bank — accepted at v1 volume (doc 07).
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -651,3 +689,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-21 | ADR-34: doctor Join routes direct to `/video/:id` (not `/ready`); added dev `/dev`-proxy standing constraint | Role-aware doctor video-join bug fix + dev-proxy fix |
 | 2026-06-22 | Added ADR-41 (doctor Today/History navigation is sidebar-only; in-page tabs removed; active view derived from the route, single source of truth) | Doctor History sidebar-link desync bug fix; new architectural decision |
 | 2026-06-22 | Added ADR-42 (doctor appointments page = in-page Today/History tabs mirroring the patient page; History retained as the prescription entry point) and marked ADR-41 Superseded | Doctor appointments page redesign (in-page tabs); supersedes ADR-41 |
+| 2026-06-28 | Added ADR-43 (manual offline payment + 3-state appointment model); marked ADR-11/12/22/24/25/32/33 Superseded and ADR-15/23/27/39 Partially superseded | Manual-payment pivot — removes the PayFast gateway, refund subsystem, no-show lifecycle, Daily webhook, and `completed` state (as-built sync) |

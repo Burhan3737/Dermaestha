@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------- |
 | Document ID      | `09-DEVTESTING_QATESTING_DOCUMENT`                |
 | Status           | Canonical                                         |
-| Version          | 1.5                                               |
-| Last updated     | 2026-06-15                                        |
+| Version          | 1.6                                               |
+| Last updated     | 2026-06-28                                        |
 | Sources absorbed | `docs/specification/02, 04, 08; vitest.config.js; playwright.config.js` |
 | Related docs     | 02, 04, 08, 12                                    |
 
@@ -37,7 +37,7 @@ This document defines the testing strategy, scope, environments, case structure,
 
 The v1 testing programme spans four layers.
 
-**Unit testing** covers isolated service-layer logic: the appointment state-machine transition table (now merged into `server/src/modules/appointment/service.js`), the ten data-integrity invariants from doc 04, password hashing, Zod schema validation, role middleware, and audit-service record emission. The runner is **Vitest** (root `vitest.config.js`, `environment: 'node'`, globs `server/test/**/*.test.js` + `shared/test/**/*.test.js`, resolved via `#src`/`#shared` aliases — tests are centralized under `server/test/` (`unit/` mirroring `src/`, plus `integration/`) and `shared/test/unit/`, not co-located (ADR-40)). A separate client-side Vitest config (`client/vitest.config.js`, `environment: 'jsdom'`) runs the React component/view tests, centralized under `client/test/unit/` mirroring `src/` (e.g. `client/test/unit/modules/<feature>/views/<View>/<View>.test.jsx`, `client/test/unit/shared/<Name>/<Name>.test.jsx`), via a `#src` alias in `client/vitest.config.js` (ADR-40).
+**Unit testing** covers isolated service-layer logic: the appointment state-machine transition table (the 3-state model — `pending` → `confirmed`, plus `cancelled` from either — merged into `server/src/modules/appointment/service.js`), the ten data-integrity invariants from doc 04, password hashing, Zod schema validation, role middleware, and audit-service record emission. The runner is **Vitest** (root `vitest.config.js`, `environment: 'node'`, globs `server/test/**/*.test.js` + `shared/test/**/*.test.js`, resolved via `#src`/`#shared` aliases — tests are centralized under `server/test/` (`unit/` mirroring `src/`, plus `integration/`) and `shared/test/unit/`, not co-located (ADR-40)). A separate client-side Vitest config (`client/vitest.config.js`, `environment: 'jsdom'`) runs the React component/view tests, centralized under `client/test/unit/` mirroring `src/` (e.g. `client/test/unit/modules/<feature>/views/<View>/<View>.test.jsx`, `client/test/unit/shared/<Name>/<Name>.test.jsx`), via a `#src` alias in `client/vitest.config.js` (ADR-40).
 
 **Integration testing** covers the live application stack: Express routes exercised against a real PostgreSQL instance (using the `DATABASE_URL` env var loaded via Vite's `loadEnv`). The same Vitest runner and config are used. Integration test files live under `server/test/integration/`.
 
@@ -94,7 +94,7 @@ The local development environment is defined by the repo's `docker-compose` setu
 
 Third-party integrations use test/sandbox modes:
 
-- **Payment (PayFast):** the `PAYFAST_*` env vars toggle the adapter to sandbox mode; no live charges are possible in development (doc 08 §A05).
+- **Payment (manual offline):** payment is settled by manual bank transfer — there is no payment gateway or adapter, so no live charges are possible. The patient submits a bank-transfer reference (`POST /api/appointments/:id/pay`) and an admin accepts or rejects it (doc 08 §A05).
 - **Video (Daily):** test rooms are created via the `DAILY_API_KEY` pointing to a Daily test project; no real call traffic is billed.
 - **Email (Resend):** test sends do not deliver to real inboxes; Resend's test mode or a test API key is used.
 
@@ -108,28 +108,28 @@ Deployment details are cross-referenced in doc 10; this document does not duplic
 
 ## 4. Test types
 
-**Functional testing** validates that each acceptance criterion defined in doc 02 is met for features F01–F16. Every named rule (e.g., Slot-Lock Rule, Free-Cancel Window Rule, Room-Isolation Rule) constitutes a testable criterion. Test cases are enumerated in doc 12 using the `TC-<Feature>-<Seq>` format defined in §5 below.
+**Functional testing** validates that each acceptance criterion defined in doc 02 is met for features F01–F16. Every named rule (e.g., Slot-Lock Rule, Manual-Payment Reference Rule, Admin-Review Accept/Reject Rule, Confirmed-Gate Rule, Room-Isolation Rule) constitutes a testable criterion. Test cases are enumerated in doc 12 using the `TC-<Feature>-<Seq>` format defined in §5 below.
 
-**End-to-end (E2E) testing** is the realized "assisted browser automation" layer: a **Playwright harness** rooted at `e2e/` (`playwright.config.js`; run with `npm run test:e2e`; `@playwright/test` is a root devDependency), one spec per journey under `e2e/tests/` over shared `e2e/support/` fixtures, driving a real browser against the app booted with the **mock adapters** (`PAYMENT_PROVIDER=mock`, `VIDEO_PROVIDER=mock`, `EMAIL_PROVIDER=console`) and a seeded Postgres DB (`e2e/global-setup.js`). The **6 Critical journeys J1–J6** (book→pay→confirm incl. fail-path; video lifecycle; prescription issue→view→PDF; cancel/refund; auth/role gates; admin onboarding→forced password change) are the v1 launch gate (ADR-38). The harness is living/extensible — a new journey is a new spec reusing `support/`. Live-vendor validation (PayFast, Daily) remains a separate launch gate (doc 07 §3/§10).
+**End-to-end (E2E) testing** is the realized "assisted browser automation" layer: a **Playwright harness** rooted at `e2e/` (`playwright.config.js`; run with `npm run test:e2e`; `@playwright/test` is a root devDependency), one spec per journey under `e2e/tests/` over shared `e2e/support/` fixtures, driving a real browser against the app booted with the **mock adapters** (`VIDEO_PROVIDER=mock`, `EMAIL_PROVIDER=console`; payment is manual/offline with no provider) and a seeded Postgres DB (`e2e/global-setup.js`). The **6 Critical journeys J1–J6** (book→submit payment reference→admin accept→confirm; video join/token-window; prescription issue→view→PDF; cancel (no refund); auth/role gates; admin onboarding→forced password change) are the v1 launch gate (ADR-38). The harness is living/extensible — a new journey is a new spec reusing `support/`. Live-vendor validation (Daily) remains a separate launch gate (doc 07 §3/§10).
 
 **Regression testing** is run after each bug fix or feature change. The full Vitest unit and integration suite is executed to confirm that no previously passing criterion has regressed. QA functional regression is scoped to the feature areas touched by the change plus any features with shared dependencies (e.g., state machine, payment flow, audit log).
 
-**Basic security testing** verifies the controls documented in doc 08. This includes: rate-limit and account-lockout thresholds from doc 08 §A07; enumeration-safe response shapes on login and forgot-password; role-boundary enforcement (patient/doctor/admin routes reject out-of-role requests per DA6); webhook signature rejection for missing or invalid signatures per doc 08 §A08; and cookie attributes (HTTP-only, Secure, SameSite=Lax). Security tests do not constitute a penetration test and do not certify regulatory compliance — both are deferred per doc 08 §4.1.
+**Basic security testing** verifies the controls documented in doc 08. This includes: rate-limit and account-lockout thresholds from doc 08 §A07; enumeration-safe response shapes on login and forgot-password; role-boundary enforcement (patient/doctor/admin routes reject out-of-role requests per DA6); admin-only enforcement of the payment accept/reject routes; and cookie attributes (HTTP-only, Secure, SameSite=Lax). Security tests do not constitute a penetration test and do not certify regulatory compliance — both are deferred per doc 08 §4.1.
 
 **Data-integrity testing** exercises the ten invariants enumerated in doc 04 (tracing to PRD §3.3). Each invariant maps to one or more test cases:
 
 | Invariant | Description                                                                                                              |
 | --------- | ------------------------------------------------------------------------------------------------------------------------ |
 | #1        | Slot double-booking is impossible — partial unique index `uniq_active_slot` rejects the second insert                    |
-| #2        | Booking confirmation and payment record commit atomically — either both persist or neither                               |
+| #2        | _Retired (ADR-43)_ — payment is offline; booking atomically creates `pending`, admin accept transitions `→confirmed` (no online charge to interlock)  |
 | #3        | Doctor rename never alters historical appointments or prescriptions                                                      |
 | #4        | Prescription immutability — no update or delete path exists; corrections are new rows                                    |
 | #5        | Medicine name, dosage, and price are snapshotted on the prescription at issue-time                                       |
-| #6        | `feeAtBooking` is snapshotted at confirmation; later doctor fee changes do not affect existing appointments              |
-| #7        | Payment-intent creation is idempotent on `(patient_user_id, slot_start)` — `intent_key` unique constraint                |
+| #6        | `feeAtBooking` is snapshotted at booking/lock time (ADR-43); later doctor fee changes do not affect existing appointments |
+| #7        | _Retired (ADR-43)_ — no `Payment` table / payment intent (offline payment)                                                |
 | #8        | `pmcNumber` and `User.email` are immutable post-creation for a doctor record                                             |
 | #9        | Deactivating a doctor preserves existing confirmed appointments; login is not revoked                                    |
-| #10       | Each appointment carries one `refund_idempotency_key`; a second refund settlement for the same appointment is impossible |
+| #10       | _Retired (ADR-43)_ — no refunds (offline money movement)                                                                 |
 
 ---
 
@@ -142,7 +142,7 @@ Test case IDs follow the pattern `TC-<Feature>-<Seq>`, where:
 - `<Feature>` is the doc 02 feature ID without the `F` prefix, zero-padded to two digits (e.g., `F03` → `03`).
 - `<Seq>` is a three-digit sequence number within the feature (e.g., `001`, `002`).
 
-Examples: `TC-F03-001` (slot picker, future-slots-only rule), `TC-F04-002` (webhook truth rule), `TC-F06-001` (free-cancel window rule).
+Examples: `TC-F03-001` (slot picker, future-slots-only rule), `TC-F04-010` (manual-payment reference rule), `TC-F06-008` (cancel rule).
 
 ### Required fields per test case
 
@@ -163,7 +163,7 @@ Priority is assigned based on flow criticality as defined by the doc 02 feature 
 
 | Priority | Applies to                                                                                                                                                        |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Critical | Core booking (F03), payment and webhook (F04), video join (F05), cancellation and refund (F06), data-integrity invariants #1–#10, role-boundary enforcement (F15) |
+| Critical | Core booking (F03), manual payment & admin review (F04), video join (F05), cancellation (F06), data-integrity invariants #1–#10, role-boundary enforcement (F15) |
 | High     | Prescription creation and download (F08), doctor availability and slot generation (F09), reminders and notifications (F07), admin doctor management (F10)         |
 | Medium   | Medicine catalogue (F11), system-health alerts (F12), records and audit log (F13), platform settings (F14)                                                        |
 | Low      | Doctor discovery and public listing (F02), legal pages (F16), UI empty states, copy and label accuracy                                                            |
@@ -194,8 +194,8 @@ Severity reflects the impact on Dermestha v1 users and data integrity. It is dis
 
 | Severity | Definition                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Critical | Slot double-booking (invariant #1 violation); payment confirmed but appointment not created or vice versa (invariant #2 violation); incorrect refund amount or double-refund (invariants #5, #10); prescription data mutated or lost (invariant #4); patient or doctor can access another user's data (role boundary breach, doc 08 §A01); webhook accepted without valid signature (doc 08 §A08) |
-| High     | Video room accessible to the wrong participant; join button not activating at correct time; cancellation window logic incorrect; `feeAtBooking` snapshot not captured; `must_change_password` gate not enforced; rate-limit thresholds not enforced per doc 08 §A07                                                                                                                               |
+| Critical | Slot double-booking (invariant #1 violation); an admin accept that confirms the appointment but fails to enqueue its confirmation email, or vice versa (atomicity breach); prescription data mutated or lost (invariant #4); patient or doctor can access another user's data (role boundary breach, doc 08 §A01) |
+| High     | Video room accessible to the wrong participant; join button not activating at correct time; cancellation not freeing the slot; `feeAtBooking` snapshot not captured at booking; `must_change_password` gate not enforced; rate-limit thresholds not enforced per doc 08 §A07                                                                                                                               |
 | Medium   | Reminder email sent for a cancelled appointment; incorrect appointment state label in UI; prescription PDF renders wrong patient identity; audit log entry missing for a required event; admin alert not raised on retry exhaustion                                                                                                                                                               |
 | Low      | Cosmetic UI misalignment; copy errors; non-critical link targets wrong; timezone display off by a minute; empty-state message missing                                                                                                                                                                                                                                                             |
 
@@ -209,8 +209,8 @@ All of the following must be true before QA functional testing begins on staging
 
 - The build is deployed to the staging environment without errors.
 - All Prisma migrations (including the hand-edited `uniq_active_slot` partial unique index from doc 04 §4b) have been applied.
-- A smoke pass confirms: the `/login` route responds, the public doctor listing loads at least one doctor, and the PayFast sandbox endpoint is reachable.
-- All third-party integrations (Daily, Resend, PayFast) are configured in sandbox/test mode.
+- A smoke pass confirms: the `/login` route responds and the public doctor listing loads at least one doctor.
+- All third-party integrations (Daily, Resend) are configured in sandbox/test mode.
 - The Vitest unit and integration suite passes with no failures on the build being promoted.
 - Test data (at least one active doctor with availability, one patient account, one admin account bootstrapped via the bootstrap script) is present on staging.
 
@@ -223,7 +223,7 @@ All of the following must be true before promoting to production:
 - All ten data-integrity invariants (#1–#10 from doc 04) have been exercised and verified.
 - The Vitest unit and integration suite passes cleanly on the release candidate commit.
 - UAT sign-off has been received from the client representative and a designated doctor for the milestone scope (M1–M4 as applicable).
-- The audit log is confirmed to record entries for at minimum: a booking confirmation, a cancellation, a payment webhook receipt, and an admin platform settings change.
+- The audit log is confirmed to record entries for at minimum: a booking confirmation, a cancellation, an admin payment accept/reject, and an admin platform settings change.
 
 ---
 
@@ -234,7 +234,7 @@ A feature is considered complete when all of the following criteria are met:
 - [ ] All Vitest unit tests for the feature's service-layer logic pass.
 - [ ] All Vitest integration tests for the feature's API routes pass.
 - [ ] Every acceptance criterion and named rule from the corresponding doc 02 feature section is covered by a test case in doc 12 with Verified status.
-- [ ] All applicable security controls from doc 08 are verified for the feature (e.g., role boundary, rate limit, cookie attributes, webhook signature).
+- [ ] All applicable security controls from doc 08 are verified for the feature (e.g., role boundary, rate limit, cookie attributes, admin-only payment review routes).
 - [ ] All data-integrity invariants that the feature touches (per the doc 04 §6 scope-to-database table) are verified.
 - [ ] Audit log entries are emitted for every state transition and admin action defined in doc 08 §A09 that the feature triggers.
 - [ ] No open Critical or High severity bugs are linked to the feature.
@@ -283,3 +283,4 @@ The release recommendation is a brief document (or structured comment) that stat
 | 2026-06-13 | Fixed §8 DoD ADR misreference (doc 13 → doc 11); no structural testing changes — the Slice G admin integration suite (`server/src/test/admin.integration.test.js`, 8 tests) lands in the already-documented `server/src/test/` location, taking final counts to 248 server / 97 client | Slice G as-built sweep |
 | 2026-06-14 | Recorded the QA-functional layer as executed (Slice H · S7 launch gate); added the **Playwright E2E harness** (`e2e/`, `npm run test:e2e`, 6 Critical journeys J1–J6 vs mock adapters; ADR-38) as the realized "assisted browser automation" layer (§1/§4); noted the assisted-manual UI pass + the live Daily REST validation; pointed at the release recommendation under `docs/superpowers/reports/` | Slice H · S7 (E2E QA + launch gate) |
 | 2026-06-15 | §1: tests centralized — server globs now `server/test/**/*.test.js` + `shared/test/**/*.test.js`; client tests under `client/test/unit/`; integration suite under `server/test/integration/`; `#src`/`#shared` aliases (ADR-40) | Test centralization (ADR-40); no count/behavior change |
+| 2026-06-28 | Manual-payment pivot: replaced the PayFast payment-environment bullet with manual offline bank transfer; dropped the webhook-signature security/DoD/severity items and the PayFast smoke + sandbox-integration entry/exit items; re-scoped the E2E Critical journeys (book→submit reference→admin accept→confirm; cancel with no refund) and dropped `PAYMENT_PROVIDER=mock`; noted the 3-state model in §1; swapped the §4 named-rule and §5/§6 priority examples to manual-payment / admin-review / confirmed-gate | Manual-payment pivot — as-built sync |

@@ -3,8 +3,8 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.10                                         |
-| Last updated     | 2026-06-14                                   |
+| Version          | 1.11                                         |
+| Last updated     | 2026-06-28                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
 
@@ -16,7 +16,7 @@
 2. [Timing Windows](#1-timing-windows)
 3. [Rate Limits & Lockout](#2-rate-limits--lockout)
 4. [Worker Cadence](#3-worker-cadence)
-5. [Refund Retry & Backoff](#4-refund-retry--backoff)
+5. [Refund Retry & Backoff — removed (ADR-43)](#4-refund-retry--backoff--removed-adr-43)
 6. [Auth & Crypto Parameters](#5-auth--crypto-parameters)
 7. [Money & Locale](#6-money--locale)
 8. [Migration Caveats](#7-migration-caveats)
@@ -38,23 +38,20 @@ Two tiers govern constants: **(A) Settings-tunable at runtime** live in the `set
 
 | Constant                  | Value                                                       | Tier                        | Source                |
 | ------------------------- | ----------------------------------------------------------- | --------------------------- | --------------------- |
-| Slot-lock TTL             | **10 min**                                                  | B                           | PRD §4.3              |
 | Min booking lead          | **60 min** (floor 30, ceiling 1440 min / 24h)               | A (`minBookingLeadMinutes`) | PRD §4.x, edge filter |
 | Slot granularity          | **30 min**                                                  | B                           | D1                    |
-| No-show grace             | slot-start **+15 min**                                      | B                           | PRD §4.3              |
 | Video token window        | slot-start **−10 min** → slot-end **+5 min**                | B                           | §3.4                  |
-| `in_progress` hard cutoff | slot-end **+5 min** (never later)                           | B                           | §3.4, §10             |
 | Reminder offsets          | **24 h** and **1 h** before slot                            | B                           | P4                    |
-| Missing-Rx alert          | `completed` + **12 h** → A3 alert (`awaiting_prescription`) | B                           | PRD §4.3              |
+| Missing-Rx alert          | `confirmed` + **12 h** past `slotEnd` → A3 alert (`awaiting_prescription`) | B           | ADR-43                |
 | Password-reset token      | **1 h**, single-use                                         | B                           | P2                    |
+
+> A `pending` appointment has **no auto-expiry** (manual-payment pivot, ADR-43): the booking lock holds until a human cancels/rejects — the former 10-minute slot-lock TTL and the 15-minute no-show grace are removed.
 
 **Environment variable names** (mirror the constants above for deploy-time tier B):
 
 | Variable               | Default |
 | ---------------------- | ------- |
-| `SLOT_LOCK_TTL_MIN`    | `10`    |
 | `SLOT_GRANULARITY_MIN` | `30`    |
-| `NO_SHOW_GRACE_MIN`    | `15`    |
 | `VIDEO_TOKEN_PRE_MIN`  | `10`    |
 | `VIDEO_TOKEN_POST_MIN` | `5`     |
 | `RESET_TOKEN_TTL_MIN`  | `60`    |
@@ -72,7 +69,7 @@ Mandated by PRD §3.6. Library: `express-rate-limit` (memory store acceptable fo
 | Login (per IP)      | **20 / 15 min**                             | `429 RATE_LIMITED`                                                 |
 | Sign-up             | **5 / IP / hour**                           | `429 RATE_LIMITED`                                                 |
 | Forgot-password     | **5 / account / hour**                      | enumeration-safe `200`; counted silently                           |
-| Payment-intent      | **10 / patient / hour**                     | `429 RATE_LIMITED` (protects PayFast quota, beyond #7 idempotency) |
+| Pay (submit reference) | **10 / patient / hour**                  | `429 RATE_LIMITED` — limits `POST /api/appointments/:id/pay` (bank-reference submit, ADR-43) |
 
 **Lockout duration:** 15 min rolling. Threshold breaches → `audit_log` (`event_type=login_lockout`); sustained abuse surfaced to A3.
 
@@ -92,31 +89,17 @@ Mandated by PRD §3.6. Library: `express-rate-limit` (memory store acceptable fo
 
 Workers use `node-cron`, running in-process. **Single-instance assumption (v1):** workers run in the one app process; **no leader election** (deliberate — "don't over-engineer"). If the app ever scales horizontally, gate workers behind a Postgres advisory lock or move them to scheduled tasks — this section is the one place that changes. Memory-backed rate-limit also assumes single instance.
 
-| Worker                 | Schedule                       | Notes                                                                                                                                  |
-| ---------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Reconciliation         | **hourly** (`0 * * * *`)       | PayFast unconfirmed-payments query, last 24 h (edge #6/#6a)                                                                            |
-| Notification           | **every minute** (`* * * * *`) | Dispatch due emails; **re-check appointment state immediately before send**; suppress reminders if no longer `confirmed`/`in_progress` |
-| Refund-retry           | **every minute** (`* * * * *`) | Process due refund retries; exponential backoff (`REFUND_BACKOFF_BASE_SEC × 2^attempts`, max `REFUND_MAX_ATTEMPTS`; Slice E).          |
-| Appointment-evaluation | **every minute** (`* * * * *`) | `confirmed→in_progress` at slot-start; resolve `completed`/no-show in grace window; never strand `in_progress` past slot-end+5 min. **Implemented** (`server/src/workers/`; `evaluateDueAppointments` in `server/src/modules/appointment/service.js`; ADR-25). |
+**One worker only (manual-payment pivot, ADR-43):** the reconciliation, refund-retry, and appointment-evaluation/completion workers were removed with the gateway, refund, and no-show subsystems. The lone cron job is `notification-dispatch`.
+
+| Worker       | Schedule                       | Notes                                                                                                                |
+| ------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Notification | **every minute** (`* * * * *`) | Dispatch due emails; **re-check appointment state immediately before send**; suppress reminders if no longer `confirmed`. `server/src/workers/index.js` → `dispatchDueNotifications` |
 
 ---
 
-## 4. Refund Retry & Backoff
+## 4. Refund Retry & Backoff — removed (ADR-43)
 
-Source: CONFIG.md §4 (Refund retry #10, edge #30).
-
-- **Strategy:** exponential backoff, base **30 s**, factor **2**, **max 5 attempts** (≈ 30 s → 8 min).
-- Each attempt reuses the per-appointment `refundIdempotencyKey` (one settlement guaranteed).
-- **On exhaustion:** `refundStatus=failed` + **A3 admin alert**. No in-app manual retry; admin acts in the gateway dashboard.
-
-**Environment variable names:**
-
-| Variable                  | Default |
-| ------------------------- | ------- |
-| `REFUND_MAX_ATTEMPTS`     | `5`     |
-| `REFUND_BACKOFF_BASE_SEC` | `30`    |
-
-> `REFUND_MAX_ATTEMPTS` (5) and `REFUND_BACKOFF_BASE_SEC` (30) gained their first consumers in Slice E (the refund-retry worker).
+The refund subsystem was removed in the manual-payment pivot. There are no refunds (cancelling forfeits; money movement is handled offline by the admin), so the `REFUND_MAX_ATTEMPTS` / `REFUND_BACKOFF_BASE_SEC` constants and the refund-retry worker no longer exist.
 
 ---
 
@@ -147,7 +130,7 @@ Source: CONFIG.md §6.
 
 - **Currency:** PKR. Stored and transmitted as **integer paisa**. Display ÷ 100 with thousands separators.
 - **Timezone:** Store UTC (`timestamptz`); render **Asia/Karachi** (no DST).
-- **Fallback gateway-fee model** (when PayFast reports none, policy #5): `fallbackFeePctBps` (basis points, range **0–10000**) + `fallbackFeeFixed` (paisa, **≥0**), both in the `settings` table (A6 — runtime-tunable, no redeploy).
+- **No gateway-fee / fallback-fee model** (ADR-43): payment is offline and there are no refunds, so the former `fallbackFeePctBps` / `fallbackFeeFixed` settings were dropped. The `settings` table instead holds the bank-transfer details shown to the patient (`bankName`, `bankAccountName`, `bankAccountNumber`, `bankInstructions`; A6 — runtime-tunable, no redeploy).
 
 ---
 
@@ -175,7 +158,7 @@ Source: `.env.example`. Copy to `.env` for local dev; set real values in Railway
 | -------------- | ------------------------------------------------------- | ----------------------------- |
 | `NODE_ENV`     | Runtime environment mode                                | `development` \| `production` |
 | `PORT`         | HTTP server port                                        | `3000`                        |
-| `APP_BASE_URL` | Public origin; used to build webhook notify/return URLs | `http://localhost:3000`       |
+| `APP_BASE_URL` | Public origin; used to build links in emails (e.g. dashboard / prescription URLs) | `http://localhost:3000`       |
 
 ### Database
 
@@ -191,35 +174,28 @@ Source: `.env.example`. Copy to `.env` for local dev; set real values in Railway
 | ---------------- | ------------------------------ | ---------------------------------------- |
 | `SESSION_SECRET` | Express-session signing secret | _(must be set — rotate per environment)_ |
 
-### PayFast (Payment Adapter)
+### Payment (offline — no gateway)
 
-| Variable                | Purpose                             | Example / Default       |
-| ----------------------- | ----------------------------------- | ----------------------- |
-| `PAYFAST_MERCHANT_ID`   | PayFast Pakistan merchant ID        | _(set per environment)_ |
-| `PAYFAST_SECURED_KEY`   | PayFast Pakistan secured key — auth for the real adapter's `GetAccessToken` step (doc 14 §2) | _(set per environment)_ |
-| `PAYFAST_MERCHANT_NAME` | PayFast Pakistan merchant name — part of the signature payload `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)` | _(set per environment)_ |
-| `PAYFAST_STORE_ID`      | PayFast Pakistan store / merchant identifier (provisioned at KYC) | _(set per environment)_ |
-| `PAYFAST_PASSPHRASE`    | **Dev-mock-only** HMAC key for the `payfast.mock` gateway's signed IPN (ADR-22); falls back to a dev-only constant if unset. NOT used by the real PayFast Pakistan adapter. | _(dev only)_ |
-| `PAYFAST_MODE`          | Real-adapter gateway mode — selects the sandbox `ipguat.apps.net.pk` vs live `ipg1.apps.net.pk` host | `sandbox` \| `live` (default `sandbox`) |
+Payment is offline bank transfer verified manually by the admin (ADR-43). **There is no payment gateway and no `PAYFAST_*` / `PAYMENT_PROVIDER` configuration.** Bank-transfer details shown to the patient are runtime-editable admin Settings (`bankName`, `bankAccountName`, `bankAccountNumber`, `bankInstructions`; A6), not env vars.
 
 ### Provider Selection (dev vs production)
 
-Adapter selection switches (ADR-10/ADR-22). **Both default to the production-safe value**: the real-but-not-yet-wired throwing stubs. The dev simulators are opt-in only; production must leave these at their defaults so the dev mock gateway and the `/dev/*` checkout routes are never mounted (see doc 08 secret-handling and doc 10 deploy note).
+Adapter selection switches (ADR-10). **Both default to the production-safe value.** The dev simulators are opt-in only; production must leave these at their defaults.
 
 | Variable           | Purpose                                                                                          | Example / Default          |
 | ------------------ | ------------------------------------------------------------------------------------------------ | -------------------------- |
-| `PAYMENT_PROVIDER` | Selects the `PaymentProvider`: `stub` (throwing placeholder, default), `mock` (dev simulated gateway, mounts `/dev/checkout`), or `payfast` (the real PayFast **Pakistan** adapter — researched-not-vendor-confirmed, doc 14 §2; do not enable for live until the doc 07 §3 merchant-verification checklist passes) | `stub` \| `mock` \| `payfast` |
 | `EMAIL_PROVIDER`   | Selects the `EmailProvider`: `stub` \| `console` \| `resend`. Boot-time selection: `EMAIL_PROVIDER=console` forces the console logger; else a present `RESEND_API_KEY` selects the real Resend adapter; else fallback to console with a loud warning. | `stub` |
-| `VIDEO_PROVIDER`   | Selects the `VideoProvider`: `stub` (throwing placeholder, default), `mock` (dev — real webhook path + `/dev/video/*` + `/dev/worker/*` simulator), or `daily` (the real `daily.js` Daily.co adapter — slot-bounded rooms + HMAC-verified webhook; opt-in, live-delivery gated by doc 07; ADR-33). Mock and `/dev/*` routes **must never be active in production** (ADR-24; doc 08; doc 10). | `stub` |
+| `VIDEO_PROVIDER`   | Selects the `VideoProvider`: `stub` (throwing placeholder, default), `mock` (dev), or `daily` (the real `daily.js` Daily.co adapter — **free tier: slot-bounded room + token only, no participant webhook**; ADR-43). Mock / `/dev/*` routes **must never be active in production**. | `stub` |
 | `VIDEO_MOCK_SECRET` | Dev-only mock meeting-token signing key (HMAC). Optional; for use only when `VIDEO_PROVIDER=mock`. Never set in production. | _(optional, dev-only)_ |
 
-### Daily.co (Video Adapter)
+### Daily.co (Video Adapter — free tier)
 
 | Variable        | Purpose              | Example / Default       |
 | --------------- | -------------------- | ----------------------- |
 | `DAILY_API_KEY`        | Daily.co API key (Bearer auth for `createRoom`/`issueToken`)                                           | _(set per environment)_ |
 | `DAILY_DOMAIN`         | Daily.co team domain                                                                                   | `your-team.daily.co`    |
-| `DAILY_WEBHOOK_SECRET` | HMAC key for `POST /api/webhooks/daily` signature verification (doc 14 §3) — the `hmac` printed by the one-time `server/scripts/register-daily-webhook.mjs` OPS step; base64-decoded before use | _(set per environment)_ |
+
+> No `DAILY_WEBHOOK_SECRET` — the participant webhook was removed with the no-show lifecycle (ADR-43). Daily runs on the free tier (room + token only).
 
 ### Resend (Email Adapter)
 
@@ -242,13 +218,11 @@ Adapter selection switches (ADR-10/ADR-22). **Both default to the production-saf
 
 ### Tunable Defaults
 
-All **three** `settings` tunables are editable at runtime via `PUT /api/admin/settings` (A6) without a redeploy: `minBookingLeadMinutes` (30–1440), `fallbackFeePctBps` (0–10000), and `fallbackFeeFixed` (≥0 paisa).
+The `settings` row (A6) is editable at runtime via `PUT /api/admin/settings` without a redeploy: `minBookingLeadMinutes` (30–1440) and the four bank-transfer fields (`bankName`, `bankAccountName`, `bankAccountNumber`, `bankInstructions`).
 
 | Variable               | Purpose                                              | Default |
 | ---------------------- | ---------------------------------------------------- | ------- |
-| `SLOT_LOCK_TTL_MIN`    | Slot-lock TTL in minutes                             | `10`    |
 | `SLOT_GRANULARITY_MIN` | Slot granularity in minutes                          | `30`    |
-| `NO_SHOW_GRACE_MIN`    | No-show grace period in minutes after slot-start     | `15`    |
 | `VIDEO_TOKEN_PRE_MIN`  | Minutes before slot-start to open video token window | `10`    |
 | `VIDEO_TOKEN_POST_MIN` | Minutes after slot-end to close video token window   | `5`     |
 | `RESET_TOKEN_TTL_MIN`  | Password-reset token TTL in minutes                  | `60`    |
@@ -264,13 +238,6 @@ All **three** `settings` tunables are editable at runtime via `PUT /api/admin/se
 | `FORGOT_MAX_PER_ACCOUNT_HOUR`         | Max forgot-password requests per account per hour | `5`     |
 | `PAYMENT_INTENT_MAX_PER_PATIENT_HOUR` | Max payment-intent requests per patient per hour  | `10`    |
 
-### Refund Retry (#10)
-
-| Variable                  | Purpose                             | Default |
-| ------------------------- | ----------------------------------- | ------- |
-| `REFUND_MAX_ATTEMPTS`     | Maximum refund retry attempts       | `5`     |
-| `REFUND_BACKOFF_BASE_SEC` | Exponential backoff base in seconds | `30`    |
-
 ### Email Dispatch
 
 | Variable                 | Purpose                                                                                                                    | Default |
@@ -278,12 +245,7 @@ All **three** `settings` tunables are editable at runtime via `PUT /api/admin/se
 | `EMAIL_MAX_ATTEMPTS`     | Max email dispatch attempts before a job is marked failed and an `email.send_failed_final` audit alert is written (F07.03) | `3`     |
 | `EMAIL_BACKOFF_BASE_SEC` | Base seconds for email dispatch exponential backoff (`base × 2^attempts`)                                                  | `60`    |
 
-### Reconciliation Worker
-
-| Variable                     | Purpose                                                                                             | Default |
-| ---------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
-| `RECONCILIATION_LOOKBACK_H`  | Hours of history the reconciliation worker scans for pending payments (F04.03)                      | `24`    |
-| `RECONCILIATION_MIN_AGE_MIN` | Minimum payment age in minutes before reconciliation acts (avoids racing a webhook still in flight) | `60`    |
+> The reconciliation-worker config (`RECONCILIATION_LOOKBACK_H`, `RECONCILIATION_MIN_AGE_MIN`) was removed with the payment gateway (ADR-43).
 
 ---
 
@@ -315,3 +277,4 @@ Source: root `package.json` (`scripts` + `devDependencies`). Run from the projec
 | 2026-06-14 | Added `DAILY_WEBHOOK_SECRET` to the Daily.co env section (§8); updated the `VIDEO_PROVIDER` row so `daily` resolves to the real `daily.js` adapter (HMAC-verified webhook + slot-bounded rooms, gated by doc 07) rather than the stub | Slice H · S2 (Daily.co video adapter; ADR-33) |
 | 2026-06-14 | Renamed the Error-Tracking env var `ERROR_TRACKING_DSN` → `SENTRY_DSN` (string, optional; DSN-gated Sentry + PII scrub; ADR-36); flipped §7 #4 Dual-Zod "known inconsistency" → resolved (single zod@3 via `shared` workspace + root `overrides.zod`; duck-typing removed; ADR-37) | Slice H · S6 (launch foundation + hardening) |
 | 2026-06-14 | Added §9 Build & Test Scripts — recorded `npm run test:e2e` (`playwright test`) + noted `@playwright/test` as a cross-cutting root devDependency (like `vitest`); ADR-38 | Slice H · S7 (E2E QA + launch gate) |
+| 2026-06-28 | Manual-payment pivot (ADR-43): removed all `PAYFAST_*`/`PAYMENT_PROVIDER`/`REFUND_*`/`RECONCILIATION_*`/`NO_SHOW_GRACE_MIN`/`SLOT_LOCK_TTL_MIN`/`DAILY_WEBHOOK_SECRET` config; §3 worker cadence → single `notification-dispatch` job; §4 refund-retry section retired; §6 fallback-fee model → bank-transfer settings; Daily → free tier (no webhook); pay rate-limit re-scoped to the bank-reference submit endpoint; missing-Rx alert keyed on `confirmed` | Manual-payment pivot — config as-built sync |

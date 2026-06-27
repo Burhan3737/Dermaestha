@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.10                                                                                                    |
-| Last updated     | 2026-06-14                                                                                              |
+| Version          | 1.11                                                                                                    |
+| Last updated     | 2026-06-28                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
 
@@ -68,19 +68,17 @@ Scoping rules by role (PRD §3.6):
 ### A04 — Insecure design
 
 - **Appointment state machine as single authority:** all appointment transitions go through one writer (the `transition()` function in `server/src/modules/appointment/service.js`). No route or worker transitions state outside this module; the allowed-transition table is the definitive authority (PRD §4.3; ARCH §8).
-- **Data integrity invariants:** ten non-negotiable invariants (#1–#10) are enforced at the storage and service layers (PRD §3.3): slot double-booking impossible via partial unique index; atomic booking+payment commit; doctor-identity durability across renames; prescription immutability; price/fee/medicine snapshots at write time; idempotent payment intents and refunds; deactivation that preserves existing appointments.
+- **Data integrity invariants:** the non-negotiable data-integrity invariants are enforced at the storage and service layers (PRD §3.3): slot double-booking impossible via the `uniq_active_slot` partial unique index (covering `pending`/`confirmed`); doctor-identity durability across renames; prescription immutability; price/fee/medicine snapshots at write time (`feeAtBooking` snapshotted at lock); deactivation that preserves existing appointments.
 - **Append-only audit log:** `audit.service.record()` is the single writer; no update or delete path exists for audit entries anywhere in the application (PRD §3.6; ARCH §8).
-- **Idempotency keys:** `payments.intent_key` UNIQUE `(patient_user_id, slot_start)` prevents double-payment-intents; `refund_idempotency_key` UNIQUE per appointment prevents double-refund settlements (PRD §3.3 #7/#10; ARCH §5).
 
 ---
 
 ### A05 — Security misconfiguration
 
-- **12-factor secrets:** all secrets and integration credentials (`DATABASE_URL`, `SESSION_SECRET`, `PAYFAST_*`, `DAILY_API_KEY`, `RESEND_API_KEY`, `SENTRY_DSN`) are environment variables, not committed to code (ARCH §14.5; `.env.example` is the documented contract).
-- **PayFast sandbox/live mode:** the payment adapter toggles between sandbox and live mode via an env var, preventing accidental live-mode charges in non-production environments (ARCH §12).
-- **Dev provider switches must stay at production-safe defaults:** `PAYMENT_PROVIDER` and `EMAIL_PROVIDER` default to the non-simulating `stub` adapters; the dev mock payment gateway (`mock`) and its `/dev/checkout` routes activate only on explicit opt-in and **must never be set in production** (ADR-22; doc 10 deploy checklist). The mock-IPN HMAC uses `PAYFAST_PASSPHRASE` (or a dev-only fallback constant when unset) — this signing secret is for the dev simulator only; production uses the real PayFast passphrase for genuine IPN verification (doc 15).
-- **Dev video switch must stay at production-safe default:** `VIDEO_PROVIDER` defaults to `stub`; the dev mock video provider (`mock`), the `/dev/video/*` participant-join simulator routes, and the `/dev/worker/*` evaluation trigger route must never be active in production (ADR-24; doc 10 deploy checklist; doc 15). `VIDEO_MOCK_SECRET` is a dev-only signing key for mock meeting tokens and must not be set in production.
-- **Dev worker trigger routes mount only in development:** the on-demand worker trigger routes (`POST /dev/worker/*`) are conditionally mounted at startup only when `NODE_ENV === 'development'` and are never registered in production — same discipline as the existing dev payment and video simulators (ADR-24; doc 10 deploy checklist; doc 15).
+- **12-factor secrets:** all secrets and integration credentials (`DATABASE_URL`, `SESSION_SECRET`, `DAILY_API_KEY`, `RESEND_API_KEY`, `SENTRY_DSN`) are environment variables, not committed to code (ARCH §14.5; `.env.example` is the documented contract).
+- **Dev provider switch must stay at the production-safe default:** `EMAIL_PROVIDER` defaults to the non-simulating `stub` adapter; the dev simulator adapter activates only on explicit opt-in and **must never be set in production** (doc 10 deploy checklist). Payment is an offline bank transfer with no gateway, so there is no payment-provider switch, mock checkout, or IPN signing secret in v1 (ADR-43).
+- **Dev video switch must stay at production-safe default:** `VIDEO_PROVIDER` defaults to `stub`; the dev mock video provider (`mock`) must never be active in production (doc 10 deploy checklist; doc 15). `VIDEO_MOCK_SECRET` is a dev-only signing key for mock meeting tokens and must not be set in production. (Daily runs on the free tier — room + token only, no participant webhook; ADR-43.)
+- **Dev worker trigger route mounts only in development:** the single on-demand worker trigger route (`POST /dev/worker/notifications`) is conditionally mounted at startup only when `NODE_ENV === 'development'` and is never registered in production (doc 10 deploy checklist; doc 15).
 - **Sentry error tracking (DSN-gated, PII-scrubbed):** error tracking is Sentry (`@sentry/node`), initialized at boot only when `SENTRY_DSN` is set — with no DSN it is a logging no-op, so non-production environments never egress. Sentry is configured with `sendDefaultPii: false` and a `beforeSend` hook that **scrubs PII before any event leaves the process**: it deletes the request body (`request.data`), cookies, the `Authorization` and `Cookie` headers, and the entire `user` object (emails / patient identifiers). **External error-egress posture:** only scrubbed exception metadata reaches Sentry; request bodies, cookies, auth tokens, and user identity never cross the boundary. The DSN is an env secret. This external sink is separate from A3 — A3 exception alerts come from `system.unhandled_exception` audit rows (see §A09). Unhandled exceptions are never leaked in error responses (PRD §3.6 A3; ARCH §14.5).
 - **Single-instance worker assumption:** in-process `node-cron` workers and the memory-backed `express-rate-limit` store assume a single running instance. If the app ever scales horizontally, workers must be gated behind a Postgres advisory lock or moved to scheduled tasks, and the rate-limit store must move to a shared backend. This is a documented known limitation (CONFIG §3), not a silent assumption.
 
@@ -96,8 +94,8 @@ Scoping rules by role (PRD §3.6):
 | Login (per IP)  | 20 / 15 min                             | `429 RATE_LIMITED`                                                    |
 | Sign-up         | 5 / IP / hour                           | `429 RATE_LIMITED`                                                    |
 | Forgot-password | 5 / account / hour                      | Enumeration-safe `200`; counted silently                              |
-| Payment-intent  | 10 / patient / hour                     | `429 RATE_LIMITED` (protects PayFast API quota beyond idempotency #7) |
-| Admin writes    | 60 / 15 min (keyed by `session.userId`) | `429 RATE_LIMITED` (applied to admin doctor writes, settings PUT, email resend, dispute) |
+| Payment-reference submit | 10 / patient / hour            | `429 RATE_LIMITED`                                                   |
+| Admin writes    | 60 / 15 min (keyed by `session.userId`) | `429 RATE_LIMITED` (applied to admin doctor writes, settings PUT, email resend, payment accept/reject) |
 
 Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_log` (`event_type=login_lockout`); sustained abuse is surfaced to the admin alert feed (A3).
 
@@ -115,13 +113,7 @@ Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_l
 
 ### A08 — Software and data integrity failures
 
-**PayFast webhook signature verification:** every inbound `payment.success` or `payment.failed` webhook is signature-verified before any state change is applied. Payloads with a missing, invalid, or expired signature are rejected with a `401` and logged to the admin alert feed (PRD §3.4; PRD §3.6; ARCH §11).
-
-**Daily webhook signature verification:** every inbound `POST /api/webhooks/daily` participant event is HMAC-SHA256 verified — signed string `timestamp + "." + rawBody` (the exact received bytes), keyed on the base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time compared — before any join is recorded. A missing or invalid signature is rejected `401` and written to the audit log as `video.webhook_rejected` (doc 14 §3; ADR-33).
-
-**Refund idempotency:** each appointment carries a single `refund_idempotency_key` (UNIQUE constraint). An automatic retry, the hourly reconciliation path, or an admin's out-of-band gateway action can never produce a second refund settlement for the same appointment (PRD §3.3 #10; ARCH §8). For PayFast **Pakistan** (no refund API), that admin out-of-band action — recorded via `POST /api/admin/payments/:appointmentId/record-refund` — is the primary refund path, and the same key keeps it single-settlement (ADR-32).
-
-**Reconciliation safety net:** an hourly worker queries PayFast for unconfirmed payments over the last 24 hours and completes the same atomic commit used by the webhook path, preventing silent missed-webhook data loss (PRD §3.1 flow 2; ARCH §10). PayFast **Pakistan** exposes no status-query API, so for that adapter the worker instead surfaces stuck payments once for manual review (`payment.manual_review_required`; ADR-32).
+**Manual payment confirmation (no gateway, no webhook):** payment is an offline bank transfer the admin verifies by hand. There is no online gateway, no inbound payment or video webhook, and no webhook signature verification anywhere — `routes.js` mounts no webhook routes. The patient submits a free-text bank transaction reference (`POST /api/appointments/:id/pay` sets `paymentReference` + `paymentSubmittedAt`, appointment stays `pending`); the admin matches it against the bank account and either accepts (`pending → confirmed`) or rejects (`pending → cancelled`). No refunds, disputes, or chargebacks exist, so there is no refund-idempotency or reconciliation machinery (ADR-43).
 
 **Prescription immutability:** no `UPDATE` or `DELETE` route or service method exists for prescriptions. Corrections require a new linked prescription; the original is permanently retained (PRD §3.3 #4; ARCH §5).
 
@@ -131,16 +123,15 @@ Lockout duration: **15 min rolling**. Threshold breaches are written to `audit_l
 
 **Audit log coverage (PRD §3.6):**
 
-- Appointment state transitions: `confirmed`, `cancelled_refunded`, `cancelled_no_refund`, `doctor_cancelled`, `in_progress`, `completed`, `prescription_issued`, `patient_no_show`, `doctor_no_show`.
+- Appointment state transitions (3-state machine): `pending` (booking), `confirmed` (admin accept), `cancelled` (admin reject, patient/doctor cancel). Prescriptions are child-record writes that do not change appointment state.
 - Auth events: successful login, password change, admin-mediated password reset.
-- Payment events: intent created, webhook success, webhook failure.
-- Refund events: initiated, retried, settled, failed.
-- Admin operational actions: doctor edits and deactivate/reactivate (A4), manual email re-trigger (A3/A5), `disputed` flag set/cleared (A5), platform settings changes (A6).
-- System actor events: reconciliation resolutions, no-show evaluations, reminder dispatches.
+- Payment events: bank-reference submitted (`payment.submitted`).
+- Admin operational actions: doctor edits and deactivate/reactivate (A4), manual email re-trigger (A3/A5), payment accept/reject (A5), platform settings changes (A6).
+- System actor events: notification/reminder dispatches.
 
 The audit log is **append-only** — no update or delete path is exposed at the application or API layer. Access is admin-only via the filtered query API (A5) (PRD §3.6; ARCH §11).
 
-**Admin alert feed (A3):** the admin dashboard surfaces alert entries for payment-webhook reconciliation mismatches, refund API failures after retry exhaustion, email-send failures after retry exhaustion, appointments in `awaiting_prescription` state for over 12 hours, and unhandled application exceptions. The A3 exception alerts are sourced from `system.unhandled_exception` audit rows written by the global error handler (no PII, no stack, message truncated to ≤500 chars; written fire-and-forget so an audit-write failure can never block the 500 response). The `captureException(...)` → Sentry (`SENTRY_DSN`, PII-scrubbed; §A05) call is a separate parallel path and does **not** feed A3 (PRD A3).
+**Admin alert feed (A3):** the admin dashboard surfaces alert entries for patient bank-reference submissions awaiting verification (`payment.submitted`), email-send failures after retry exhaustion, and unhandled application exceptions. The A3 exception alerts are sourced from `system.unhandled_exception` audit rows written by the global error handler (no PII, no stack, message truncated to ≤500 chars; written fire-and-forget so an audit-write failure can never block the 500 response). The `captureException(...)` → Sentry (`SENTRY_DSN`, PII-scrubbed; §A05) call is a separate parallel path and does **not** feed A3 (PRD A3).
 
 **Threshold-breach escalation:** sustained failed-login volume (beyond the per-account/per-IP rate-limit triggers) is surfaced to the A3 alert feed (PRD §3.6; ARCH §7; CONFIG §2).
 
@@ -160,7 +151,7 @@ The audit log is **append-only** — no update or delete path is exposed at the 
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PII          | Patient full name, email, phone; "booked for" subject name, age, relation; prescription content (medicines, dosage, instructions, notes) | Accessible per §3 access-control rules                                                                                                                                                                    |
 | Doctor PII   | Full name, email, phone, PMC number, photo                                                                                               | PMC number and email are immutable post-creation (PRD §3.3 #8)                                                                                                                                            |
-| Payment data | Card numbers, wallet credentials                                                                                                         | **Never touches the platform.** Handled exclusively by PayFast's hosted checkout. The platform stores only: gateway-assigned payment reference, gateway-reported fee, refund reference, and refund status |
+| Payment data (low sensitivity) | Patient-typed bank transaction reference (`paymentReference`) + `paymentSubmittedAt` on the appointment; admin-set bank details in Settings | **No card, wallet, or gateway data exists.** Payment is an offline bank transfer the admin verifies by hand (ADR-43). The only payment data stored is a free-text bank reference the patient types — no hosted checkout, gateway callbacks, fees, or refund records |
 | Session data | Session cookie + server-side session record in the `session` table                                                                       | HTTP-only, Secure, SameSite=Lax; 7-day rolling TTL                                                                                                                                                        |
 | Audit log    | Timestamped event records with actor identity                                                                                            | Admin-only; append-only; no PII beyond actor/target references                                                                                                                                            |
 | Notification outbox | `recipient_email` snapshot and `vars` JSON snapshot stored in `notification_jobs` at enqueue time | No PHI beyond what `users`/`appointments` already hold; rows are accessible only by the in-process dispatch worker — no external read path |
@@ -213,7 +204,7 @@ The platform uses role-based access control (RBAC) with three user-facing roles 
 | `patient` | Registered patients; self-managed accounts                                                                                                            |
 | `doctor`  | Dermatologists onboarded by admin; credentials managed by admin                                                                                       |
 | `admin`   | Internal Dermestha staff; single bootstrap account (DA4)                                                                                              |
-| `system`  | The three in-process background workers (reconciliation, notification, appointment-evaluation); no session, identified in audit entries by actor type |
+| `system`  | The in-process notification-dispatch worker (the single remaining cron job; reconciliation and appointment-evaluation workers were removed in the manual-payment pivot — ADR-43); no session, identified in audit entries by actor type |
 
 Roles are stored on the `users.role` enum column. A single `requireRole(...)` middleware reads the session's role and rejects any request outside the allowed roles for the route. This is the **exclusive route-level authorization mechanism** and is never enforced only on the frontend. Supplemental **parameter-level** authorization may additionally be performed in a handler body where the protected surface is a specific query param rather than the route itself — for example, the admin-only `includeInactive` flag on the otherwise-shared doctor/medicine list routes gates the param with an in-handler `req.session.role !== 'admin'` check (PRD DA6; ARCH §7; ARCH §11).
 
@@ -224,7 +215,7 @@ For the full list of routes with per-endpoint role requirements, see **document 
 - All `/api/admin/*` routes: `admin` only.
 - All `/api/doctors/:id/appointments` and prescription-builder routes: `doctor` (own appointments only).
 - All `/api/patients/:id/*` and patient dashboard routes: `patient` (own records only) or `admin`.
-- Webhook inbound routes (`/api/webhooks/payfast`): no session; verified by the PayFast webhook signature check instead (signed IPN — see doc 14 for the verification specifics).
+- Admin payment review: `POST /api/admin/appointments/:id/accept` and `.../reject` (`admin` only) confirm or cancel a `pending` appointment after the admin matches the submitted bank reference; there are no webhook inbound routes in v1 (`routes.js` mounts none — ADR-43).
 
 ### 3.3 Special authentication flows
 
@@ -243,10 +234,6 @@ For the full list of routes with per-endpoint role requirements, see **document 
 Every security-relevant action is written to `audit_log` by `audit.service.record()` with: `at` (UTC timestamp), `event_type`, `actor_type` (`patient` / `doctor` / `admin` / `system`), `actor_id`, `target_ref`, optional `reason`, and optional `meta` jsonb. The log is append-only; no update or delete path is exposed at any layer.
 
 The admin can query the log via the filtered API backing A5 (filters: appointment ID, user ID/email, event type, actor type, date range). No write or delete API for audit entries is exposed.
-
-### 3.5 Disputed marker
-
-An appointment can be flagged `disputed = true` by admin via the A5 detail view when a chargeback or unresolved patient claim is recorded. This is a **boolean flag on the `appointments` table, not a state transition** — the §4.3 state machine is unchanged and the flag can attach to any terminal state. Setting and clearing the flag are admin-only actions and are themselves audit-logged. No automated behavior is triggered by the flag in v1; it is a support-workflow marker only (PRD §3.6; ARCH §11).
 
 ---
 
@@ -287,3 +274,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | 2026-06-14 | A08: added Daily webhook signature-verification control — `POST /api/webhooks/daily` is HMAC-SHA256 verified over the raw body (base64-decoded `DAILY_WEBHOOK_SECRET`, constant-time); bad signature → `401` + `video.webhook_rejected` audit (doc 14 §3; ADR-33) | Slice H · S2 (Daily.co video adapter) |
 | 2026-06-14 | §4.2: noted the public/unauthenticated `/legal/terms`,`/legal/privacy` pages are built as banner-marked DRAFT pending legal review, and that the Privacy page cross-references this document's §2 data-handling policies (final copy = pre-launch gate; ADR-35) | Slice H · S4 (public surface — landing + legal) |
 | 2026-06-14 | A05: documented the Sentry error-tracking control — DSN-gated (`SENTRY_DSN`), `sendDefaultPii:false`, `beforeSend` scrubs request bodies/cookies/auth headers/user identity before egress + external error-egress posture; renamed the generic "error-tracking DSN" secret to `SENTRY_DSN` in the §A05 secrets list and the §A09 `captureException` note (ADR-36) | Slice H · S6 (launch foundation + hardening) |
+| 2026-06-28 | Manual-payment pivot sync: reclassified payment data as low-sensitivity free-text bank reference (§2.1); removed the PayFast webhook + Daily webhook signature-verification, refund-idempotency, and reconciliation controls (A04/A08), the PayFast adapter + IPN/mock-payment controls (A05), the `disputed` marker (§3.5) and the payfast webhook route (§3.2); re-scoped the payment rate-limit row and audit/alert coverage (A07/A09); dropped `PAYFAST_*` from the secrets list | Manual-payment pivot — as-built sync (ADR-43) |

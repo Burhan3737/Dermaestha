@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.9                                                           |
-| Last updated     | 2026-06-14                                                    |
+| Version          | 1.10                                                          |
+| Last updated     | 2026-06-28                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
 
@@ -55,35 +55,15 @@ enum DoctorStatus {
   active
 }
 
-/// Stored appointment states. NOTE: `slot_available` from PRD §4.3 is intentionally
-/// NOT a value here — availability is the ABSENCE of a row for (doctor, slot). The first
-/// persisted state is `slot_locked`. Keeps the partial unique index small and makes
-/// lock-release a state transition / row-removal rather than a status flip.
+/// Stored appointment states (manual-payment 3-state model, ADR-43). NOTE: `slot_available`
+/// from PRD §4.3 is intentionally NOT a value here — availability is the ABSENCE of a row for
+/// (doctor, slot). The first persisted state is `pending` (booking creates it on click and
+/// locks the slot). Keeps the partial unique index small and makes slot-release a state
+/// transition (→ `cancelled`) rather than a status flip.
 enum AppointmentState {
-  slot_locked
-  confirmed
-  in_progress
-  completed
-  prescription_issued
-  cancelled_refunded
-  cancelled_no_refund
-  doctor_cancelled
-  patient_no_show
-  doctor_no_show
-}
-
-enum PaymentStatus {
   pending
-  success
-  failed
-}
-
-enum RefundStatus {
-  initiated
-  retrying
-  settled
-  failed
-  manual_required
+  confirmed
+  cancelled
 }
 
 enum AuditActorType {
@@ -98,9 +78,9 @@ enum NotificationType {
   reminder_24h
   reminder_1h
   prescription_ready
-  refund_confirmation
-  cancellation_apology
-  refund_delayed
+  payment_submitted_admin
+  payment_not_received
+  cancellation
 }
 
 enum NotificationStatus {
@@ -111,7 +91,7 @@ enum NotificationStatus {
 }
 ```
 
-**Key note on `AppointmentState`:** `slot_available` is intentionally absent. Availability is the _absence_ of a row for a `(doctor, slot)` pair. The first persisted state is `slot_locked`. This design keeps the partial unique index (`uniq_active_slot`) small and makes slot release a row-removal rather than a status flip.
+**Key note on `AppointmentState`:** `slot_available` is intentionally absent. Availability is the _absence_ of a row for a `(doctor, slot)` pair. The first persisted state is `pending`, created on booking click (which also locks the slot and snapshots `feeAtBooking`). This design keeps the partial unique index (`uniq_active_slot`, over `pending`/`confirmed`) small. Slot release is the `→ cancelled` transition (admin reject, or patient/doctor/admin cancel), which removes the row from the index. The manual-payment pivot (ADR-43) collapsed the prior 10-state machine — `slot_locked`, `in_progress`, `completed`, `prescription_issued`, `cancelled_refunded`, `cancelled_no_refund`, `doctor_cancelled`, `patient_no_show`, `doctor_no_show` are all removed; the `PaymentStatus` and `RefundStatus` enums are dropped entirely with the `Payment` table and refund subsystem.
 
 ---
 
@@ -162,7 +142,7 @@ model Doctor {
   user           User         @relation(fields: [userId], references: [id])
   pmcNumber      String       @unique @map("pmc_number")
   specialization String
-  /// Consultation fee in PKR paisa. Snapshotted to Appointment.feeAtBooking at confirm (#6).
+  /// Consultation fee in PKR paisa. Snapshotted to Appointment.feeAtBooking at booking/lock (#6).
   fee            Int
   bio            String?
   photoUrl       String?      @map("photo_url")
@@ -226,26 +206,22 @@ model Appointment {
   patient       User             @relation("PatientAppointments", fields: [patientUserId], references: [id])
   slotStart     DateTime         @map("slot_start") @db.Timestamptz(6)
   slotEnd       DateTime         @map("slot_end") @db.Timestamptz(6)
-  state         AppointmentState @default(slot_locked)
-  /// Fee snapshot captured on transition to `confirmed` (#6). Null while slot_locked.
+  state         AppointmentState @default(pending)
+  /// Fee snapshot captured at booking/lock time (#6, ADR-43) — needed for the payment
+  /// instructions shown to the patient while `pending`.
   feeAtBooking  Int?             @map("fee_at_booking")
+  /// Patient's offline bank-transfer reference (manual-payment, ADR-43); set by POST /:id/pay.
+  paymentReference   String?     @map("payment_reference")
+  /// When the patient submitted the reference; drives the admin review queue.
+  paymentSubmittedAt DateTime?   @map("payment_submitted_at") @db.Timestamptz(6)
   /// "Who is this for?" (P8). When false, subject* describe the third party.
   forSelf         Boolean        @default(true) @map("for_self")
   subjectName     String?        @map("subject_name")
   subjectAge      Int?           @map("subject_age")
   subjectRelation String?        @map("subject_relation")
-  /// Support-workflow marker, orthogonal to the state machine (§3.6). Admin-set via A5.
-  disputed      Boolean          @default(false)
-  /// now()+10min while slot_locked; the lock-release worker reads this.
-  lockExpiresAt DateTime?        @map("lock_expires_at") @db.Timestamptz(6)
-  /// Set on FIRST participant join; drives no-show resolution (ADR-12). Nullable.
-  doctorJoinedAt  DateTime?      @map("doctor_joined_at") @db.Timestamptz(6)
-  /// Set on FIRST participant join; drives no-show resolution (ADR-12). Nullable.
-  patientJoinedAt DateTime?      @map("patient_joined_at") @db.Timestamptz(6)
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  payments      Payment[]
   prescriptions Prescription[]
   notificationJobs NotificationJob[]
 
@@ -259,55 +235,15 @@ model Appointment {
 }
 ```
 
-`feeAtBooking` is `null` while the appointment is `slot_locked` and is populated (snapshot from `Doctor.fee`) on transition to `confirmed` (invariant #6). The `forSelf / subjectName / subjectAge / subjectRelation` fields implement the "booking for a third party" feature (PRD P8). `disputed` is an orthogonal support flag, admin-set; it does not participate in the state machine.
+`feeAtBooking` is the snapshot of `Doctor.fee` taken at **booking/lock time** (when the `pending` row is created), so the payment instructions can show the amount due immediately (invariant #6; changed from "on confirm" by ADR-43). The `forSelf / subjectName / subjectAge / subjectRelation` fields implement the "booking for a third party" feature (PRD P8).
 
-`doctorJoinedAt` and `patientJoinedAt` are both nullable `timestamptz`; they are set once (on first join) by the `POST /api/webhooks/daily` handler via `recordJoinFromDailyEvent` and drive the no-show resolution logic (ADR-12). Migration `20260604141222_add_video_join_columns` adds them as additive nullable columns; the `uniq_active_slot` partial index is untouched.
+`paymentReference` and `paymentSubmittedAt` are the manual-payment fields (ADR-43; migration `20260627000000_manual_payment_pivot`): `POST /api/appointments/:id/pay` records the patient's offline bank-transfer reference and the submission time, leaves the state `pending`, and enqueues the admin review alert. The admin then accepts (→ `confirmed`) or rejects (→ `cancelled`). The pivot migration also dropped the former `disputed`, `lockExpiresAt`, `doctorJoinedAt`, and `patientJoinedAt` columns (no dispute flag, no lock-expiry, no participant-join tracking).
 
 ---
 
-### 2f. Payment
+### 2f. Payment — removed (ADR-43)
 
-One row per booking attempt. All idempotency for payment intents and refunds lives here.
-
-```prisma
-/// One row per booking attempt. Idempotency lives here (#7, #10).
-model Payment {
-  id                   String        @id @default(cuid())
-  appointmentId        String        @map("appointment_id")
-  appointment          Appointment   @relation(fields: [appointmentId], references: [id])
-  /// Denormalized for the intent-idempotency key below; FK-less by design (scalar only).
-  patientUserId        String        @map("patient_user_id")
-  slotStart            DateTime      @map("slot_start") @db.Timestamptz(6)
-  providerRef          String?       @map("provider_ref")
-  status               PaymentStatus @default(pending)
-  /// Charged amount in PKR paisa.
-  amount               Int
-  /// Gateway-reported fee (paisa); drives refund math + cancellation estimate (policy #5).
-  gatewayFee           Int?          @map("gateway_fee")
-  refundIdempotencyKey String?       @unique @map("refund_idempotency_key")
-  refundRef            String?       @map("refund_ref")
-  refundStatus         RefundStatus? @map("refund_status")
-  /// Refund-retry bookkeeping (F06.03 / edge #30). The refund-retry worker polls retrying+due rows.
-  refundAttempts    Int       @default(0)  @map("refund_attempts")
-  nextRefundRetryAt DateTime? @map("next_refund_retry_at") @db.Timestamptz(6)
-  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  /// Payment-intent idempotency on (patient, slot) (#7): a retry/double-submit cannot
-  /// open two parallel intents for the same booking attempt.
-  @@unique([patientUserId, slotStart], name: "intent_key")
-  @@index([appointmentId])
-  @@map("payments")
-}
-```
-
-`patientUserId` and `slotStart` are denormalized scalars (not a separate FK relation) specifically to form the `intent_key` composite unique. `gatewayFee` (paisa) drives refund math and cancellation fee estimates under policy #5. When the gateway does not report a fee, the Settings fallback model applies.
-
-`refundAttempts` and `nextRefundRetryAt` (Slice E, migration `20260610231617_slice_e_notification_outbox`) back the refund-retry worker (F06.03 / edge #30): on a provider failure `refundStatus` becomes `retrying`, `refundAttempts` increments, and `nextRefundRetryAt` is set to an exponential-backoff time; the minute-cron worker polls `refundStatus = retrying AND nextRefundRetryAt ≤ now`. At `REFUND_MAX_ATTEMPTS` the row flips to `refundStatus = failed`, `nextRefundRetryAt = null`, an audit alert (`payment.refund_exhausted`) is written, and a `refund_delayed` notification is enqueued.
-
-Against the real PayFast **Pakistan** adapter (which exposes no refund API), a refund instead degrades immediately to `refundStatus = manual_required` — one `payment.refund_manual_required` alert, **no** retry — and an admin later records the out-of-band settlement, flipping it to `settled` and reusing the `refundIdempotencyKey` (doc 11 ADR-32; `RefundStatus` gained `manual_required` via migration `20260613181905_slice_h_refund_manual_required`).
-
-**No-cascade release policy (ADR-39):** `Payment.appointment` (and `Prescription.appointment`, §2g) are deliberately **`ON DELETE RESTRICT`** (no `onDelete` declared → Prisma's required-relation default; no cascade). A `slot_locked` appointment that a `Payment` row FK-references therefore cannot be deleted (it would raise `P2003`). The failed/abandoned-payment paths consequently **release the slot by force-expiring the lock, not by deleting the appointment**: on `payment.failed` (and reconcile → `failed`) `markFailedAndReleaseLock` marks the Payment `failed` + sets `lockExpiresAt = now`; the edge-#6a `refundInFull` likewise force-expires the lock and preserves the refunded Payment. The slot then frees via lazy-expiry / reclaim-on-conflict (ADR-23). This is a service-layer policy — **no schema change**.
+The `Payment` model and the `payments` table were **dropped entirely** by the manual-payment pivot (ADR-43; migration `20260627000000_manual_payment_pivot` runs `DROP TABLE IF EXISTS "payments"`). There is no online gateway, no payment record, no `gatewayFee`/refund columns, and no payment-intent / refund idempotency keys. Offline bank-transfer payment is now captured by two columns on `Appointment` — `paymentReference` + `paymentSubmittedAt` (§2e) — and verified manually by the admin. The former `PaymentStatus` and `RefundStatus` enums are also dropped (§2a). The no-cascade release policy that this section documented (force-expire-the-lock-instead-of-delete) no longer applies: a slot frees by the `→ cancelled` transition, not by deleting an appointment.
 
 ---
 
@@ -455,17 +391,19 @@ model Settings {
   id                    Int      @id @default(1)
   /// Floor 30 (PRD); default 60. Booking lead-time filter.
   minBookingLeadMinutes Int      @default(60) @map("min_booking_lead_minutes")
-  /// Fallback gateway-fee model when PayFast reports no fee (policy #5).
-  /// Percentage in basis points (e.g. 250 = 2.50%) + a fixed component in PKR paisa.
-  fallbackFeePctBps     Int      @default(0) @map("fallback_fee_pct_bps")
-  fallbackFeeFixed      Int      @default(0) @map("fallback_fee_fixed")
+  /// Manual-payment bank-transfer instructions (ADR-43); shown to the patient as
+  /// `paymentInstructions` for a pending appointment. All nullable (unconfigured = blank).
+  bankName              String?  @map("bank_name")
+  bankAccountName       String?  @map("bank_account_name")
+  bankAccountNumber     String?  @map("bank_account_number")
+  bankInstructions      String?  @map("bank_instructions")
   updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("settings")
 }
 ```
 
-`fallbackFeePctBps` is in basis points (250 = 2.50%). `fallbackFeeFixed` is a fixed PKR paisa component. These two fields implement the fallback fee model from policy #5 when PayFast does not report a gateway fee.
+`bankName`, `bankAccountName`, `bankAccountNumber`, and `bankInstructions` are the admin-editable bank-transfer details (ADR-43; migration `20260627000000_manual_payment_pivot`). The appointment-detail endpoint returns them (with the amount due) as `paymentInstructions` for an owned `pending` appointment. The former `fallbackFeePctBps` / `fallbackFeeFixed` fallback-fee fields were dropped with the refund subsystem.
 
 ---
 
@@ -493,7 +431,7 @@ model Session {
 
 ### 2n. NotificationJob (Slice E)
 
-Transactional email outbox (F07). The intent-to-send persists in the same database — and, for event emails, the same `$transaction` — as the state change that promised it, so a crash between commit and send can never lose an email and the PayFast IPN ack never waits on a send. The minute-cron dispatch worker delivers due rows, retries with exponential backoff, and suppresses reminders the appointment has invalidated (F07.03).
+Transactional email outbox (F07). The intent-to-send persists in the same database — and, for event emails, the same `$transaction` — as the state change that promised it, so a crash between commit and send can never lose an email. The minute-cron dispatch worker delivers due rows, retries with exponential backoff, and suppresses reminders the appointment has invalidated (F07.03).
 
 ```prisma
 /// Transactional email outbox (F07): the intent-to-send persists in the same DB (and, for
@@ -528,7 +466,7 @@ model NotificationJob {
 }
 ```
 
-`recipientEmail` and `vars` are snapshots taken at enqueue time (doc 14 §5 merge-var contract) — no PHI beyond what `appointments`/`users` already hold. The `@@unique([appointmentId, type, dedupeKey])` makes enqueue idempotent (a replayed `payment.success` IPN re-runs enqueue as a no-op upsert). `dedupeKey` defaults to `''`, preserving the Slice E singleton-per-`(appointment, type)` semantics; Slice F (migration `20260612003907_slice_f_outbox_dedupe_key`) widened the constraint to a 3-column composite so `prescription_ready` can set `dedupeKey` to the prescription id and thus enqueue one email per prescription (including corrections). `onDelete: Cascade` matters: the lazy-reclaim path (`createWithReclaim`, ADR-23/39) deletes a dead `slot_locked` appointment (an expired hold whose Payment is `failed`/absent) so a new patient can take the slot, and a leftover job row must not block that delete. (Note: the `payment.failed` and edge-#6a reconciliation paths no longer delete the appointment — they force-expire the lock instead, ADR-39 — so the cascade now backstops the reclaim-delete path specifically.) The `@@index([status, scheduledFor])` feeds the dispatch worker's due-rows query.
+`recipientEmail` and `vars` are snapshots taken at enqueue time (doc 14 §5 merge-var contract) — no PHI beyond what `appointments`/`users` already hold. The `@@unique([appointmentId, type, dedupeKey])` makes enqueue idempotent (a replayed enqueue is a no-op upsert). `dedupeKey` defaults to `''`, preserving the Slice E singleton-per-`(appointment, type)` semantics; Slice F (migration `20260612003907_slice_f_outbox_dedupe_key`) widened the constraint to a 3-column composite so `prescription_ready` can set `dedupeKey` to the prescription id and thus enqueue one email per prescription (including corrections). The `onDelete: Cascade` is retained so that if an appointment is ever deleted its outbox jobs do not block the delete; in the manual-payment model (ADR-43) appointments are not deleted to free a slot — a slot frees via the `→ cancelled` transition. The `@@index([status, scheduledFor])` feeds the dispatch worker's due-rows query.
 
 ---
 
@@ -546,7 +484,6 @@ erDiagram
     doctors ||--o{ availability_blocks : "1:n"
     doctors ||--o{ appointments : "1:n (doctor_id)"
     users ||--o{ appointments : "1:n (patient_user_id)"
-    appointments ||--o{ payments : "1:n"
     appointments ||--o{ prescriptions : "1:n"
     appointments ||--o{ notification_jobs : "1:n (cascade)"
     prescriptions ||--o{ prescription_items : "1:n"
@@ -560,16 +497,13 @@ erDiagram
 | `availability_blocks` | `doctor_id`       | `doctors`       | Many blocks per doctor                                 |
 | `appointments`        | `doctor_id`       | `doctors`       | Many appointments per doctor                           |
 | `appointments`        | `patient_user_id` | `users`         | Named relation `PatientAppointments`                   |
-| `payments`            | `appointment_id`  | `appointments`  | Many payments per appointment (retries)                |
 | `prescriptions`       | `appointment_id`  | `appointments`  | 1..n per appointment (immutable; correction = new row) |
 | `prescription_items`  | `prescription_id` | `prescriptions` | Many items per prescription                            |
-| `notification_jobs`   | `appointment_id`  | `appointments`  | Outbox rows; `onDelete: Cascade` (a deleted lock drops its jobs) |
+| `notification_jobs`   | `appointment_id`  | `appointments`  | Outbox rows; `onDelete: Cascade` (a deleted appointment drops its jobs) |
 
 **Why doctor name is not on `appointments` (invariant #3):** The `appointments` table stores only `doctor_id` (a FK), never the doctor's name, specialization, or fee. If a doctor's display name were stored directly on the appointment and the doctor's profile were later updated, historical records would either change (incorrect) or diverge (inconsistent). Historical doctor identity is instead captured at the moment of prescription issuance in `Prescription.doctorSnapshot` (a jsonb snapshot of name, pmcNumber, specialization). The appointment row itself is only the booking record; the prescription is the legal document that needs the durable identity.
 
 **Prescription / appointment 1..n relation (invariant #4):** A single appointment may have multiple prescription rows. This is intentional: prescriptions are immutable once written, so a correction cannot update an existing row — instead the doctor submits a new prescription linked to the same appointment. The patient always sees the chronological list; the most-recent row supersedes earlier ones for display.
-
-**Payment ↔ appointment:** Multiple payment rows per appointment are possible because a patient may retry after a failed payment attempt. Each attempt creates a new `payments` row. The `intent_key` unique on `(patient_user_id, slot_start)` (invariant #7) prevents two concurrent open intents for the same slot.
 
 ---
 
@@ -582,8 +516,6 @@ erDiagram
 | `users`    | `@@unique`                      | `email`                         | Email uniqueness (DA2)          |
 | `doctors`  | `@@unique`                      | `user_id`                       | 1:1 user↔doctor                 |
 | `doctors`  | `@@unique`                      | `pmc_number`                    | PMC number uniqueness           |
-| `payments` | `@@unique` (name: `intent_key`) | `(patient_user_id, slot_start)` | Payment-intent idempotency (#7) |
-| `payments` | `@unique`                       | `refund_idempotency_key`        | Refund idempotency (#10)        |
 | `notification_jobs` | `@@unique`            | `(appointment_id, type, dedupe_key)` | Idempotent enqueue (replay-safe outbox, F07); `dedupe_key=''` = singleton per type, prescription id = per-prescription (Slice F) |
 
 ### 4b. The no-double-booking partial unique index (invariant #1)
@@ -592,11 +524,10 @@ This index is the most critical integrity constraint in the system. **Prisma's D
 
 ```sql
 CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
-  WHERE state IN ('slot_locked','confirmed','in_progress','completed',
-                  'prescription_issued','cancelled_no_refund');
+  WHERE state IN ('pending', 'confirmed');
 ```
 
-**Releasing / terminal states excluded from the index:** `cancelled_refunded`, `doctor_cancelled`, `patient_no_show`, `doctor_no_show`. When an appointment reaches one of these states, its `(doctor_id, slot_start)` pair is no longer covered by the index, which means the slot becomes rebookable. A second insert for a currently-held slot fails at write time (a unique violation), not at application-level validation time — this is intentional.
+**Active states covered:** `pending`, `confirmed` (the two non-terminal states in the 3-state model, ADR-43; migration `20260628000000_drop_completed_state` rebuilt the index with this list). **Releasing / terminal state excluded:** `cancelled`. When an appointment is cancelled, its `(doctor_id, slot_start)` pair is no longer covered by the index, so the slot becomes rebookable. A second insert for a currently-held slot fails at write time (a unique violation), not at application-level validation time — this is intentional.
 
 **Migration caveat:** This index must be re-applied whenever the `appointments` table is recreated via a destructive migration. See the `prisma/schema.prisma` header (this §4b is the canonical caveat).
 
@@ -608,8 +539,7 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 | `appointments`        | `@@index`                             | `(doctor_id, slot_start)` | Slot lookup; feeds availability/booking screen filters                |
 | `appointments`        | `@@index`                             | `slot_start`              | Admin records time-range (`from`/`to`) queries (F13); migration `20260613213051_slice_h_s6_indexes` |
 | `appointments`        | `@@index`                             | `patient_user_id`         | Patient appointment history screen (P-06)                             |
-| `appointments`        | `@@index`                             | `state`                   | Worker state-sweep queries (evaluation worker, reconciliation worker) |
-| `payments`            | `@@index`                             | `appointment_id`          | Payment lookup per appointment                                        |
+| `appointments`        | `@@index`                             | `state`                   | State-filtered queries (admin review queue `state=pending`, etc.)     |
 | `prescriptions`       | `@@index`                             | `appointment_id`          | Prescription list per appointment                                     |
 | `prescription_items`  | `@@index`                             | `prescription_id`         | Item list per prescription                                            |
 | `notification_jobs`   | `@@index`                             | `(status, scheduled_for)` | Dispatch worker's due-rows query (F07)                                |
@@ -642,8 +572,8 @@ These indexes were **recommended by the Slice G admin-panel review** to back adm
 | Field names                  | `camelCase` (Prisma DSL)                                                                                                | `patientUserId`, `feeAtBooking`                             |
 | ID fields                    | `id` on every model; type `String @id @default(cuid())` except `Settings.id Int @id @default(1)`                        | `id String @id @default(cuid())`                            |
 | Timestamp columns            | `created_at` (`@default(now())`), `updated_at` (`@updatedAt`); both `@db.Timestamptz(6)` UTC                            | `created_at`, `updated_at`                                  |
-| Status enums                 | lowercase values, underscore-separated                                                                                  | `slot_locked`, `cancelled_refunded`                         |
-| Boolean flags                | `is_` prefix for state toggles; direct name for workflow markers                                                        | `is_active`, `must_change_password`, `disputed`, `for_self` |
+| Status enums                 | lowercase values, underscore-separated where multi-word                                                                 | `pending`, `confirmed`, `payment_submitted_admin`           |
+| Boolean flags                | `is_` prefix for state toggles; direct name for workflow markers                                                        | `is_active`, `must_change_password`, `for_self`             |
 | Money fields                 | Integer PKR paisa                                                                                                       | `fee`, `amount`, `unit_price`, `fee_at_booking`             |
 | Append-only / no-soft-delete | `audit_log` and `prescriptions` are append-only by service-layer convention; no `deleted_at` column exists on any table | —                                                           |
 
@@ -657,18 +587,18 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | ---------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | F01 — Patient authentication & account               | `users`, `session`                                 | Sign-up/login/reset; `tos_accepted_at` consent; `must_change_password`; reset via `reset_token_hash` + `reset_token_expires_at`; sessions stored in `session`                                            |
 | F02 — Doctor discovery (listing & profile)           | `doctors`, `users`, `availability_blocks`          | `is_active` + `status = active` gate the public listing; blocks feed the next-available slot                                                    |
-| F03 — Slot booking & slot-lock                       | `appointments`, `availability_blocks`              | Slots generated at read time; `slot_locked` + `lock_expires_at`; partial unique index prevents double-lock                                      |
-| F04 — Payment                                        | `payments`, `appointments`                         | Atomic confirm; `intent_key` unique (#7); `fee_at_booking` snapshot (#6); `gateway_fee`, `provider_ref`                                         |
-| F05 — Appointment lifecycle & video                  | `appointments`                                     | State machine hub; video room/token lifecycle managed by the Daily adapter against `appointment.id` (no dedicated table)                        |
-| F06 — Cancellation & refund                          | `appointments`, `payments`                         | Transitions to `cancelled_refunded` / `cancelled_no_refund` / `doctor_cancelled`; `refund_idempotency_key` (#10), `refund_ref`, `refund_status` |
+| F03 — Slot booking & slot-lock                       | `appointments`, `availability_blocks`              | Slots generated at read time; booking creates `pending` (locks the slot, snapshots `fee_at_booking`); partial unique index prevents double-book |
+| F04 — Manual payment & admin review                  | `appointments`, `settings`                         | Offline bank transfer (ADR-43); patient submits `payment_reference`/`payment_submitted_at`; admin accept (`→confirmed`) / reject (`→cancelled`); bank details on `settings`. No `payments` table, no gateway/refund |
+| F05 — Appointment lifecycle & video                  | `appointments`                                     | State machine hub (3 states); Daily room/token lifecycle managed by the adapter against `appointment.id` (free tier — no webhook, no join columns, no dedicated table) |
+| F06 — Cancellation                                   | `appointments`                                     | `→ cancelled` from `pending` or `confirmed` (patient/doctor/admin); frees the slot. No refund — money handled offline (ADR-43)                  |
 | F07 — Reminders & notifications                      | `notification_jobs`, `appointments` (read)         | Transactional outbox (Slice E); event emails enqueue in the caller's `$transaction`; the dispatch worker re-checks appointment state before sending (F07.03), retries with backoff, and suppresses invalidated reminders |
 | F08 — Prescription                                   | `prescriptions`, `prescription_items`, `medicines` | Immutable rows (#4); price snapshot (#5); `doctor_snapshot` / `patient_id_snapshot` jsonb (#3, P8)                                              |
 | F09 — Doctor weekly availability                     | `availability_blocks`                              | Recurring weekly windows; 30-min slots generated at read time                                                                                   |
 | F10 — Admin: doctor onboarding, edit, (de)activation | `doctors`, `users`                                 | Admin CRUD; `pmc_number` + email immutability (#8); `is_active` / `status`                                                                      |
 | F11 — Admin: medicine catalogue                      | `medicines`                                        | Admin CRUD; `is_active`; `unit_price` snapshotted to `prescription_items.price`                                                                 |
-| F12 — Admin: system-health alerts                    | `audit_log`, `payments`, `appointments` (read)     | Derived from existing records; no dedicated alerts table in v1                                                                                  |
-| F13 — Admin: records & audit log (unified)           | `audit_log`, `appointments`, `payments`            | Unified read-only search over records + the append-only audit log                                                                               |
-| F14 — Admin: platform settings                       | `settings`                                         | Single row (`id = 1`); `min_booking_lead_minutes`; fallback fee model                                                                           |
+| F12 — Admin: system-health alerts                    | `audit_log`, `appointments` (read)                 | Derived from existing records; no dedicated alerts table in v1                                                                                  |
+| F13 — Admin: records & audit log (unified)           | `audit_log`, `appointments`                        | Unified read-only search over records + the append-only audit log                                                                               |
+| F14 — Admin: platform settings                       | `settings`                                         | Single row (`id = 1`); `min_booking_lead_minutes`; bank-transfer details (`bank_name`, `bank_account_name`, `bank_account_number`, `bank_instructions`) |
 | F15 — Doctor & admin authentication & roles          | `users`, `session`                                 | `role` discriminator; `must_change_password`; role middleware reads the session                                                                 |
 | F16 — Legal content (ToS / Privacy)                  | — (no table)                                       | Static `/legal/*` pages; acceptance timestamp recorded on `users.tos_accepted_at` (see F01)                                                     |
 
@@ -692,3 +622,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-13 | Added `manual_required` to the `RefundStatus` enum (§2a) + a `Payment` prose note on the PayFast-PK manual-refund degradation (§2f); migration `20260613181905_slice_h_refund_manual_required` | Slice H · S1 (PayFast Pakistan adapter; ADR-32) |
 | 2026-06-14 | Applied the two deferred admin indexes — `appointments.slotStart` + `audit_log.targetRef` — to the embedded schema (§2e, §2j), §4c inventory, and §4d (now "applied", no longer deferred); migration `20260613213051_slice_h_s6_indexes` | Slice H · S6 (launch foundation + hardening) |
 | 2026-06-14 | Documented the no-cascade release policy (§2f): `Payment.appointment` / `Prescription.appointment` are `ON DELETE RESTRICT` (no schema change) and the failed/abandoned-payment paths force-expire the lock rather than delete (ADR-39); corrected the now-stale §2n `onDelete: Cascade` rationale (the `payment.failed`/edge-#6a paths no longer delete — the cascade now backstops the lazy-reclaim delete) | Slice H · S7 (E2E QA + launch gate; ADR-39) |
+| 2026-06-28 | Manual-payment pivot (ADR-43): `AppointmentState` → 3 values (`pending`/`confirmed`/`cancelled`); dropped `PaymentStatus`/`RefundStatus` enums and the `Payment` model (§2f); `NotificationType` → `payment_submitted_admin`/`payment_not_received`/`cancellation` (was refund/apology types); added `Appointment.paymentReference`/`paymentSubmittedAt`, dropped `disputed`/`lockExpiresAt`/`doctorJoinedAt`/`patientJoinedAt`, `feeAtBooking` now snapshot at booking; `Settings` gained the four bank fields, dropped `fallbackFee*`; `uniq_active_slot` now `WHERE state IN ('pending','confirmed')`; pruned payment FKs/indexes/scope rows; migrations `20260627000000_manual_payment_pivot` + `20260628000000_drop_completed_state` | Manual-payment pivot — schema as-built sync |

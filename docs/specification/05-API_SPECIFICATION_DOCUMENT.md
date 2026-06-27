@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.17                          |
-| Last updated     | 2026-06-16                    |
+| Version          | 1.18                          |
+| Last updated     | 2026-06-28                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -86,15 +86,14 @@ Validation is Zod-first (`shared/schemas`), then the controller calls a service;
 | `401`  | Not authenticated                                            | `UNAUTHENTICATED`                                                     |
 | `403`  | Wrong role / not owner (DA6); or session must change password (DA3) | `FORBIDDEN`, `MUST_CHANGE_PASSWORD`                                                           |
 | `404`  | Not found _or_ not visible to caller (avoid existence leaks) | `NOT_FOUND`                                                           |
-| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `LOCK_EXPIRED`, `IMMUTABLE_FIELD`, `INVALID_STATE`, `BLOCK_HAS_BOOKINGS`, `ACTIVE_LOCK_EXISTS`, `OVERLAP`, `INVALID_TRANSITION`, `PMC_TAKEN`, `EMAIL_TAKEN` (P2002 on doctor create) |
-| `422`  | Well-formed but semantically rejected                        | `BOOKING_TOO_SOON`, `REFUND_INELIGIBLE`, `SLOT_NOT_BOOKABLE`, `VIDEO_WINDOW_CLOSED` |
+| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `IMMUTABLE_FIELD`, `INVALID_STATE`, `BLOCK_HAS_BOOKINGS`, `OVERLAP`, `INVALID_TRANSITION`, `PMC_TAKEN`, `EMAIL_TAKEN` (P2002 on doctor create) |
+| `422`  | Well-formed but semantically rejected                        | `BOOKING_TOO_SOON`, `SLOT_NOT_BOOKABLE`, `VIDEO_WINDOW_CLOSED` |
 | `429`  | Rate-limited / locked out                                    | `RATE_LIMITED`, `ACCOUNT_LOCKED`                                      |
 | `500`  | Unexpected; logged to error tracking                         | `INTERNAL` — a non-`AppError`/non-`ZodError` 500 also writes a fire-and-forget `system.unhandled_exception` audit row (F12.01 alert source; `targetRef` = route path, `reason` = message ≤ 500 chars) |
 
 Additional rules:
 
 - **Enumeration-safe auth (P2):** `forgot-password` and `login` return an identical shape for known/unknown accounts; never reveal which emails exist.
-- **Webhooks** return `200` only after the signature verifies and the event is durably handled; an invalid signature is `401` + logged to the admin alert feed.
 
 ### 3.3 Lists & pagination
 
@@ -163,38 +162,33 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                           | Role                 | Purpose                                                     | Notes                                                                  |
 | --------------------------------------- | -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `POST /api/appointments/lock`           | patient              | Create `slot_locked` (10-min hold) + "who-for" (P3/P8)      | a concurrent 2nd lock fails via the partial unique index → 409 `SLOT_TAKEN` (#1); validation also returns 409 `ACTIVE_LOCK_EXISTS`/`OVERLAP` (single-lock / no-overlap) and 422 `SLOT_NOT_BOOKABLE` (non-bookable or expired-lock collision, ADR-23) |
-| `POST /api/appointments/:id/pay`        | patient              | Create idempotent payment intent → PayFast handoff URL (P3) | idempotent on `(patient, slot)` (#7); 409 `LOCK_EXPIRED` if hold gone  |
-| `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant; `?scope=history` returns terminal-state rows newest-first; list rows (both roles) include `hasPrescription`; patient active scope also surfaces a live `slot_locked` payment hold (row carries `lockExpiresAt`) — not just `confirmed`/`in_progress` — so an abandoned hold is recoverable (P-08 "Payment pending" recovery) |
-| `GET /api/appointments/:id`             | patient/doctor/admin | Detail, ownership-checked                                   | 404 (not 403) when not visible; detail adds `subjectAge`, `subjectRelation`, `patientName`, and `lockExpiresAt` (lets P-07 show a terminal Failure/Lock-expired state once a `slot_locked` hold is released/expired, instead of polling forever) |
-| `POST /api/appointments/:id/cancel`     | patient/doctor       | Cancel (P6/D5) → state transition + refund per policy       | see §5 transition table for ≥2h vs <2h vs doctor                       |
-| `POST /api/appointments/:id/dispute`    | admin                | Set/clear `disputed` flag (A5)                              | flag only — not a state transition; audit-logged                       |
-| `GET /api/appointments/:id/video-token` | patient/doctor       | Time-bound Daily token (P5/D3)                              | issued only within slot-start−10m … slot-end+5m                        |
+| `POST /api/appointments/lock`           | patient              | Create `pending` (locks the slot on click) + "who-for" (P3/P8) | snapshots `feeAtBooking` at lock (ADR-43); a concurrent 2nd lock fails via the partial unique index → 409 `SLOT_TAKEN` (#1); validation also returns 409 `OVERLAP` and 422 `SLOT_NOT_BOOKABLE` (past/lead-time). No 10-min auto-expiry — the slot frees only when a human cancels/rejects |
+| `POST /api/appointments/:id/pay`        | patient              | Submit the offline bank-transfer reference (P3, ADR-43)     | body `{ reference }`; sets `paymentReference` + `paymentSubmittedAt`, stays `pending`, enqueues the admin alert + `payment_submitted_admin` email. **No gateway, no handoff URL** |
+| `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant; `?scope=history` returns past/cancelled rows newest-first; list rows (both roles) include `hasPrescription`. Patient Upcoming = `pending` ∪ `confirmed` with `slotEnd ≥ now`; Past = `confirmed` with `slotEnd < now` ∪ `cancelled` (time-based, no `completed` state) |
+| `GET /api/appointments/:id`             | patient/doctor/admin | Detail, ownership-checked                                   | 404 (not 403) when not visible; detail adds `subjectAge`, `subjectRelation`, `patientName`; for an owned **`pending`** appointment it also returns `paymentInstructions { amountDue, bankName, bankAccountName, bankAccountNumber, bankInstructions }` (amount + bank details from Settings, ADR-43) |
+| `POST /api/appointments/:id/cancel`     | patient/doctor       | Cancel (P6/D5) → `→ cancelled` from `pending`/`confirmed`   | body `{ reason? }`; frees the slot; enqueues a `cancellation` email. **No refund** — money handled offline (ADR-43) |
+| `GET /api/appointments/:id/video-token` | patient/doctor       | Time-bound Daily token (P5/D3)                              | **`confirmed`-only** (non-confirmed → 404); issued within slot-start−10m … slot-end+5m; Daily free tier (room + token, no join recording) |
 
 ---
 
-### F04 — Payments & webhooks (§3.4, #6/#7/#10)
+### F04 — Manual payment & admin review (ADR-43, #6)
 
-| Method · Path                | Role   | Purpose                                           | Notes                                                                                                                    |
-| ---------------------------- | ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `POST /api/webhooks/payfast` | system | `payment.success`/`failed` ingest (CHECKOUT_URL server callback) | **signature-verified or 401 + alert**; success commits appointment+payment in one tx (#2), snapshots `feeAtBooking` (#6); `payment.failed` marks the Payment `failed` + **releases the slot-lock (force-expire `lockExpiresAt`), no appointment delete** (ADR-39) |
-| `POST /api/payments/verify-return` | patient | Verify + commit the browser SUCCESS_URL/FAILURE_URL return params (dual-channel confirm; doc 14 §2) | calls `verifyReturn` → the **same** `processWebhook` atomic commit as the IPN; idempotent if the callback already confirmed; bad signature → `401` + `payment.webhook_rejected` audit |
-| `POST /api/webhooks/daily`   | system | Participant join/leave events → evaluation worker | **HMAC signature-verified over the raw body** or `401` + `video.webhook_rejected` audit (doc 14 §3); verified joins record `doctorJoinedAt`/`patientJoinedAt`, feeding no-show resolution |
-| `POST /api/webhooks/resend`  | system | Bounce/complaint signal                           | flags email failures to A3                                                                                               |
+Payment is **offline bank transfer**, verified manually by the admin — there is no online gateway, no webhook, no `Payment` table, and no refund subsystem. The patient submits a bank reference via `POST /api/appointments/:id/pay` (F03 above), the admin reviews the `pending` queue, then accepts or rejects:
 
-> Refunds have **no patient/doctor route** — they are a side-effect of cancel/no-show transitions, orchestrated by the refund logic in `modules/appointment/service.js` with the per-appointment idempotency key (#10), retried with backoff, admin-alerted on exhaustion. No in-app manual retry (admin acts in the gateway dashboard if needed).
+| Method · Path                                  | Role  | Purpose                                              | Notes                                                                                                  |
+| ---------------------------------------------- | ----- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `POST /api/admin/appointments/:id/accept`      | admin | Verify the payment → `pending → confirmed`           | enqueues the `booking_confirmation` email; fires the `booking_confirmed` analytics event (doc 14 §6). 409 `INVALID_TRANSITION` if not `pending` |
+| `POST /api/admin/appointments/:id/reject`      | admin | Payment not received → `pending → cancelled`         | frees the slot; enqueues the `payment_not_received` email. 409 `INVALID_TRANSITION` if not `pending`    |
 
-> **Dev-only, non-canonical:** when `PAYMENT_PROVIDER=mock`, the app mounts `GET /dev/checkout` + `POST /dev/payment/complete` to simulate PayFast's hosted page by emitting a real signed IPN to `/api/webhooks/payfast` (ADR-22, doc 14 §2). These `/dev/*` routes are not part of the canonical API surface and are never mounted in production.
+> The admin review **queue** is `GET /api/admin/records?state=pending` (F13 below) — there is no separate list endpoint. Bank-transfer details shown to the patient come from admin Settings (F14, `GET`/`PUT /api/admin/settings`).
 
-> **Dev-only worker triggers (non-canonical):** When `NODE_ENV === 'development'`, the app additionally mounts three on-demand routes to trigger worker passes directly (never mounted in production). See the worker/cron section in doc 14 for the production schedule.
+> **No webhooks, no refunds, no reconciliation:** there is no `POST /api/webhooks/*` route, no `POST /api/payments/verify-return`, no `POST /api/appointments/:id/dispute`, and no refund/record-refund route. Cancelling forfeits; any money movement is handled offline by the admin (ADR-43).
+
+> **Dev-only worker trigger (non-canonical):** When `NODE_ENV === 'development'`, the app mounts one on-demand route to run a worker pass directly (never mounted in production):
 >
-> | Method · Path                    | Returns        | Runs                                 |
-> | -------------------------------- | -------------- | ------------------------------------ |
-> | `POST /dev/worker/notifications` | `{ ok: true }` | Notification dispatch pass           |
-> | `POST /dev/worker/refund-retry`  | `{ ok: true }` | Refund-retry pass                    |
-> | `POST /dev/worker/reconcile`     | `{ ok: true }` | Payment-reconciliation pass (F04.03) |
-
-> **Reconciliation worker (F04.03) — reuses the webhook confirm path:** The hourly payment-reconciliation worker, when the gateway reports a lost-IPN payment as paid, performs the **same** atomic `confirmPaidAppointment` transition as the `payment.success` webhook above: `slot_locked → confirmed`, snapshot `feeAtBooking`, write payment record, and enqueue confirmation email — all inside one Prisma `$transaction`. `appointmentState.transition` remains the only writer of `Appointment.state`; the worker never writes state directly. On edge #6a (gateway reports paid but the slot is no longer claimable), the worker issues a full gross refund instead of creating a second appointment.
+> | Method · Path                    | Returns        | Runs                       |
+> | -------------------------------- | -------------- | -------------------------- |
+> | `POST /dev/worker/notifications` | `{ ok: true }` | Notification dispatch pass |
 
 ---
 
@@ -202,7 +196,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                              | Role                 | Purpose                                                 | Notes                                                                                |
 | ------------------------------------------ | -------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `POST /api/appointments/:id/prescriptions` | doctor (owner)       | Submit immutable prescription + items (D4)              | 404-no-leak if not the owning doctor; state must be `completed`/`prescription_issued` else 409 `INVALID_STATE`; each item is `medicineId` XOR `medicineName` with dosage/duration/instructions, unknown `medicineId` → 400 `VALIDATION_FAILED`; one `$transaction`: create + items (server-side name/price snapshot #3/#5; free-text price `null`) → first-issue `completed→prescription_issued` transition → `prescription_ready` outbox enqueue (`dedupeKey` = prescription id) → `201` |
+| `POST /api/appointments/:id/prescriptions` | doctor (owner)       | Submit immutable prescription + items (D4)              | 404-no-leak if not the owning doctor; appointment state must be **`confirmed`** else 409 `INVALID_STATE` (a doctor may prescribe any time after confirmation — no time gate, no `completed` state, ADR-43); each item is `medicineId` XOR `medicineName` with dosage/duration/instructions, unknown `medicineId` → 400 `VALIDATION_FAILED`; one `$transaction`: create + items (server-side name/price snapshot #3/#5; free-text price `null`) → `prescription_ready` outbox enqueue (`dedupeKey` = prescription id) → `201`. **Issuing does NOT change appointment state** — prescriptions are child records |
 | `GET /api/appointments/:id/prescriptions`  | patient/doctor/admin | Chronological list for the appointment (P7)             | role-scoped (patient-owner / doctor-owner / admin); `{ data: [...] }` ordered `issuedAt` asc, items included |
 | — _(no `PUT`/`DELETE`)_                    | —                    | **Immutability (#4)** — corrections are new linked rows | a 2nd submit appends a new row (+ a 2nd `prescription_ready` email) and leaves state unchanged, never edits |
 
@@ -223,13 +217,12 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | Method · Path                            | Role  | Purpose                                    | Notes                                                                                                   |
 | ---------------------------------------- | ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | `GET /api/admin/audit`                   | admin | Filtered audit query (A5)                  | filters: `appointmentId,userId,email,eventType,actorType,from,to` — `appointmentId` maps to `targetRef`, `email` resolves to `actorId` (an unknown email matches NOTHING via a sentinel); `pageSize` ≤ 100; newest-first page envelope; **read-only, no write/delete route** |
-| `GET /api/admin/records`                 | admin | Unified records view (A5)                  | full filter set via `recordsQuerySchema`: `page`/`pageSize` (≤ 100), `patient` (email-or-phone contains, case-insensitive), `doctorName` (contains), `appointmentId`, `paymentRef` (exact match vs `providerRef` OR `refundRef`), `state` (`AppointmentState` enum), `from`/`to` (`YYYY-MM-DD` as Karachi day boundaries: `from`→00:00 PKT gte, `to`→exclusive next-midnight PKT). Response `{ data: [recordRow], page: { number, size, total } }`; money columns come from the payment with `status='success'` (enum is `pending`\|`success`\|`failed`, NOT "paid") |
+| `GET /api/admin/records`                 | admin | Unified records view + payment-review queue (A5) | full filter set: `page`/`pageSize` (≤ 100), `patient` (email-or-phone contains, case-insensitive), `doctorName` (contains), `appointmentId`, `paymentRef` (contains, case-insensitive, vs `paymentReference`), `state` (`AppointmentState` enum — `pending`\|`confirmed`\|`cancelled`; `?state=pending` is the admin review queue), `from`/`to` (`YYYY-MM-DD` as Karachi day boundaries: `from`→00:00 PKT gte, `to`→exclusive next-midnight PKT). Each `recordRow` carries `amountDue` (= `feeAtBooking`), `paymentReference`, `paymentSubmittedAt` (manual-payment, ADR-43). Response `{ data: [recordRow], page: { number, size, total } }` |
 | `GET /api/admin/records/:id`             | admin | Appointment detail (F13.02)                | `{ appointment, history, prescriptions, notificationJobs }` — transition history + prescriptions + email jobs; 404 if not found |
-| `GET /api/admin/alerts`                  | admin | Alert feed / system health (A3)            | real 7 kinds: `payment.reconciliation_mismatch`, `payment.refund_exhausted`, `payment.manual_review_required`, `payment.refund_manual_required`, `email.send_failed_final`, `system.unhandled_exception` (audit rows, cap 100), plus the derived `awaiting_prescription` (cap 100); email alerts carry `failedJobs[]`; response `{ data: [...] }` newest-first |
+| `GET /api/admin/alerts`                  | admin | Alert feed / system health (A3)            | audit-row kinds (cap 100): `payment.submitted` (a patient submitted a bank reference awaiting review, ADR-43), `email.send_failed_final`, `system.unhandled_exception`; plus the derived `awaiting_prescription` (cap 100, `confirmed` + no prescription + `slotEnd ≤ now−12h`); email alerts carry `failedJobs[]`; response `{ data: [...] }` newest-first |
 | `POST /api/admin/emails/:jobId/resend`   | admin | Re-trigger a failed email (A3/A5)          | `:jobId` = `notification_jobs.id`; only `failed` jobs accepted (any other status / lost race → 409 `INVALID_STATE`); atomic reset `attempts=0, nextAttemptAt=null, lastError=null`; 404 unknown; audit `admin.email_resend` |
-| `POST /api/admin/payments/:appointmentId/record-refund` | admin | Record an out-of-band (gateway-portal) manual refund — PayFast PK has no refund API (A3) | `adminWriteLimiter`; idempotent on `rf_<appointmentId>` (re-POST when already `settled` → no-op); 404 if no `success` payment; reuses the `refund_idempotency_key` (#10), sets `refundStatus → settled`; enqueues `refund_confirmation`; audit `payment.manual_refund_recorded` |
-| `GET /api/admin/settings`                | admin | Read platform settings (A6)                | returns shaped `{ minBookingLeadMinutes, fallbackFeePctBps, fallbackFeeFixed }`, or `null` if the singleton row is missing (unseeded DB) |
-| `PUT /api/admin/settings`                | admin | Update lead-time + fallback-fee model (A6) | full replace of the 3 tunables — `minBookingLeadMinutes` 30–1440, `fallbackFeePctBps` 0–10000 bps, `fallbackFeeFixed` ≥ 0 paisa; returns the updated shaped object; audit `settings.updated` with before/after meta |
+| `GET /api/admin/settings`                | admin | Read platform settings (A6)                | returns shaped `{ minBookingLeadMinutes, bankName, bankAccountName, bankAccountNumber, bankInstructions }`, or `null` if the singleton row is missing (unseeded DB) |
+| `PUT /api/admin/settings`                | admin | Update lead-time + bank-transfer details (A6) | `minBookingLeadMinutes` (30–1440) + the four bank fields; returns the updated shaped object; audit `settings.updated` with before/after meta |
 
 ---
 
@@ -249,31 +242,22 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 ## 5. Appointment state-machine transition table
 
-The **only** writer that performs transitions is the `transition()` function in `modules/appointment/service.js`. It validates `from → to` against the table below, writes the audit entry, then fires side-effects (refund, email, video token). Controllers and the three workers call it; none mutate `state` directly.
+The **only** writer that performs transitions is the `transition()` function in `modules/appointment/service.js`. It validates `from → to` against the table below, writes the audit entry, then fires side-effects (email enqueue, slot release). Controllers call it; the state machine is the sole writer of `Appointment.state`. The manual-payment pivot (ADR-43) collapsed the prior 10-state machine to **three** states.
 
-The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND state = :from`, so a concurrent transition that already moved the row loses (matched-count 0 → 409 `INVALID_TRANSITION`) instead of silently double-applying. This closes the double-apply race (e.g. two concurrent first-issue prescription submits) — exactly one wins.
+The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND state = :from`, so a concurrent transition that already moved the row loses (matched-count 0 → 409 `INVALID_TRANSITION`) instead of silently double-applying.
 
-`slot_available` = **no row** (absence). Booking inserts at `slot_locked`.
+`slot_available` = **no row** (absence). Booking inserts at `pending` (which also locks the slot and snapshots `feeAtBooking`).
 
-| From                  | → To                        | Trigger (actor)                          | Side-effects                                                                              |
-| --------------------- | --------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------- |
-| _(none)_              | `slot_locked`               | patient picks slot + Pay (patient)       | set `lockExpiresAt=now+10m`; partial unique index guards #1                               |
-| `slot_locked`         | `confirmed`                 | `payment.success` webhook (system)       | **one tx**: snapshot `feeAtBooking` (#6) + write payment (#2); enqueue confirmation email |
-| `slot_locked`         | _(lock released)_           | lock expiry or `payment.failed` (system) | lock force-expired (`lockExpiresAt=now`), **not** deleted; `payment.failed` also marks the Payment `failed`; slot frees via lazy-expiry / reclaim (ADR-23/39) |
-| `confirmed`           | `cancelled_refunded`        | patient cancels ≥2h before (patient)     | refund net-of-fee (policy #5); slot released; refund email                                |
-| `confirmed`           | `cancelled_no_refund`       | patient cancels <2h before (patient)     | no refund; slot stays blocked                                                             |
-| `confirmed`           | `doctor_cancelled`          | doctor cancels any time (doctor)         | refund net-of-fee; **apology email**; slot released                                       |
-| `confirmed`           | `in_progress`               | slot-start arrives (system)              | activate video room/tokens                                                                |
-| `in_progress`         | `completed`                 | both joined + call ends (system)         | finalize at slot-end+5m; transient drops don't finalize (edge #22)                        |
-| `in_progress`         | `patient_no_show`           | patient absent at slot+15m (system)      | **no refund**                                                                             |
-| `in_progress`         | `doctor_no_show`            | doctor absent at slot+15m (system)       | refund net-of-fee; apology email                                                          |
-| `in_progress`         | _(non-penalizing terminal)_ | missing participant data (system)        | resolve + admin alert; never leave `in_progress` past slot-end+5m                         |
-| `completed`           | `prescription_issued`       | doctor submits prescription (doctor)     | immutable write (#4); "prescription ready" email                                          |
-| `prescription_issued` | `prescription_issued`       | additional prescription (doctor)         | new linked row, chronological (#4) — state unchanged                                      |
+| From        | → To        | Trigger (actor)                                              | Side-effects                                                                          |
+| ----------- | ----------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| _(none)_    | `pending`   | patient picks slot + books (patient)                        | snapshot `feeAtBooking` (#6); partial unique index guards #1. `POST /:id/pay` later sets `paymentReference`/`paymentSubmittedAt` + enqueues `payment_submitted_admin` (no state change) |
+| `pending`   | `confirmed` | admin accepts / verifies the bank reference (admin)         | enqueue `booking_confirmation`; fire `booking_confirmed` analytics                    |
+| `pending`   | `cancelled` | admin rejects (admin), or patient/doctor/admin cancels      | frees slot; enqueue `payment_not_received` (admin reject) or `cancellation` (cancel)  |
+| `confirmed` | `cancelled` | patient / doctor / admin cancels                            | frees slot; enqueue `cancellation`. **No refund** — money handled offline (ADR-43)    |
 
-**Derived (not a stored state):** `awaiting_prescription` — a `completed` appointment with no prescription after 12h raises an A3 alert (doc 15).
+**Prescriptions do NOT transition state:** a doctor submits a prescription on a `confirmed` appointment (any time after confirm) — it is a child-record write (`prescription_ready` email), the appointment stays `confirmed` (#4). There is no `completed`/`prescription_issued` state.
 
-**Orthogonal flag:** `disputed` may be set OR cleared on an appointment in **any** state (the `setDisputed` service has no state check) via `POST /api/appointments/:id/dispute` (`{ disputed: boolean }`); it is never a state-machine transition; audits `appointment.disputed` / `appointment.dispute_cleared`.
+**Derived (not a stored state):** `awaiting_prescription` — a `confirmed` appointment with no prescription `≥12h` after `slotEnd` raises an A3 alert.
 
 ---
 
@@ -296,12 +280,12 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | D2 today + history            | `GET /api/appointments` (doctor scope)                                       |
 | D3 join call                  | `appointments/:id/video-token`                                               |
 | D4 build Rx                   | `POST .../prescriptions`, `GET /api/medicines`                               |
-| D5 cancel                     | `appointments/:id/cancel` (doctor → `doctor_cancelled`)                      |
+| D5 cancel                     | `appointments/:id/cancel` (doctor → `cancelled`)                            |
 | A1 onboard doctor             | `POST /api/doctors`                                                          |
 | A2 medicines                  | `medicines/*`                                                                |
 | A3 health/alerts              | `GET /api/admin/alerts`, `emails/:jobId/resend`                              |
 | A4 edit/deactivate            | `PATCH /api/doctors/:id`, `deactivate`/`reactivate`                          |
-| A5 records & audit            | `GET /api/admin/records`, `GET /api/admin/records/:id`, `GET /api/admin/audit`, `appointments/:id/dispute` |
+| A5 records & audit            | `GET /api/admin/records`, `GET /api/admin/records/:id`, `GET /api/admin/audit`; payment review `POST /api/admin/appointments/:id/accept`/`reject` |
 | A6 settings                   | `GET`/`PUT /api/admin/settings`                                              |
 | DA1 doctor create+pw          | `POST /api/doctors`                                                          |
 | DA2 shared login+route        | `POST /api/auth/login`, `GET /api/auth/me`                                   |
@@ -314,16 +298,16 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 
 | #   | Invariant               | Mechanism                                                                      |
 | --- | ----------------------- | ------------------------------------------------------------------------------ |
-| 1   | no double-booking       | partial unique index `uniq_active_slot` (raw-SQL migration) → 409 `SLOT_TAKEN` |
-| 2   | atomic book+pay         | single Prisma `$transaction` in the `payfast` webhook path                     |
+| 1   | no double-booking       | partial unique index `uniq_active_slot` (raw-SQL migration, over `pending`/`confirmed`) → 409 `SLOT_TAKEN` |
+| 2   | atomic book+pay         | **Retired (ADR-43)** — payment is offline; booking atomically creates `pending`, admin accept → `confirmed` |
 | 3   | durable doctor identity | no denormalized name on appointment; `Prescription.doctorSnapshot`             |
 | 4   | Rx immutable            | no `PUT`/`DELETE` route or service method; corrections = new rows              |
 | 5   | price snapshot          | `PrescriptionItem.price` captured at submit                                    |
-| 6   | fee snapshot            | `Appointment.feeAtBooking` set on `→confirmed`                                 |
-| 7   | intent idempotency      | `Payment @@unique([patientUserId, slotStart])`                                 |
+| 6   | fee snapshot            | `Appointment.feeAtBooking` set at booking/lock (ADR-43)                        |
+| 7   | intent idempotency      | **Retired (ADR-43)** — no `Payment` table / payment intent (offline payment)   |
 | 8   | PMC/email immutable     | `PATCH /api/doctors/:id` rejects both → `IMMUTABLE_FIELD`                      |
 | 9   | deactivation preserves  | `isActive` flag gates listing/booking only; login + scoped routes intact       |
-| 10  | refund idempotency      | `Payment.refundIdempotencyKey @unique`                                         |
+| 10  | refund idempotency      | **Retired (ADR-43)** — no refunds (offline money movement)                      |
 
 ---
 
@@ -349,3 +333,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-14 | `payment.failed` outcome corrected on the `POST /api/webhooks/payfast` row + the `slot_locked` state-machine row: marks the Payment `failed` + **releases the slot-lock (force-expire), no appointment delete** — was "row removed / released" (ADR-39) | Slice H · S7 (E2E QA + launch gate; ADR-39) |
 | 2026-06-15 | Flow-audit fixes: `POST /api/auth/login` body `role` clarified as accepted-but-ignored/non-authoritative (ISSUE-12); `GET /api/auth/me` anonymous → `200 null` not `401` (ISSUE-13); `GET /api/appointments/:id` detail adds `lockExpiresAt` for the P-07 terminal-state fix (ISSUE-3) | Three-role flow-audit fix session |
 | 2026-06-16 | GET /api/appointments active scope now also returns a live slot_locked hold (lockExpiresAt) | Pending-hold recovery feature (34f978d) |
+| 2026-06-28 | Manual-payment pivot (ADR-43): `/:id/pay` repurposed to submit a bank reference; `/:id` returns `paymentInstructions` for a pending appt; added admin `accept`/`reject`; removed PayFast/Daily/Resend webhooks, `verify-return`, `dispute`, and `record-refund`; rewrote the state-machine table to 3 states (`pending`/`confirmed`/`cancelled`); prescription gate → `confirmed` (no state change on issue); admin records/alerts/settings re-shaped (bank fields, `state=pending` review queue, `payment.submitted` alert); retired invariants #2/#7/#10; pruned obsolete 409/422 codes and the dev `/dev/worker/*` set to `notifications` only | Manual-payment pivot — API as-built sync |

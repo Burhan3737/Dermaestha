@@ -4,8 +4,8 @@
 | ---------------- | ---------------------------------- |
 | Document ID      | 14-INTEGRATION_CONTRACTS_DOCUMENT  |
 | Status           | Canonical                          |
-| Version          | 1.11                               |
-| Last updated     | 2026-06-14                         |
+| Version          | 1.12                               |
+| Last updated     | 2026-06-28                         |
 | Sources absorbed | `docs/engineering/INTEGRATIONS.md` |
 | Related docs     | 03, 05, 08, 15                     |
 
@@ -14,7 +14,7 @@
 ## Index
 
 1. [Adapter contracts (JSDoc @typedef)](#1-adapter-contracts-jsdoc-typedef)
-2. [PayFast (payment) payload shapes](#2-payfast-payment-payload-shapes)
+2. [Payment — manual offline, no integration](#2-payment--manual-offline-no-integration)
 3. [Daily.co (video) payload shapes](#3-dailyco-video-payload-shapes)
 4. [Resend (email) shapes](#4-resend-email-shapes)
 5. [Email merge-variable catalog (8 triggers)](#5-email-merge-variable-catalog-8-triggers)
@@ -26,35 +26,17 @@
 
 ## Purpose
 
-This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md`. It defines the three vendor adapter interface contracts (JSDoc `@typedef`s), all payload shapes for PayFast, Daily.co, and Resend, the six-trigger email merge-variable catalog, and the analytics event catalog. Each vendor sits behind a `@typedef` contract so a swap is a new file and a config switch; services depend on the typedef, never on a vendor SDK directly.
+This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md`. It defines the vendor adapter interface contracts (JSDoc `@typedef`s), all payload shapes for Daily.co and Resend, the email merge-variable catalog, and the analytics event catalog. Payment is an offline, admin-verified bank transfer with no payment integration (ADR-43). Each vendor sits behind a `@typedef` contract so a swap is a new file and a config switch; services depend on the typedef, never on a vendor SDK directly.
 
 ---
 
 ## 1. Adapter contracts (JSDoc @typedef)
 
-### PaymentProvider (PayFast) — modules 6, 8
+### Payment — no provider adapter (ADR-43)
 
-```js
-/**
- * @typedef {Object} PaymentProvider
- * @property {(args: CheckoutArgs) => Promise<CheckoutResult>} createCheckout
- *   Build a hosted-checkout handoff for a slot_locked appointment.
- * @property {(req: import('express').Request) => WebhookResult} verifyWebhook
- *   Verify signature + parse an inbound IPN (the CHECKOUT_URL server callback). THROWS on invalid signature (→ 401 + alert).
- * @property {(req: import('express').Request) => WebhookResult} verifyReturn
- *   Verify + parse the browser SUCCESS_URL/FAILURE_URL return params; same verification as
- *   verifyWebhook (dual-channel confirmation). THROWS on invalid signature (→ 401 + alert).
- * @property {(args: RefundArgs) => Promise<RefundResult>} refund
- *   Idempotent refund keyed by refundIdempotencyKey.
- * @property {(sinceIso: string) => Promise<UnconfirmedPayment[]>} listUnconfirmed
- *   Reconciliation query: payments not yet confirmed in the window (hourly worker).
- * @property {(args: QueryPaymentStatusArgs) => Promise<QueryPaymentStatusResult>} queryPaymentStatus
- *   Reconciliation probe: fetch live status for a single payment by providerRef (F04.03).
- *   Used by the hourly reconciliation worker to recover from lost payment.success IPNs.
- */
-```
+There is no `PaymentProvider` contract. Payment is an offline bank transfer verified manually by the admin — no payment gateway, no hosted checkout, no webhook/return-URL verification, no refund, and no reconciliation/status-query API. See §2 and doc 11 ADR-43.
 
-### VideoProvider (Daily.co) — module 9
+### VideoProvider (Daily.co, free tier) — module 9
 
 ```js
 /**
@@ -64,19 +46,10 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
  *   existing `appt_<id>` room. Optional `notAfterIso` sets the room `exp` (slot-bounded; default 24h).
  * @property {(args: TokenArgs) => Promise<{ token: string, expiresAt: string }>} issueToken
  *   Time-bound participant token scoped to the slot window.
- * @property {(req: import('express').Request) => NormalizedVideoEvent | null} verifyWebhook
- *   Verify the Daily HMAC signature + normalize the participant event. Returns null for irrelevant
- *   or tokenless (knocking) events and the create-time test ping; THROWS AppError(INVALID_SIGNATURE,
- *   401) on a bad signature.
  */
-
-/** @typedef {Object} NormalizedVideoEvent
- *  @property {'participant.joined'|'participant.left'} type
- *  @property {string} appointmentId      // payload.room with the 'appt_' prefix stripped
- *  @property {'doctor'|'patient'} role   // anchored to the meeting-token user_id Daily echoes back
- *  @property {string} timestamp          // joined_at; .left falls back to the envelope event_ts
- *  @property {string} eventId */
 ```
+
+Daily runs on the **free tier** (ADR-43): `createRoom` + `issueToken` only. There is no participant webhook, no `verifyWebhook`, and no normalized video event (§3).
 
 ### EmailProvider (Resend) — module 13
 
@@ -90,79 +63,11 @@ This document is a faithful re-presentation of `docs/engineering/INTEGRATIONS.md
 
 ---
 
-## 2. PayFast (payment) payload shapes
+## 2. Payment — manual offline, no integration
 
-### CheckoutArgs and CheckoutResult
+Per ADR-43 there is **no payment integration**: payment is an offline bank transfer the admin verifies by hand. There are no external payload shapes — no hosted checkout, no signed IPN/webhook, no return-URL verification, no refund or reconciliation/status-query contract, and no `Payment` table.
 
-```js
-/** @typedef {Object} CheckoutArgs
- *  @property {string} appointmentId
- *  @property {string} intentKey          // (patient,slot) idempotency (#7)
- *  @property {number} amount             // PKR paisa
- *  @property {string} returnUrl @property {string} cancelUrl @property {string} notifyUrl */
-
-/** @typedef {Object} CheckoutResult
- *  @property {string} redirectUrl        // send the browser here
- *  @property {string} providerRef */
-```
-
-### WebhookResult (signed IPN)
-
-```js
-/** @typedef {Object} WebhookResult
- *  @property {'payment.success'|'payment.failed'} event
- *  @property {string} providerRef
- *  @property {string} intentKey
- *  @property {number} amount             // paisa
- *  @property {number|null} gatewayFee    // paisa; null → use Settings fallback (policy #5) */
-```
-
-### RefundArgs and RefundResult
-
-```js
-/** @typedef {Object} RefundArgs
- *  @property {string} providerRef @property {number} amount @property {string} idempotencyKey */
-/** @typedef {Object} RefundResult
- *  @property {string|null} refundRef
- *  @property {'settled'|'initiated'|'failed'|'manual_required'} status
- *    // 'manual_required': PayFast PK exposes no confirmed refund API → manual admin settlement
- *    //                    (refundRef null until an admin records the out-of-band refund; ADR-32). */
-```
-
-### UnconfirmedPayment (reconciliation query)
-
-```js
-/** @typedef {Object} UnconfirmedPayment
- *  @property {string} intentKey @property {string} providerRef @property {number} amount
- *  @property {'success'|'failed'|'pending'} status */
-```
-
-### QueryPaymentStatusArgs and QueryPaymentStatusResult
-
-```js
-/** @typedef {Object} QueryPaymentStatusArgs
- *  @property {string} providerRef */
-/** @typedef {Object} QueryPaymentStatusResult
- *  @property {'paid'|'failed'|'unknown'} status
- *  @property {number} [amount]          // paisa; present when status is 'paid'
- *  @property {number|null} [gatewayFee] // paisa; null → use Settings fallback (policy #5) */
-```
-
-### PayFast Pakistan IPG specifics (researched — NOT vendor-confirmed)
-
-> **The entire external contract below is researched, NOT vendor-confirmed.** Every detail — base URLs, the `GetAccessToken`→`PostTransaction` init flow, the signature field list/order, the callback field names, and the amount unit — is gated behind doc 07 §3's PayFast-Pakistan merchant-verification checklist before go-live. The adapter (`server/src/integrations/payment/payfast.js`) keeps each detail behind a named constant/helper so a single correction lands once PayFast confirms the official spec.
-
-- **Init flow (two-step):** `createCheckout` first POSTs `GetAccessToken` (auth: `MERCHANT_ID` + `SECURED_KEY`) to obtain an access token, then builds the signed `PostTransaction` handoff field set (`MERCHANT_ID`, `MERCHANT_NAME`, `TOKEN`, `PROCCODE`, `TXNAMT`, `CURRENCY_CODE=PKR`, `BASKET_ID`, `TXNDESC`, `SUCCESS_URL`, `FAILURE_URL`, `CHECKOUT_URL`, `SIGNATURE`). `BASKET_ID` = `appointmentId` and doubles as the provider ref / intent key (PayFast PK echoes it; there is no separate intent key on the wire).
-- **Signature:** `md5(MERCHANT_ID:MERCHANT_NAME:TXNAMT:BASKET_ID)`; reject on mismatch → `401` + admin alert (§3.4). [LOW confidence — doc 07 §3 #1.]
-- **Amounts are rupees-decimal on the wire** (e.g. `"2500.00"`), not paisa. The adapter converts paisa↔rupees at the boundary (`paisaToRupees` / `rupeesToPaisa`); all internal money stays integer paisa (doc 15 §6).
-- **Dual-channel confirmation:** PayFast PK confirms through (1) a server-to-server callback to `CHECKOUT_URL` (= `notifyUrl` = `${APP_BASE_URL}/api/webhooks/payfast`), parsed by `verifyWebhook`, AND (2) the browser return to `SUCCESS_URL` / `FAILURE_URL`, parsed by `verifyReturn` (§1). Both run the identical signature-verify + parse and feed the same atomic-commit path; either channel can be the one that confirms (whichever arrives first — the commit is idempotent on replay).
-- **On verified `payment.success`** (either channel): the handler runs the **single `$transaction`** that moves the appointment `slot_locked→confirmed`, snapshots `feeAtBooking` (#6), and writes the `payments` row (#2). PayFast PK reports **no** gateway fee, so `gatewayFee` is `null` and the `settings` fallback fee model always applies (policy #5).
-- **Hosts:** sandbox `ipguat.apps.net.pk`, live `ipg1.apps.net.pk` (selected by `PAYFAST_MODE`); base path `/Ecommerce/api/Transaction/`.
-- **No confirmed refund or status-query API:** `refund` returns `{ status: 'manual_required', refundRef: null }` (manual admin settlement, doc 11 ADR-32 / doc 07 §3 #3); `queryPaymentStatus` returns `{ status: 'unknown' }` (reconciliation surfaces these for manual review, doc 07 §3 #4).
-
-### Dev simulation: `payfast.mock` (ADR-22)
-
-The concrete PayFast network adapter is not yet wired; the production default (`PAYMENT_PROVIDER=stub`) throws `NOT_IMPLEMENTED`. For dev/CI, a `payfast.mock` adapter implements the same `PaymentProvider` typedef: `createCheckout` returns a redirect to an app-served, env-guarded hosted-checkout page (`GET /dev/checkout`, mounted only when `PAYMENT_PROVIDER=mock`). Its Pay/Fail action builds a **real HMAC-signed IPN** (over the fields above, keyed on `PAYFAST_PASSPHRASE`) and POSTs it through the **same** `verifyWebhook` + atomic-commit path as production, so signature verification, the `$transaction` commit (#2), `feeAtBooking` snapshot (#6), and 401-on-bad-signature are exercised offline. The mock signs its own deterministic field set rather than PayFast's exact MD5 param order — the real adapter implements that when wired. The mock also implements `queryPaymentStatus`, returning `{ status: 'unknown' }` (the mock keeps no payment ledger; reconciliation unit tests stub richer answers). The `payfast.stub` (`PAYMENT_PROVIDER=stub`, real-adapter placeholder for Slice H) marks `queryPaymentStatus` as not-yet-implemented and throws `NOT_IMPLEMENTED`. The mock gateway and `/dev/*` routes must never be active in production (doc 10/15/08).
+The flow uses internal `/api` routes only (contracts in doc 05): booking creates a `pending` appointment and snapshots `feeAtBooking` at lock time; the patient is shown bank details from admin Settings (`paymentInstructions { amountDue, bankName, bankAccountName, bankAccountNumber, bankInstructions }` on `GET /api/appointments/:id` for an owned `pending` appointment), transfers offline, and submits a bank reference via `POST /api/appointments/:id/pay` (sets `paymentReference` + `paymentSubmittedAt`, stays `pending`, enqueues a `payment_submitted_admin` admin alert). The admin reviews the `pending` queue (`GET /api/admin/records?state=pending`) and either accepts (`POST /api/admin/appointments/:id/accept` → `pending → confirmed`) or rejects (`POST /api/admin/appointments/:id/reject` → `pending → cancelled`, frees the slot). Paid is paid — cancelling forfeits; any money movement is offline. See doc 11 ADR-43 for the rationale.
 
 ---
 
@@ -181,29 +86,13 @@ The concrete PayFast network adapter is not yet wired; the production default (`
  *  @property {string} displayName */
 ```
 
-### Participant join/leave event (Daily webhook)
+### Room + token only — free tier (ADR-43)
 
-Participant events are received at `POST /api/webhooks/daily` (signature-verified) and feed the evaluation worker. Daily delivers its current **versioned envelope**:
+Daily runs on the **free tier**: the adapter exposes only `createRoom` (deterministic `appt_<id>` room, idempotent) and `issueToken` (slot-bounded participant token). There is **no** participant webhook — `POST /api/webhooks/daily` was removed, along with `verifyWebhook`, the normalized participant event, join recording, and `DAILY_WEBHOOK_SECRET`. `video-token` is issued for `confirmed` appointments only and returns the room name + token (`joinSimUrl: null`); the SPA joins Daily directly and the platform never proxies media.
 
-```json
-{ "version": "1.0",
-  "type": "participant.joined" | "participant.left",
-  "id": "<event id>",
-  "payload": { "room": "appt_<id>", "user_id": "doctor"|"patient",
-               "user_name": "...", "owner": true,
-               "joined_at": "ISO-8601", "session_id": "..." },
-  "event_ts": 1700000000 }
-```
+### Dev simulation: `daily.mock` (ADR-24, ADR-43)
 
-`payload.room` is the room **name** (`appt_<id>`); note the boolean is `payload.owner`, NOT `is_owner`. **Role** is taken from the meeting-token `user_id` Daily echoes back (`'doctor'`/`'patient'`; `payload.owner` is only a fallback) — tokenless/knocking participants have no role and are ignored (`verifyWebhook` returns null). The adapter normalizes the envelope to a `NormalizedVideoEvent` (§1), preferring `payload.joined_at` for the timestamp and falling back to the envelope `event_ts` for `.left` (which has no confirmed participant timestamp).
-
-**HMAC verification (`verifyWebhook`):** Daily signs each delivery with headers `X-Webhook-Timestamp` + `X-Webhook-Signature`. The signed string is `timestamp + "." + rawBody`; the MAC is HMAC-SHA256 keyed on the **base64-decoded** `DAILY_WEBHOOK_SECRET`, output base64, compared constant-time. A mismatch THROWS `401` (→ `video.webhook_rejected` audit, doc 05). The signed string runs over the **exact received bytes** (`req.rawBody`), so the route mounts its own `express.json({ verify })` to capture them; the create-time `{ "test": "test" }` ping verifies and returns null. **Launch gate:** the signed-string serialization (raw received bytes vs `JSON.stringify`) must be validated against a live Daily delivery before go-live (doc 07).
-
-The worker maps join/leave to no-show resolution (doctor vs patient absent at slot+15m). Transient drops do not finalize `completed` (edge #22); missing participant data → non-penalizing terminal + admin alert (§10). Tokens are browser-only; the platform never proxies media.
-
-### Dev simulation: `daily.mock` (ADR-24)
-
-The concrete Daily.co network adapter (`daily.js`) is now wired and selected via `VIDEO_PROVIDER=daily` (ADR-33; live-delivery gated by doc 07); `VIDEO_PROVIDER=stub` (the default) still throws `NOT_IMPLEMENTED`. For dev/CI, a `daily.mock` adapter (`server/src/integrations/video/daily.mock.js`) implements the same `VideoProvider` typedef (ADR-10): `createRoom` returns a deterministic `appt_<id>` room name; `issueToken` returns an HMAC-signed (keyed on `VIDEO_MOCK_SECRET`) opaque dev token bounded by the slot window. A dev-only, env-guarded simulator (`/dev/video/*`, mounted only when `VIDEO_PROVIDER=mock`) emits the documented Daily participant payload above through the **same** real `POST /api/webhooks/daily` handler, so the join-recording and no-show resolution paths are exercised offline and in CI. The `/dev/worker/*` route triggers one evaluation-worker pass on demand. The mock and all `/dev/*` routes must never be active in production (doc 10/15/08; ADR-24).
+The concrete Daily.co network adapter (`daily.js`) is wired and selected via `VIDEO_PROVIDER=daily` (ADR-33; live-delivery gated by doc 07); `VIDEO_PROVIDER=stub` (the default) still throws `NOT_IMPLEMENTED`. For dev/CI, a `daily.mock` adapter (`server/src/integrations/video/daily.mock.js`) implements the same `VideoProvider` typedef (ADR-10): `createRoom` returns a deterministic `appt_<id>` room name; `issueToken` returns an HMAC-signed (keyed on `VIDEO_MOCK_SECRET`) opaque dev token bounded by the slot window. With the participant webhook removed, there is no `/dev/video/*` join simulator and no evaluation-worker pass. The mock and all `/dev/*` routes must never be active in production (doc 10/15/08; ADR-24).
 
 ---
 
@@ -243,20 +132,22 @@ The active email adapter posts to `POST https://api.resend.com/emails` with head
 
 Retry/backoff lives in the notification worker (doc 15); no PDF attachments in v1 — links to the dashboard. Merge-vars are the data contract; final plain-text copy shipped in Slice H · S5 (`server/src/integrations/email/templates.js`, shared `render()`). All email times render in Asia/Karachi (F07.02).
 
-| `EmailTemplate`        | Trigger                                   | Merge vars                                                   |
-| ---------------------- | ----------------------------------------- | ------------------------------------------------------------ |
-| `booking_confirmation` | `→confirmed`                              | `patientName, doctorName, slotStartLocal, fee, dashboardUrl` |
-| `reminder_24h`         | 24 h before slot (skipped for short-lead) | `patientName, doctorName, slotStartLocal, joinUrl`           |
-| `reminder_1h`          | 1 h before slot (skipped for short-lead)  | same as `reminder_24h`                                       |
-| `prescription_ready`   | every prescription submit (incl. corrections); `dedupeKey` = prescription id | `patientName, doctorName, prescriptionUrl`                   |
-| `refund_confirmation`  | refund `settled`                          | `patientName, amount, refundRef, appointmentRef`             |
-| `cancellation_apology` | `doctor_cancelled` / `doctor_no_show`     | `patientName, doctorName, slotStartLocal, refundAmount`      |
-| `refund_delayed`       | edge #30 patient delay notice             | `patientName, appointmentRef`                               |
-| `password_reset`       | patient forgot-password request (F01.03)  | `resetUrl, expiresInMinutes`                                |
+| `EmailTemplate`          | Trigger                                   | Merge vars (`?` = optional)                          |
+| ------------------------ | ----------------------------------------- | ---------------------------------------------------- |
+| `booking_confirmation`   | admin accepts a `pending` appointment (`→confirmed`) | `patientName, doctorName?, slotStartLocal?, fee?, dashboardUrl` |
+| `reminder_24h`           | 24 h before slot (skipped for short-lead) | `patientName, doctorName?, slotStartLocal?, joinUrl` |
+| `reminder_1h`            | 1 h before slot (skipped for short-lead)  | same as `reminder_24h`                               |
+| `prescription_ready`     | every prescription submit (incl. corrections); `dedupeKey` = prescription id | `patientName, doctorName?, prescriptionUrl`        |
+| `payment_submitted_admin`| patient submits a bank reference (admin alert) | `appointmentRef, reference?, reviewUrl?`        |
+| `payment_not_received`   | admin rejects a `pending` appointment (`→cancelled`) | `patientName, slotStartLocal?, appointmentRef?` |
+| `cancellation`           | appointment cancelled (patient/doctor/admin) | `patientName, doctorName?, slotStartLocal?`      |
+| `password_reset`         | patient forgot-password request (F01.03)  | `expiresInMinutes, resetUrl`                         |
 
-**Auth transactional email (F01.03):** `password_reset` is the one auth-flow template — dispatched directly by the auth service (not the notification worker's six appointment-cadence triggers). The send is best-effort and must never block or alter the enumeration-safe forgot-password response; on provider failure the link is logged in non-production and a warning is recorded.
+**Manual-payment producers (ADR-43):** with no gateway/refund subsystem there are no `refund_confirmation` / `cancellation_apology` / `refund_delayed` templates. The two new admin/patient alerts — `payment_submitted_admin` (patient submitted a reference) and `payment_not_received` (admin rejected) — back the offline accept/reject review loop; the former also raises an in-app admin alert.
 
-**Reminder invalidation (§3.4):** the worker re-checks appointment state immediately before dispatch and **suppresses** any reminder for an appointment no longer `confirmed`/`in_progress`.
+**Auth transactional email (F01.03):** `password_reset` is the one auth-flow template — dispatched directly by the auth service (not the notification worker's appointment-cadence triggers). The send is best-effort and must never block or alter the enumeration-safe forgot-password response; on provider failure the link is logged in non-production and a warning is recorded.
+
+**Reminder invalidation (§3.4):** the worker re-checks appointment state immediately before dispatch and **suppresses** any reminder for an appointment no longer `confirmed`.
 
 ---
 
@@ -268,7 +159,7 @@ Ingested at `POST /api/analytics/events` as `{ type, networkType, meta }`. **As 
 | -------------------- | ------------------------------------- | -------------------------------------- |
 | `landing_view`       | P-01 loads                            | `{ referrer? }`                        |
 | `booking_started`    | patient locks a slot                  | `{ doctorId }`                         |
-| `booking_confirmed`  | `→confirmed`                          | `{ doctorId, fee }`                    |
+| `booking_confirmed`  | admin accepts a `pending` appt (`→confirmed`, server-side) | `{ doctorId, fee }`                    |
 | `video_join_attempt` | Join Call clicked                     | `{ appointmentId, role }`              |
 | `video_join_success` | Daily `joined-meeting` (media up)     | `{ appointmentId, role }`              |
 
@@ -304,3 +195,4 @@ Webhook handlers return `200` only after signature verify + durable handling; in
 | 2026-06-14 | §6 analytics catalog: corrected the wire shape to the as-built `{ type, networkType, meta }` (`networkType` is the envelope **sibling** the client `track.js` attaches to every event, ADR-34) and removed `networkType` from the `video_join_success` `meta` cell (it was wrongly nested); aligned the `video_join_success` trigger to the Daily `joined-meeting` event | Slice H · S3 (video UI; ADR-34): fix wrong stated fact in the catalog |
 | 2026-06-14 | §5: resolved "final copy is M4" — final plain-text copy for all 8 templates shipped in Slice H · S5 (`server/src/integrations/email/templates.js`, shared `render()`); merge-vars unchanged | Slice H · S5 (email template copy) |
 | 2026-06-14 | §6 intro: noted the `POST /api/analytics/events` ingestion endpoint now EXISTS (built — public, rate-limited, closed-catalog validated; doc 05); the catalog itself is unchanged | Slice H · S6 (launch foundation + hardening) |
+| 2026-06-28 | Dropped the PayFast `PaymentProvider` contract + all PayFast/refund/reconcile payload shapes (§1–2, now a manual-offline note); dropped the Daily participant webhook + `verifyWebhook` + `NormalizedVideoEvent` (free tier = `createRoom`+`issueToken` only, §1, §3); rebuilt the §5 email catalog to the as-built 8 templates (removed `refund_confirmation`/`cancellation_apology`/`refund_delayed`, added `payment_submitted_admin`/`payment_not_received`, renamed `cancellation_apology`→`cancellation`); clarified `booking_confirmed` fires server-side on admin accept (§6) | Manual-payment pivot — as-built sync |

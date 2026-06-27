@@ -4,8 +4,8 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.8                                           |
-| Last updated     | 2026-06-22                                    |
+| Version          | 1.9                                           |
+| Last updated     | 2026-06-28                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
 
@@ -38,7 +38,7 @@ Each feature ID below maps to the PRD §2.2 user stories (and supporting §3.x s
 | `F03`      | Slot booking & slot-lock                       | P3, P8, A6                |
 | `F04`      | Payment                                        | P3, §3.4                  |
 | `F05`      | Appointment lifecycle & video consultation     | P5, P9, D2, D3, §4.3      |
-| `F06`      | Cancellation & refund                          | P6, D5                    |
+| `F06`      | Cancellation                                   | P6, D5                    |
 | `F07`      | Reminders & notifications                      | P4, §3.4                  |
 | `F08`      | Prescription                                   | P7, D4, §3.5              |
 | `F09`      | Doctor weekly availability                     | D1                        |
@@ -101,40 +101,39 @@ One-line: patient picks a future 30-minute slot within a doctor's availability, 
   - **Recipient** (radio, required, user input): `Myself` (default) | `Someone else`.
   - If `Someone else`: the form expands to capture **patient name** (text, required), **age** (number, required), **relation** (text, required).
   - **Identity Snapshot Rule**: the actual-patient identity is stored on the appointment record and later auto-pulled by the doctor's prescription builder (F08) and the rendered PDF (§3.5) — the doctor never re-types it.
-- **F03.03 - Slot-lock & checkout handoff**
-  - **Slot-Lock Rule**: on "Confirm & Pay", the slot is locked for 10 minutes while the patient completes the payment flow (policy #2). On payment failure or 10-minute lock expiry, the slot is released and no booking record persists.
+- **F03.03 - Slot-lock & payment handoff**
+  - **Slot-Lock Rule**: on booking, the slot is immediately locked by creating a `pending` appointment (snapshotting `feeAtBooking`) and the patient is shown the bank-transfer payment instructions. There is **no 10-minute auto-expiry** (ADR-43): the `pending` appointment (and its slot lock) persists until a human acts — the patient/doctor cancels, or the admin rejects an unverified payment.
   - **Single-Lock Rule**: a patient cannot hold multiple slot locks simultaneously.
-  - **Recoverable-Hold Rule**: an abandoned or in-progress hold is recoverable rather than an invisible dead-end — while live it surfaces in the patient's appointments as a "Payment pending" card with a "Complete payment" action, and the booking-page active-lock error links there. The Single-Lock Rule above is unchanged; the hold still expires after the 10-minute TTL if payment is not completed.
+  - **Recoverable-Hold Rule**: a `pending` appointment awaiting payment is recoverable rather than an invisible dead-end — it surfaces in the patient's appointments as a "Payment pending" card linking to the payment instructions, where the patient submits/updates their bank transaction reference. The Single-Lock Rule above is unchanged; the hold does not expire on a timer — it ends only when cancelled or rejected.
   - **No-Overlap Rule**: a patient cannot book overlapping slots with the same or different doctors.
   - **Double-Booking Rule (#1)**: slot double-booking is impossible at the storage layer; a second attempt to book the same `(doctor, slot-time)` fails at write time (§3.3 #1).
-  - On confirm, the patient is redirected to the payment aggregator's hosted page (F04).
+  - On confirm, the patient is taken to the booking's payment-instructions view (F04) showing the bank-transfer details and amount due.
   - **KPI #1 telemetry (landing → booking conversion funnel)**: the client emits `landing_view` on the public landing (P-01) mount (`{ referrer? }`) and `booking_started` on a successful slot-lock (`{ doctorId }`), through the fire-and-forget client seam `lib/analytics/track.js` → `POST /api/analytics/events` (doc 14 §6; ADR-35). The emit is best-effort and no-ops until the analytics route ships (S6). The funnel's terminal `booking_confirmed` event is emitted server-side post-confirmation and remains S6.
 
 Uses the shared `Button`, `Card`, confirmation `Modal`, and slot-grid components (doc 06).
 
-### **F04 - Payment**
+### **F04 - Payment** (manual offline bank transfer + admin review — ADR-43)
 
-One-line: hosted-checkout payment at booking via a Pakistan-compatible aggregator, confirmed by signed webhook with reconciliation safety net.
+One-line: the patient pays by offline bank transfer against displayed bank details, submits the bank reference in-app, and an admin reviews and accepts/rejects the booking (manual offline model — ADR-43 supersedes the hosted-aggregator design).
 
-- **F04.01 - Hosted checkout (P3, §3.4)**
-  - **Payment-at-Booking Rule (#1 policy)**: the patient pays at booking; on payment success the slot is confirmed and a confirmation email is sent.
-  - Methods: **cards**, **JazzCash**, **Easypaisa**, **bank transfer** via the aggregator's hosted page. The platform never sees card numbers or wallet credentials (§3.6).
-  - **feeAtBooking Snapshot (#6)**: the consultation fee is snapshotted on the appointment at confirmation; later changes to the doctor's `consultationFee` never affect the existing appointment's billed amount, refund amount, or revenue accounting (§3.3 #6).
-- **F04.02 - Confirmation & idempotency**
-  - **Webhook-Truth Rule**: on a signature-verified `payment.success` webhook, the slot is marked `confirmed`, the confirmation email is sent within 60 seconds, and the patient is redirected to the dashboard. The verified webhook is the source of truth regardless of browser state.
-  - **Atomic-Commit Rule (#2)**: booking confirmation and the corresponding payment record commit atomically — either both persist or neither does (§3.3 #2).
-  - **Idempotent-Intent Rule (#7)**: payment-intent creation is idempotent on `(patient, slot)` so double-submits/retries cannot produce two parallel intents (§3.3 #7); rate-limited per patient (§3.6).
-  - **Webhook-Auth Rule**: any webhook with a missing, invalid, or expired signature is rejected and logged to the admin alert feed (§3.4, §3.6).
-- **F04.03 - Reconciliation safety net**: an hourly worker queries the aggregator for unconfirmed payments over the last 24h and completes the same atomic commit as the webhook path, alerting the admin on mismatch (§3.1, edge #6). If the slot was already confirmed to another patient, no second appointment is created and the paying patient is auto-refunded in full (edge #6a).
+- **F04.01 - Payment instructions & bank-reference submission (P3, §3.4)**
+  - **Manual-Payment Rule (#1 policy)**: the patient pays at booking by offline bank transfer; the slot is held as `pending` from slot-lock (F03.03) and is only ever confirmed after an admin accepts the payment.
+  - **feeAtBooking Snapshot (#6)**: the consultation fee is snapshotted on the appointment at slot-lock (`feeAtBooking`); later changes to the doctor's `consultationFee` never affect the existing appointment's billed amount or revenue accounting (§3.3 #6).
+  - **Payment-Instructions Rule**: `GET /api/appointments/:id` returns `paymentInstructions {amountDue, bankName, bankAccountName, bankAccountNumber, bankInstructions}` for an owned `pending` appointment. The bank details come from admin platform settings (F14).
+  - **Reference-Submission Rule**: the patient submits the bank-transfer reference via `POST /api/appointments/:id/pay` with body `{reference}`. This records `paymentReference` + `paymentSubmittedAt`, leaves the appointment in `pending`, and enqueues the `payment_submitted_admin` email plus an admin alert for review.
+- **F04.02 - Admin payment review**
+  - **Admin-Review Rule**: the admin lists awaiting-review bookings via `GET /api/admin/records?state=pending` and either accepts (`POST /api/admin/appointments/:id/accept` → `confirmed`, sends `booking_confirmation`, fires the `booking_confirmed` analytics event) or rejects (`POST /api/admin/appointments/:id/reject` → `cancelled`, sends `payment_not_received`, frees the slot).
+  - The platform never handles card numbers or wallet credentials — payment is settled entirely offline (§3.6).
+- **F04.03 - RETIRED (ADR-43)**: the hosted-aggregator reconciliation safety net is removed together with the payment gateway. There is no signed webhook, no idempotent payment intent, no `Payment` table, and no reconciliation worker in the manual model. *(superseded — formerly the hourly reconciliation query and edge #6a auto-refund)*
 
 ### **F05 - Appointment lifecycle & video consultation**
 
 One-line: the confirmed appointment progresses through the §4.3 state machine; patient and doctor join an appointment-scoped browser video room.
 
 - **F05.01 - Patient upcoming view (P9)**
-  - "Upcoming" section lists all appointments in `confirmed` or `in_progress` state, sorted by slot time ascending.
-  - Row columns: **doctor name + photo**, **slot date/time** in `Asia/Karachi`, **"for: [actual patient]"** line if booked-for-someone-else (P8), **consultation fee paid**, **"Join Call" button** (F05.03), and — **for `confirmed` appointments only** — a **"Cancel" link** (F06). Once `in_progress`, the Cancel link is not shown (no cancellation path from `in_progress`).
-  - After slot completion the appointment moves out of "Upcoming" into the "Past appointments" view (F08.01).
+  - "Upcoming" section is time-based: it lists every `pending` appointment plus every `confirmed` appointment whose slot end is still in the future (`slotEnd ≥ now`), sorted by slot time ascending.
+  - Row columns: **doctor name + photo**, **slot date/time** in `Asia/Karachi`, **"for: [actual patient]"** line if booked-for-someone-else (P8), **consultation fee**, a **"Join Call" button** (F05.03, on `confirmed` rows only), and a **"Cancel" link** (F06) on `pending` and `confirmed` rows. A `pending` row also surfaces the **"Complete payment"** action (F03.03 / F04.01).
+  - Once the slot end has passed, a `confirmed` appointment moves out of "Upcoming" into the "Past appointments" view (F08.01).
   - **Empty-State Rule**: shows "No upcoming appointments — Browse doctors" linking to the public doctor listing (F02).
 - **F05.02 - Doctor today view (D2)**
   - Doctor dashboard default view shows today's appointments sorted by slot time; past appointments are shown under an in-page "History" tab on the same D-02 page (route `/doctor/history`), beside the "Today" tab — mirroring the patient Upcoming/Past page (ADR-42).
@@ -145,29 +144,23 @@ One-line: the confirmed appointment progresses through the §4.3 state machine; 
   - Pre-call lighting prompt (patient): "Find a well-lit area; sit facing a window or lamp if possible".
   - If the patient joins before the doctor: waiting screen "Doctor will be with you shortly".
   - If the doctor joins before the patient: waiting screen "Waiting for the patient to join…".
-  - **Room-Isolation Rule**: room identity is appointment-scoped — patient and doctor share the same room ID and cannot join the wrong room (§3.4); tokens are time-bound (slot-start − 10 min through slot-end + 5 min).
+  - **Room-Isolation Rule**: room identity is appointment-scoped — patient and doctor share the same room ID and cannot join the wrong room (§3.4); tokens are time-bound (slot-start − 10 min through slot-end + 5 min) and are issued only for `confirmed` appointments. Daily is used on the free tier as room + token only (no participant webhook).
   - **Hard-Cutoff Rule**: the session has a hard cutoff at slot-end + 5 minutes (room expires); a soft warning is shown to the doctor at 5 minutes remaining.
   - **KPI #3 telemetry (video-join success by network type)**: the client emits `video_join_attempt` on the "Join Call" click (patient upcoming P9 + doctor today D2) and `video_join_success` on the Daily `joined-meeting` event once media is up (patient video room P5, doctor video room D3), through the fire-and-forget client seam `lib/analytics/track.js` → `POST /api/analytics/events` (doc 14 §6; ADR-34). The emit is best-effort and no-ops until the analytics route ships (S6); `networkType` rides the envelope (sibling of `meta`) and backs the 3G-success KPI.
-  - **No-Show Grace Rule (policy #7)**: if neither party has joined by slot-start + 15 minutes, the appointment is marked `patient_no_show` or `doctor_no_show` (whichever absent — see §3 state machine, with doctor-absence precedence).
-- **F05.04 - State machine ownership**: non-payment transitions are driven by the appointment-evaluation worker (`system` actor). See §3.
+- **F05.04 - State machine ownership**: in the 3-state model every transition is actor-driven — admin accept/reject (F04.02) and patient/doctor cancel (F06). There is no appointment-evaluation worker and no automated no-show / completion transition (ADR-43); joining the video room does not change the appointment state. See §3.
 
-### **F06 - Cancellation & refund**
+### **F06 - Cancellation**
 
-One-line: in-app-only cancellation with a 2-hour free-cancel window; refunds are net of gateway fee; doctor cancels have no time restriction.
+One-line: in-app-only cancellation from `pending` or `confirmed`; the slot is freed and a cancellation email is sent. No refunds in the manual offline-payment model (ADR-43).
 
 - **F06.01 - Patient cancel (P6)**
-  - **In-App-Only Rule**: the cancellation channel is in-app only (no phone or email cancellations); the Cancel button is visible on `confirmed` bookings in the patient dashboard.
-  - **Free-Cancel Window Rule (policy #4)**: if cancelled ≥2 hours before slot start → refund initiated to the original payment method; UI shows "Refund initiated, expected within 5–7 working days"; appointment marked `cancelled_refunded` and the slot is released.
-  - **Late-Cancel Rule (policy #4)**: if cancelled <2 hours before slot start → confirmation modal "No refund available for late cancellations — proceed anyway?"; on confirm the appointment is marked `cancelled_no_refund`, the slot stays blocked on the doctor's calendar, and no refund is issued.
-  - **Net-of-Fee Refund Rule (policy #5)**: refund amount = amount paid at booking minus the payment-gateway transaction fee. The cancellation modal explicitly shows the expected refund amount and the line "Refund excludes the payment-gateway fee charged at booking." The refund-status view in the dashboard shows the **same** breakdown (identical number across modal and dashboard).
-  - Refund status is visible in the dashboard with timestamp and gateway reference number.
+  - **In-App-Only Rule**: the cancellation channel is in-app only (no phone or email cancellations); the Cancel button is visible on `pending` and `confirmed` bookings in the patient dashboard.
+  - **Cancel Rule**: `POST /api/appointments/:id/cancel` moves the appointment to `cancelled` (from `pending` or `confirmed`), releases the slot, and sends a `cancellation` email. There is no time-window and no refund — payment is offline bank transfer settled out-of-band (ADR-43).
 - **F06.02 - Doctor cancel (D5)**
   - **Reason** (text, required, internal — shown to admin only).
-  - **No-Window Rule**: doctor cancellation has no time-window restriction (can cancel even <2hr before).
-  - On submit: appointment marked `doctor_cancelled`, refund automatically initiated to the patient's original payment method (net of gateway fee per F06.01), apology email sent with an offer to rebook.
-- **F06.03 - Refund mechanics**
-  - **Refund Idempotency Rule (#10)**: each appointment carries a single refund idempotency key so an automatic retry, the reconciliation path, or an admin's out-of-band gateway action can never settle a refund twice (§3.3 #10).
-  - **Fee-Source Rule (policy #5)**: the gateway fee used in the refund is the fee/net-settlement figure the aggregator reports for the original payment; if the aggregator does not report a per-transaction fee, the admin-configured fallback fee model (F14) applies. The reported figure always wins when present.
+  - **No-Window Rule**: doctor cancellation has no time-window restriction.
+  - On submit: appointment marked `cancelled`, the slot is released, and a `cancellation` email is sent to the patient. No refund.
+- **F06.03 - RETIRED (ADR-43)**: refund mechanics (idempotency key, net-of-fee refund, fallback-fee source) are removed with the payment gateway. There are no in-app refunds and no `Payment` table in the manual model. *(superseded — formerly the refund idempotency and fee-source rules)*
 
 Uses the shared confirmation `Modal`, `Button`, and `Card` components (doc 06).
 
@@ -175,7 +168,7 @@ Uses the shared confirmation `Modal`, `Button`, and `Card` components (doc 06).
 
 One-line: email-only confirmation and reminder cadence in `Asia/Karachi`, with retry/backoff and reminder invalidation.
 
-- **F07.01 - Triggers (§3.4 — six types)**: booking confirmation, 24-hour reminder, 1-hour reminder, prescription-ready notification, refund confirmation, cancellation apology (doctor-initiated cancel).
+- **F07.01 - Triggers (§3.4 — seven types)**: `payment_submitted_admin` (admin alert on bank-reference submission), `booking_confirmation` (on admin accept), `payment_not_received` (on admin reject), 24-hour reminder, 1-hour reminder, `prescription_ready`, and `cancellation`. *(refund-confirmation and doctor-cancel apology emails are removed with the gateway — ADR-43)*
 - **F07.02 - Reminder cadence (P4)**
   - Booking confirmation email sent immediately after the `confirmed` state.
   - Reminder email sent 24 hours before slot start.
@@ -184,7 +177,7 @@ One-line: email-only confirmation and reminder cadence in `Asia/Karachi`, with r
   - **Short-Lead Skip Rule**: if confirmed <24h before slot start, the 24-hour reminder is skipped; if confirmed <1h before slot start, the 1-hour reminder is skipped (reachable because the minimum lead time is configurable down to 30 minutes — P3).
 - **F07.03 - Reliability & invalidation**
   - **Retry Rule**: on send failure, the system retries 3× with exponential backoff; the admin is alerted on final failure.
-  - **Reminder-Invalidation Rule**: when an appointment leaves `confirmed` (any cancellation or terminal no-show), undispatched 24h/1h reminders must be suppressed; the notification worker re-checks appointment state immediately before dispatch and never delivers a reminder for an appointment no longer in `confirmed`/`in_progress` at send time.
+  - **Reminder-Invalidation Rule**: when an appointment leaves `confirmed` (i.e. is cancelled), undispatched 24h/1h reminders must be suppressed; the notification worker re-checks appointment state immediately before dispatch and never delivers a reminder for an appointment no longer in `confirmed` at send time.
 - **F07.04 - Out of scope (v1)**: no PDF attachments — the prescription-ready email contains a dashboard link, not an attachment. No SMS/WhatsApp in v1.
 
 ### **F08 - Prescription**
@@ -192,14 +185,14 @@ One-line: email-only confirmation and reminder cadence in `Asia/Karachi`, with r
 One-line: doctor builds an immutable, itemised prescription with a read-only patient-ID header; patient downloads a client-rendered PDF indefinitely.
 
 - **F08.01 - Patient prescription view & download (P7)**
-  - The patient dashboard "Past appointments" view shows all past appointments with their terminal state via patient-facing labels: `completed`/`prescription_issued` → "Completed" (with Download Prescription where applicable); `patient_no_show` → "Missed (no-show)"; `doctor_no_show`/`doctor_cancelled` → "Cancelled by doctor — refund issued"; `cancelled_refunded` → "Cancelled — refunded"; `cancelled_no_refund` → "Cancelled — no refund". The underlying state is the source of truth.
-  - For appointments in `prescription_issued` state, a **"Download Prescription"** button is shown.
+  - The patient dashboard "Past appointments" view is time-based — it holds `confirmed` appointments whose slot has ended plus all `cancelled` appointments — and labels each: a past `confirmed` appointment → "Completed" (with Download Prescription where a prescription exists); a `cancelled` appointment → "Cancelled". The underlying state is the source of truth.
+  - A **"Download Prescription"** button is shown for any past `confirmed` appointment that has at least one linked prescription.
   - **Client-Render Rule**: clicking renders a PDF client-side from stored prescription JSON and triggers a browser download (§3.5). The rendering is isolated behind a single replaceable boundary for a future server-side move.
   - **Itemised-Total Rule**: each catalogue medicine shows its admin-configured price and the prescription shows a computed total. Free-text medicines not in the catalogue are shown as "not priced", excluded from the total, with an "N item(s) not priced" note.
   - **Chronological Corrections Rule (policy #9)**: if the doctor issues additional prescriptions for the same appointment, all are visible chronologically and each is downloadable separately.
   - **Indefinite-Retention Rule**: the prescription remains downloadable indefinitely (no expiry); v1 has no patient-initiated account-deletion flow (deferred to v1.1).
 - **F08.02 - Doctor prescription builder (D4)**
-  - **Completed-Gate Rule**: the builder is accessible from the appointment row after the consultation is marked `completed`.
+  - **Confirmed-Gate Rule**: the builder is accessible from the appointment row once the appointment is `confirmed` (any time after confirmation); issuing a prescription does not change the appointment state — it stays `confirmed` (ADR-43).
   - **Read-Only Patient-ID Header (P8)**: above the medicine list, a read-only header shows the actual patient identity (account holder name if "Myself"; otherwise the captured name + age + relation). The doctor confirms identity by reading the header and does not type the patient name — it is auto-pulled from the appointment record (§3.5).
   - Form fields:
     - **Add medicine** (search/select from medicine catalogue, with free-text fallback for medicines not in the catalogue).
@@ -254,7 +247,7 @@ One-line: admin adds doctors with an initial password, edits most fields, and de
   - **Deactivation-Preserves-Appointments Rule (#9)**: deactivate sets `active=false`, removes the doctor from the public listing immediately, and blocks all new bookings; existing `confirmed` future appointments are kept and honoured — not cancelled, no refunds, no cascade (§3.3 #9). Login and panel access are not revoked — a deactivated doctor can still view those appointments (F05.02), join calls (F05.03), and submit prescriptions (F08.02).
   - **Deactivation-Warning Rule**: the confirmation modal shows a warning with the count of upcoming `confirmed` appointments that will remain on the doctor's calendar.
   - The doctor's photo + bio remain visible in upcoming- and past-appointment views for patients with appointments or prescription history under that doctor.
-  - If the doctor genuinely cannot serve (e.g., PMC license revoked), the admin cancels each appointment individually via the doctor-cancel flow (F06.02) — each refund net of gateway fee + apology email per policy #5.
+  - If the doctor genuinely cannot serve (e.g., PMC license revoked), the admin cancels each appointment individually via the doctor-cancel flow (F06.02) — each moves to `cancelled` with a `cancellation` email and no refund (ADR-43).
   - Reactivate restores the doctor to the public listing using their saved availability template.
 
 Uses the shared `Button`, `Card`, confirmation `Modal`, file-upload `Input`, and form `Input` components (doc 06).
@@ -278,20 +271,18 @@ Uses the shared `Button`, `Card`, and form `Input` components (doc 06).
 
 ### **F12 - Admin: system-health alerts**
 
-One-line: an admin alert feed surfaces payment, refund, email, prescription-SLA, and exception failures with manual email re-trigger only.
+One-line: an admin alert feed surfaces payment-review, email, prescription-SLA, and exception items with manual email re-trigger only.
 
 - **F12.01 - Alert feed (A3)**: shows alerts for —
-  - Payment-webhook reconciliation mismatches.
-  - Refund API failures.
-  - Payments stuck in reconciliation when the gateway exposes no status-query API (`payment.manual_review_required`) — PayFast Pakistan; surfaced once for manual review.
-  - Refunds that require manual out-of-band settlement when the gateway exposes no refund API (`payment.refund_manual_required`) — PayFast Pakistan.
+  - Bank-transfer reference submitted by a patient — a `pending` booking awaiting admin accept/reject (F04.01).
   - Transactional-email send failures (after retry exhaustion).
-  - Appointments in `completed` state with no linked prescription whose `slotEnd ≤ now − 12h` (slot-end is the reference point, not completion-time; see §3).
+  - Appointments in `confirmed` state with no linked prescription whose `slotEnd ≤ now − 12h` (slot-end is the reference point; see §3).
   - Unhandled application exceptions — written to the audit log directly by the Express error-handler bridge as `system.unhandled_exception` (route path + message only; NO stack trace, NO PII). No external error-tracking SDK feeds this alert.
-  - Each alert links to the relevant appointment/payment record.
+  - Each alert links to the relevant appointment record.
+  - *(retired with the gateway — ADR-43: payment-webhook reconciliation mismatches, refund-API failures, and the PayFast `payment.manual_review_required` / `payment.refund_manual_required` sources.)*
 - **F12.02 - Remediation**
-  - **Email-Only Re-Trigger Rule**: the admin can manually re-trigger emails only — and only a `failed` job may be re-triggered (its status is set atomically back to `pending`). A non-failed or already-queued job returns `409 INVALID_STATE`. Each successful re-trigger writes an `admin.email_resend` audit entry. Refunds are never re-triggered.
-  - **No-Manual-Refund Rule**: refunds are not re-triggered from the app; on a refund-API failure the platform auto-retries with exponential backoff and, after exhaustion, raises this alert. The admin then resolves the refund out-of-band in the aggregator's dashboard and the platform reconciles the final status; idempotency (§3.3 #10) makes out-of-band resolution safe.
+  - **Email-Only Re-Trigger Rule**: the admin can manually re-trigger emails only — and only a `failed` job may be re-triggered (its status is set atomically back to `pending`). A non-failed or already-queued job returns `409 INVALID_STATE`. Each successful re-trigger writes an `admin.email_resend` audit entry.
+  - *(retired — ADR-43: the No-Manual-Refund remediation rule is removed; there are no in-app refunds in the manual model.)*
 
 Uses the shared alert `Card` / feed and `Button` components (doc 06).
 
@@ -303,28 +294,31 @@ One-line: a single read-only admin page to look up appointments, payments, and t
   - **Single-Surface Rule**: this page replaces the separate appointment/payment-search and audit-log views; overlapping information lives in one place with a superset of filters.
   - Filters: patient email or phone, doctor name, appointment ID, payment reference number, user (patient or doctor) ID or email, event type, actor type (`patient` | `doctor` | `admin` | `system`), appointment `state` (the `AppointmentState` enum), and a date range whose `from`/`to` are interpreted as `Asia/Karachi` day boundaries. Results are paginated, newest-first.
   - **Intentional UI gap**: the server supports the audit-tab filters (`eventType` / `actorType` / `userId` / `email`) and this records `state` filter, but the corresponding admin-UI filter controls are deferred to a later slice — A-03/A-04 currently expose pagination only for the audit tab.
-  - Record row columns: **appointment ID**, **slot date/time**, **patient name** (and **"for: [actual patient]"** if applicable), **doctor name**, **current state**, **amount paid**, **payment reference**, **refund reference** (if any).
-  - Audit entry columns: **timestamp** in `Asia/Karachi`, **event type**, **actor type**, **actor identity**, **target record reference**, **optional reason**. Event coverage matches §3.6 (appointment state transitions, auth events, payment events, refund events).
+  - Record row columns: **appointment ID**, **slot date/time**, **patient name** (and **"for: [actual patient]"** if applicable), **doctor name**, **current state**, **amount**, **payment reference** (the patient's submitted bank-transfer reference). *(refund reference removed with the gateway — ADR-43)*
+  - Audit entry columns: **timestamp** in `Asia/Karachi`, **event type**, **actor type**, **actor identity**, **target record reference**, **optional reason**. Event coverage matches §3.6 (appointment state transitions, auth events, payment-submission and admin accept/reject events).
 - **F13.02 - Detail view**
   - Clicking a row opens an appointment detail view showing the full state-transition history (from the §3.6 audit log), any linked prescriptions, and the linked **email jobs** (`notification_jobs` for that appointment, each with its status + attempt count).
   - Action buttons: **Re-trigger email** (emails only, per F12) and **Set / clear `disputed` flag** (per §4.4 #10 / §3.6) — the flag is both set AND cleared as explicit admin actions, each audited (`appointment.disputed` / `appointment.dispute_cleared`).
 - **F13.03 - Read-only & access**
-  - **Read-Only Rule**: the view is read-only with respect to records (append-only convention, §3.6); no update or delete UI is exposed. The mutations it does allow (email re-trigger, mark disputed) are themselves recorded as admin-actor audit entries. Refunds are never re-triggered in-app (§3.3 #10).
+  - **Read-Only Rule**: the view is read-only with respect to records (append-only convention, §3.6); no update or delete UI is exposed. The mutations it does allow (email re-trigger, mark disputed) are themselves recorded as admin-actor audit entries.
   - **Admin-Only Route Rule**: the route is reachable only by the admin role per DA6; no patient or doctor surface exposes this view.
 
 Uses the shared table/list, filter bar, `Card`, `Button`, and confirmation `Modal` components (doc 06).
 
 ### **F14 - Admin: platform settings**
 
-One-line: admin tunes booking parameters and the fallback fee model without a code change; every change is audit-logged.
+One-line: admin tunes booking parameters and the bank-transfer payment details without a code change; every change is audit-logged.
 
 - **F14.01 - Minimum booking lead time (A6)**
   - **Minimum booking lead time** (duration, required, admin input) — default 1 hour, allowed range 30–1440 minutes (floor 30 min per §4.1 #3 and the glossary entry "Minimum booking lead time"; ceiling 1440 min / 24h).
   - **Future-Only Rule**: changes apply to future booking attempts only; existing `confirmed` appointments are unaffected.
-- **F14.02 - Fallback transaction-fee model**
-  - **Fallback fee percentage** (stored in basis points — integer 0–10000 = 0–100%, admin input) **and/or** **fixed fallback amount** (integer ≥ 0, PKR paisa, admin input) — with a documented default and validated bounds.
-  - **Fallback-Fee Rule (policy #5)**: used only when the aggregator does not report a per-transaction fee for a payment; when the aggregator does report a fee, that reported figure always wins. This figure feeds the refund amount, the cancellation-modal estimate, and the dashboard refund breakdown (F06) identically.
-- **F14.03 - Audit**: each settings change is recorded in the audit log as an admin-actor `settings.updated` entry (§3.6), whose metadata includes `before` and `after` snapshots of the three tunables (minimum lead time, fallback fee percentage, fixed fallback amount).
+- **F14.02 - Bank-transfer payment details (ADR-43)**
+  - **Bank name** (text, required, admin input)
+  - **Bank account name** (text, required, admin input)
+  - **Bank account number** (text, required, admin input)
+  - **Bank instructions** (text, optional, admin input)
+  - **Payment-Instructions Source Rule**: these four fields populate the `paymentInstructions {bankName, bankAccountName, bankAccountNumber, bankInstructions}` returned to a patient on a `pending` appointment (F04.01). Changing them affects only future payment instructions. *(retired — ADR-43: the fallback transaction-fee model (`fallbackFee*`) is removed with the gateway.)*
+- **F14.03 - Audit**: each settings change is recorded in the audit log as an admin-actor `settings.updated` entry (§3.6), whose metadata includes `before` and `after` snapshots of the tunables (minimum lead time and the bank-transfer details).
 
 Uses the shared form `Input`, `Button`, and `Card` components (doc 06).
 
@@ -355,53 +349,40 @@ The §4.3 appointment state machine, reproduced faithfully.
 
 ```text
 slot_available
-    │ (patient picks + clicks Pay)
+    │ (patient picks + clicks Confirm & Pay → POST /api/appointments/lock)
     ▼
-slot_locked  (10-min reservation during payment flow)
+pending  (slot reserved; feeAtBooking snapshotted at lock; patient submits bank-transfer reference via POST /:id/pay)
     │
-    ├─ payment webhook: success ─────► confirmed
+    ├─ admin accepts payment ────────► confirmed   (booking_confirmation email; booking_confirmed analytics)
     │
-    └─ lock expires / payment fails ─► slot_available  (released)
+    ├─ admin rejects payment ────────► cancelled   (payment_not_received email; slot released)
+    │
+    └─ patient / doctor cancels ─────► cancelled   (cancellation email; slot released)
 
 
 confirmed
     │
-    ├─ patient cancels ≥2hr before ──► cancelled_refunded  (refund initiated, slot released)
+    ├─ patient / doctor cancels ─────► cancelled   (cancellation email; slot released)
     │
-    ├─ patient cancels <2hr before ──► cancelled_no_refund  (slot stays blocked, no refund)
+    │ (slot time arrives — patient + doctor join the appointment-scoped video room; NO state change)
     │
-    ├─ doctor cancels (any time) ────► doctor_cancelled  (refund initiated, apology email, slot released)
-    │
-    │ (slot-start time arrives)
-    ▼
-in_progress  (video room active; grace window = slot-start + 15min)
-    │
-    ├─ both join + call ends normally ──► completed
-    │       │
-    │       ├─ doctor submits prescription ──► prescription_issued  (immutable)
-    │       │       │
-    │       │       └─ doctor issues additional prescription(s) ──► all linked to appointment, chronological
-    │       │
-    │       └─ no prescription submitted within 12hr ──► alert raised (status: awaiting_prescription)
-    │
-    ├─ patient absent at slot+15 ──► patient_no_show  (no refund)
-    │
-    └─ doctor absent at slot+15 ──► doctor_no_show  (refund initiated, apology email)
+    └─ doctor issues prescription(s) ─► linked to the appointment, chronological (state stays confirmed)
 ```
 
-**Transition triggers & owning components.** Each non-payment transition has a defined trigger and owning component:
+The model is exactly three states: `pending` → `confirmed`, plus `cancelled` (reachable from `pending` or `confirmed`). There is no `in_progress`, `completed`, `prescription_issued`, `*_no_show`, `cancelled_refunded`, `cancelled_no_refund`, or `doctor_cancelled` state (ADR-43).
 
-- `confirmed → in_progress`: at slot-start time, set by a scheduled **appointment-evaluation job** (the same component that owns the grace-window check below).
-- `in_progress → completed`: finalised at **slot-end + 5 min** once both parties have joined at least once. A transient mid-call disconnect does **not** finalise completion — either party may rejoin the same room until slot-end + 5 min (edge #22). Earlier finalisation on "both parties left" is permitted only on an explicit end-of-call action by both parties, not a dropped connection; absent that signal, completion waits for the slot-end + 5 min cutoff. Join/leave facts come from the video provider's participant events (§3.4). The doctor never manually marks completion in v1.
-- `in_progress → patient_no_show` / `doctor_no_show`: at slot-start + 15 min the job inspects recorded join events. **If the doctor never joined (whether or not the patient joined) → `doctor_no_show`** (refund net of gateway fee + apology email). If the doctor joined but the patient never joined → `patient_no_show` (no refund). If both joined, the no-show path is not taken. Doctor-absence takes precedence because the platform failed to deliver the contracted doctor; the patient is not penalised for an appointment the doctor also missed.
-- **Missing participant data at evaluation**: if the video provider's participant events are unavailable/unreadable when the job runs at slot-end + 5 min, the job must still move the appointment out of `in_progress` — it resolves to a **non-penalising terminal state** (treated as `doctor_no_show` for refund purposes so the patient is not charged for an unverifiable consultation) **and** raises an admin alert (F12) flagging that the resolution was made without join data, so the admin can adjudicate via F13. The appointment must never remain `in_progress` past slot-end + 5 min.
-- The appointment-evaluation job is a new `system` component (alongside the reconciliation and notification workers in §3.1); its audit-log actor type is `system`. The hard requirement is that no appointment can remain in `in_progress` past slot-end + 5 min without resolving to a terminal state.
+**Transition triggers & owning components.** Every transition is actor-driven — there is no appointment-evaluation worker:
 
-**Refunds.** Refund amounts on `cancelled_refunded`, `doctor_cancelled`, and `doctor_no_show` are net of the payment-gateway transaction fee per policy #5.
+- `pending → confirmed`: admin accepts the submitted payment (`POST /api/admin/appointments/:id/accept`); sends `booking_confirmation` and fires the `booking_confirmed` analytics event (F04.02).
+- `pending → cancelled`: admin rejects the payment (`POST /api/admin/appointments/:id/reject`, sends `payment_not_received`) **or** the patient/doctor cancels (F06); the slot is released.
+- `confirmed → cancelled`: patient or doctor cancels (`POST /api/appointments/:id/cancel`, F06); the slot is released and a `cancellation` email is sent. No refund.
+- Joining the video room at slot time does **not** change the appointment state, and issuing a prescription does **not** change it either — the appointment stays `confirmed` (F08).
+
+**Refunds.** None. The manual offline-payment model issues no refunds (ADR-43); a cancelled booking simply frees the slot, and any money already transferred is settled out-of-band.
 
 **`disputed` flag (orthogonal).** A `disputed` boolean flag (set via F13/A5) is orthogonal to this state machine — it can attach to any terminal state and does not alter transitions (see the Disputed-marker bullet in §3.6).
 
-**`awaiting_prescription` (derived condition, not a state).** `awaiting_prescription` is **not** a distinct appointment state — it is a derived condition: an appointment in `completed` with no linked prescription whose `slotEnd ≤ now − 12h` (the 12-hour clock runs from slot-end, not completion-time). It drives the F12/A3 alert and dashboard reminder but does not appear as a state transition in the audit log; the appointment remains `completed` until a prescription is submitted (`prescription_issued`).
+**`awaiting_prescription` (derived condition, not a state).** `awaiting_prescription` is **not** a distinct appointment state — it is a derived condition: a `confirmed` appointment with no linked prescription whose `slotEnd ≤ now − 12h` (the 12-hour clock runs from slot-end). It drives the F12/A3 alert and dashboard reminder but does not appear as a state transition in the audit log; the appointment remains `confirmed` whether or not a prescription is ever submitted.
 
 **Slice G audit event types.** The admin panel (F10–F14) introduces twelve new audit event types recorded through the append-only audit log (§3.6): `doctor.created`, `doctor.updated`, `doctor.deactivated`, `doctor.reactivated`, `doctor.password_reset`, `doctor.availability_updated`, `doctor.photo_updated`, `appointment.disputed`, `appointment.dispute_cleared`, `admin.email_resend`, `settings.updated`, and `system.unhandled_exception`.
 
@@ -416,29 +397,29 @@ All 40 edge cases from §4.4, grouped by the PRD's 7 categories, each keeping it
 | #   | Edge case                                                  | Tag | v1 handling                                                                                                |
 | --- | ---------------------------------------------------------- | --- | ---------------------------------------------------------------------------------------------------------- |
 | 1   | Two patients click "book" on the same slot simultaneously  | A   | Storage-layer uniqueness on slot identity (§3.3 #1). Second click fails fast with "slot just taken" error. |
-| 2   | Patient starts booking, abandons mid-flow                  | P   | Slot lock expires after 10 min (policy #2) and is released.                                                |
-| 3   | Patient on slow 3G — slot expires before payment completes | P   | Same as #2. 10-min lock chosen to accommodate this.                                                        |
+| 2   | Patient starts booking, abandons mid-flow                  | P   | The `pending` appointment holds the slot (no timed expiry, ADR-43); the admin rejects the unpaid hold (or the patient cancels) to free the slot.        |
+| 3   | Patient on slow 3G — submits the bank reference late       | P   | No payment timer to race: the `pending` hold persists until the admin accepts the verified payment or rejects it.                                       |
 | 4   | Doctor adds a new slot while patient is browsing           | A   | Frontend refreshes on focus; stale-data shows brief "slot no longer available" error. Acceptable friction. |
 
 ### Payment flow
 
 | #   | Edge case                                                                                                                               | Tag | v1 handling                                                                                                                                                                                                                                                                                                                                                                       |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 5   | Patient double-clicks "Pay" — two payment attempts                                                                                      | A   | Idempotent payment-intent creation on `(patient, slot)` (§3.3 #7); aggregator also handles duplicate detection.                                                                                                                                                                                                                                                                   |
-| 6   | Payment succeeds but webhook never reaches server                                                                                       | A   | Hourly reconciliation query against the aggregator for unconfirmed payments in the past 24h; reconciles state and alerts admin on mismatch.                                                                                                                                                                                                                                       |
-| 6a  | Payment succeeds (late webhook or reconciliation) but the slot's lock had expired and the slot was already confirmed to another patient | A   | No second appointment is created (storage uniqueness, §3.3 #1). The platform auto-initiates a **full refund** to the paying patient (platform-caused, not a cancellation — net-of-gateway-fee policy #5 does **not** apply), raises an admin alert, and emails the patient that the slot could not be secured and a refund is on the way. Refund is idempotency-keyed (§3.3 #10). |
-| 7   | Payment fails — patient retries inside lock window                                                                                      | A   | Same locked slot held; patient retries; second attempt triggers a fresh payment intent.                                                                                                                                                                                                                                                                                           |
-| 8   | Patient closes browser during payment redirect                                                                                          | A   | The verified webhook is the source of truth — if it fires success, booking is confirmed and email sent regardless of browser state.                                                                                                                                                                                                                                               |
-| 9   | Patient pays twice (e.g., refreshes success page)                                                                                       | A   | Idempotency at intent + aggregator duplicate detection.                                                                                                                                                                                                                                                                                                                           |
+| 5   | Patient double-clicks "Pay" — two payment attempts                                                                                      | A   | `POST /:id/pay` overwrites `paymentReference`/`paymentSubmittedAt` on the same `pending` appointment; the admin reviews it once (F04, ADR-43).                                                                                                                                                                                                                                                                   |
+| 6   | Payment succeeds but webhook never reaches server                                                                                       | A   | RETIRED (ADR-43): no webhook or reconciliation in the manual model. A booking with no submitted reference stays `pending` until an admin accepts or rejects it (F04.02).                                                                                                                                                                                                                                       |
+| 6a  | Payment succeeds (late webhook or reconciliation) but the slot's lock had expired and the slot was already confirmed to another patient | A   | RETIRED (ADR-43): the gateway late-webhook / reconciliation race and its auto-refund no longer exist — there is no webhook, no reconciliation, and no refunds in the manual offline-payment model. |
+| 7   | Payment fails — patient retries inside lock window                                                                                      | A   | The patient can resubmit the bank reference via `POST /:id/pay` (overwrites the prior value) while the booking is `pending`; the admin reviews the latest reference (ADR-43).                                                                                                                                                                                                                                                                                           |
+| 8   | Patient closes browser during payment redirect                                                                                          | A   | The `pending` booking and its `paymentInstructions` remain on `GET /:id`; the patient returns via the "Payment pending / Complete payment" card (F03.03/F04.01).                                                                                                                                                                                                                                               |
+| 9   | Patient pays twice (e.g., refreshes success page)                                                                                       | A   | RETIRED (ADR-43): no in-app payment capture; a duplicate bank transfer is an out-of-band banking matter resolved manually.                                                                                                                                                                                                                                                                                                                           |
 | 10  | Chargeback weeks later                                                                                                                  | K   | Admin tool marks appointment as `disputed` via A5 detail view. No automated handling in v1.                                                                                                                                                                                                                                                                                       |
 
 ### Pre-consultation (after confirmed, before call)
 
 | #   | Edge case                                                  | Tag | v1 handling                                                                                                                                              |
 | --- | ---------------------------------------------------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 11  | Patient cancels inside cancel window                       | P   | Auto-refund initiated to original payment, net of gateway fee (policy #5).                                                                               |
-| 12  | Patient cancels outside cancel window                      | P   | Confirmation modal; on confirm, appointment marked `cancelled_no_refund`. **Slot stays blocked on the doctor's calendar; no refund issued** (policy #4). |
-| 13  | Doctor cancels a confirmed appointment                     | P   | Refund initiated (net of gateway fee); apology email to patient (policy #5 + state machine).                                                             |
+| 11  | Patient cancels inside cancel window                       | P   | Appointment → `cancelled`; slot released; `cancellation` email. No 2-hour window and no refund in the manual model (ADR-43).                                                                               |
+| 12  | Patient cancels outside cancel window                      | P   | RETIRED (ADR-43): the free-cancel window and the `cancelled_no_refund` distinction are gone; every cancellation resolves to `cancelled` with the slot released and no refund (see #11). |
+| 13  | Doctor cancels a confirmed appointment                     | P   | Appointment → `cancelled`; slot released; `cancellation` email to the patient. No refund or apology email (ADR-43).                                                             |
 | 14  | Doctor wants to change availability with existing bookings | A   | UI prevents deleting a window containing confirmed bookings; doctor must cancel each booking first.                                                      |
 | 15  | Reminder email fails to send                               | A   | Provider retries with exponential backoff (3×); admin alerted on final failure.                                                                          |
 | 16  | Patient wants to reschedule                                | P   | Cancel + rebook (policy #6).                                                                                                                             |
@@ -449,14 +430,14 @@ All 40 edge cases from §4.4, grouped by the PRD's 7 categories, each keeping it
 | --- | --------------------------------------------------- | --- | -------------------------------------------------------------------------------------------------------------------------------- |
 | 17  | Patient joins early                                 | A   | "Doctor will be with you shortly" waiting screen until slot start.                                                               |
 | 18  | Patient joins late (within grace)                   | A   | Can join any time until slot end; consultation length effectively shortened.                                                     |
-| 19  | Doctor joins late (within grace)                    | A   | Patient sees "doctor running late" message; no automatic refund unless full no-show.                                             |
-| 20  | Patient absent at slot+15                           | P   | Marked `patient_no_show`; no refund (policy #7).                                                                                 |
-| 21  | Doctor absent at slot+15                            | P   | Marked `doctor_no_show`; refund initiated (net of gateway fee) + apology (policy #7).                                            |
+| 19  | Doctor joins late (within grace)                    | A   | Patient sees a "doctor running late" message and can rejoin until the token window closes. No no-show automation or refund in v1 (ADR-43).                                             |
+| 20  | Patient absent at slot+15                           | P   | No automated no-show detection (ADR-43); the appointment stays `confirmed` and is handled out-of-band. No refund.                                                                                 |
+| 21  | Doctor absent at slot+15                            | P   | No automated no-show detection (ADR-43); the appointment stays `confirmed`. If the doctor cannot serve, the doctor/admin cancels it (F06 → `cancelled`). No refund.                                            |
 | 22  | Call drops mid-consultation (network issue)         | A   | Video session persists for slot duration + 5 min; either party can rejoin the same room.                                         |
 | 23  | Consultation runs over slot end                     | A   | Hard cutoff at slot-end + 5 min; soft warning to doctor at 5 min remaining.                                                      |
 | 24  | Audio/video doesn't work for one party              | K   | Manual support fallback (admin uses the A5 records & audit-log view). No automated recovery in v1.                               |
 | 25  | Patient and doctor join different rooms by accident | A   | Impossible — room identity is appointment-scoped and access-gated (§3.4).                                                        |
-| 25a | Neither patient nor doctor joins by slot+15         | P   | Resolves to `doctor_no_show` (doctor-absence precedence); refund initiated net of gateway fee + apology email (policy #7, §4.3). |
+| 25a | Neither patient nor doctor joins by slot+15         | P   | No automated no-show resolution (ADR-43); the appointment stays `confirmed` and is handled out-of-band. No refund. |
 
 ### Post-consultation
 
@@ -471,16 +452,16 @@ All 40 edge cases from §4.4, grouped by the PRD's 7 categories, each keeping it
 
 | #   | Edge case                                                  | Tag | v1 handling                                                                                                                                                                                                                                                                                                    |
 | --- | ---------------------------------------------------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 30  | Refund API call fails                                      | A   | Transient failures auto-retry with exponential backoff (idempotency-keyed, §3.3 #10). On retry exhaustion: admin alert; admin resolves the refund out-of-band in the payment aggregator's dashboard; platform reconciles the final status. Patient notified of delay via email. No manual in-app refund retry. |
-| 31  | Refund takes 5–7 days to reflect                           | A   | Patient dashboard shows transparent status ("refund initiated 2 days ago, expected within 7 days") + gateway reference number.                                                                                                                                                                                 |
-| 32  | Patient cancels + immediately rebooks inside cancel window | A   | No penalty; treated as two independent operations (first cancel refunded, second booking standard flow).                                                                                                                                                                                                       |
+| 30  | Refund API call fails                                      | A   | RETIRED (ADR-43): no in-app refunds, refund API, retry worker, or reconciliation in the manual offline-payment model. |
+| 31  | Refund takes 5–7 days to reflect                           | A   | RETIRED (ADR-43): no refunds, so no refund-status timeline.                                                                                                                                                                                 |
+| 32  | Patient cancels + immediately rebooks inside cancel window | A   | No penalty; two independent operations (cancel frees the slot, rebook is the standard flow). No refund involved (ADR-43).                                                                                                                                                                                                       |
 
 ### System-level
 
 | #   | Edge case                                            | Tag | v1 handling                                                                                      |
 | --- | ---------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------ |
 | 33  | Video provider outage during peak consultation hours | K   | Status banner shown; patients/doctors offered reschedule + apology. No automatic fallback in v1. |
-| 34  | Payment aggregator outage                            | A   | New bookings blocked with banner; existing confirmed bookings unaffected.                        |
+| 34  | Payment aggregator outage                            | A   | RETIRED (ADR-43): no payment aggregator — payment is offline bank transfer, so there is no gateway outage that blocks bookings.                        |
 | 35  | Email provider outage                                | A   | Reminders delayed; queue processed when service returns; admin alerted.                          |
 | 36  | Timezone confusion                                   | A   | All UI in `Asia/Karachi`; storage in UTC. Pakistan doesn't observe DST.                          |
 
@@ -490,7 +471,7 @@ All 40 edge cases from §4.4, grouped by the PRD's 7 categories, each keeping it
 | --- | ------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 37  | Booking for someone else (parent for child, child for parent) | P   | "Who is this consultation for?" field captures actual patient name (policy #10). Prescription auto-pulls the actual patient name onto the PDF (§3.5).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 38  | Patient is a minor                                            | K   | Doctor uses clinical judgment; no platform enforcement in v1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 39  | Doctor's PMC license revoked / admin deactivates a doctor     | P   | Past appointments untouched. **Existing `confirmed` future appointments are kept and honored — not auto-cancelled** (client decision). Future bookings are blocked and the doctor is removed from the public listing; photo + bio remain visible in upcoming- and past-appointment views for patients with appointments or prescription history under that doctor. The deactivate modal warns the admin with the count of upcoming appointments first. If the doctor genuinely cannot serve, the admin cancels each appointment individually via the `doctor_cancelled` flow (D5) — refund net of gateway fee + apology email. Triggered from A4. |
+| 39  | Doctor's PMC license revoked / admin deactivates a doctor     | P   | Past appointments untouched. **Existing `confirmed` future appointments are kept and honored — not auto-cancelled** (client decision). Future bookings are blocked and the doctor is removed from the public listing; photo + bio remain visible in upcoming- and past-appointment views for patients with appointments or prescription history under that doctor. The deactivate modal warns the admin with the count of upcoming appointments first. If the doctor genuinely cannot serve, the admin cancels each appointment individually via the doctor-cancel flow (D5/F06) — the appointment moves to `cancelled` with a `cancellation` email and no refund (ADR-43). Triggered from A4. |
 | 40  | Patient under another patient's account                       | A   | Account-level auth; no cross-account access.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ---
@@ -569,3 +550,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | 2026-06-21 | F05.03: added the doctor-first waiting copy ("Waiting for the patient to join…") alongside the existing patient-first copy | Role-aware video waiting-screen copy |
 | 2026-06-22 | F05.02: doctor today/history is sidebar-only — past appointments are a separate History view at `/doctor/history` (no in-page tabs; ADR-41) | Doctor History sidebar-link desync bug fix |
 | 2026-06-22 | F05.02: doctor past appointments are an in-page "History" tab on D-02 (mirrors patient Upcoming/Past; ADR-42, supersedes ADR-41) | Doctor appointments page redesign (in-page tabs) |
+| 2026-06-28 | F04 → manual offline bank transfer + admin accept/reject (paymentInstructions, `/pay {reference}`, F04.03 reconciliation retired); F05 → 3-state model (no in_progress/completed/no-show), F05.04 evaluation worker removed, video-token confirmed-only on Daily free tier; F06 renamed Cancellation, all refund/window/`doctor_cancelled` rules retired; F07 trigger set re-listed (payment_submitted_admin/booking_confirmation/payment_not_received/cancellation + reminders; refund/apology removed); F08 prescription gate `completed`→`confirmed` (issuing does not change state); F12/F13 gateway/refund/PayFast sources retired; F14.02 fallback-fee → bank-transfer fields; §3 state machine + §4 edge handlings synced | Manual-payment pivot — as-built sync |

@@ -4,8 +4,8 @@
 | -------------------- | ---------------------------------- |
 | **Document ID**      | 03-ARCHITECTURE_DOCUMENT           |
 | **Status**           | Canonical                          |
-| **Version**          | 1.7                                |
-| **Last updated**     | 2026-06-15                         |
+| **Version**          | 1.8                                |
+| **Last updated**     | 2026-06-28                         |
 | **Sources absorbed** | `docs/engineering/ARCHITECTURE.md` |
 | **Related docs**     | 02, 04, 05, 10, 14, 15             |
 
@@ -30,18 +30,15 @@ This document defines how Dermestha v1 is wired: the structural decisions, techn
 
 ## 1. High-level architecture
 
-Dermestha v1 is a **single-deployable, same-origin monolith**: one JavaScript Express application that exposes a JSON API and serves the built React (Vite) single-page app from the same origin (no CORS). Business logic lives in a **service layer** (`model → controller → service`); a single **role middleware** is the server-side authorization boundary. Three **in-process background workers** advance time-based state. Three **external integrations** each sit behind a thin **adapter interface** so a vendor can be swapped without touching business logic.
+Dermestha v1 is a **single-deployable, same-origin monolith**: one JavaScript Express application that exposes a JSON API and serves the built React (Vite) single-page app from the same origin (no CORS). Business logic lives in a **service layer** (`model → controller → service`); a single **role middleware** is the server-side authorization boundary. A single **in-process background worker** dispatches due notifications. Two **external integrations** each sit behind a thin **adapter interface** so a vendor can be swapped without touching business logic.
 
 **Components:**
 
-- **Web client** — All three surfaces (patient / doctor / admin); discovery, booking, payment handoff, video, dashboards, prescription render. React + Vite (JavaScript + JSDoc), token-based CSS.
+- **Web client** — All three surfaces (patient / doctor / admin); discovery, booking, manual payment (bank-transfer reference submission), video, dashboards, prescription render. React + Vite (JavaScript + JSDoc), token-based CSS.
 - **API + app core** — JSON API, service-layer business logic, state machine, invariants, authorization. Node + Express (JavaScript + JSDoc), Prisma.
 - **Database** — Durable store for all domain data and server sessions. PostgreSQL (managed).
-- **Reconciliation worker** — Hourly query of PayFast for unconfirmed payments; reconcile missed webhooks. `node-cron` (in-process). (PayFast Pakistan exposes no status-query API → the query returns `unknown` and the worker surfaces stuck payments once for manual review; ADR-32.)
-- **Notification worker** — Schedule and dispatch the 6 email triggers; retry/backoff; reminder invalidation. `node-cron` (in-process).
-- **Appointment-evaluation worker** — Advance `confirmed→in_progress`, resolve `completed`/no-show within the grace window. `node-cron` (in-process). **Now implemented** (`server/src/workers/`; `evaluateDueAppointments` in `server/src/modules/appointment/service.js`; ADR-25): owns all non-payment §4.3 transitions (`confirmed→in_progress` at slot-start; `in_progress→completed` at slot-end+5m; no-show resolution at slot+15m with doctor-absence precedence per ADR-12).
-- **Payment adapter** — Hosted checkout; dual-channel confirmation (signed `CHECKOUT_URL` callback + browser return) verify; refund + status-query degrade to a manual admin path for PayFast Pakistan (no vendor API; ADR-32). PayFast Pakistan.
-- **Video adapter** — Per-appointment rooms, time-bound participant tokens. Daily.co.
+- **Notification worker** — Schedule and dispatch the 6 email triggers; retry/backoff; reminder invalidation. `node-cron` (in-process). This is the **only** background worker: `notification-dispatch` runs every minute calling `dispatchDueNotifications` (`server/src/workers/index.js`). Payment is offline and admin-verified, so no reconciliation, refund-retry, or appointment-evaluation worker exists (ADR-43).
+- **Video adapter** — Per-appointment rooms, time-bound participant tokens (Daily free tier — `createRoom` + `issueToken` only, no participant webhook). Daily.co.
 - **Email adapter** — Transactional sends + bounce/failure signal. Resend.
 
 ---
@@ -50,16 +47,16 @@ Dermestha v1 is a **single-deployable, same-origin monolith**: one JavaScript Ex
 
 | Decision              | Choice                                                                                                               | Rationale                                                                                                                                                                                                                                                                                                               |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Language**          | JavaScript end-to-end (ES modules), with `// @ts-check` + JSDoc type hints                                           | No build/transpile step and no `tsconfig`. JSDoc + `@ts-check` (via a `jsconfig.json`) gives editor-level type-checking on the risky invariant modules — the state machine, slot-lock, refund math — without committing to TypeScript. Prisma's generated client still surfaces model types through JSDoc/editor hints. |
+| **Language**          | JavaScript end-to-end (ES modules), with `// @ts-check` + JSDoc type hints                                           | No build/transpile step and no `tsconfig`. JSDoc + `@ts-check` (via a `jsconfig.json`) gives editor-level type-checking on the risky invariant modules — the state machine and slot-lock — without committing to TypeScript. Prisma's generated client still surfaces model types through JSDoc/editor hints. |
 | **App framework**     | Node + Express monolith, `model → controller → service`                                                              | Team expertise; serves the SPA same-origin → satisfies no-CORS requirement, one domain, cookie auth just works.                                                                                                                                                                                                         |
 | **Frontend**          | Vite + React (JS) SPA, served by Express `static`                                                                    | Fast builds; one deployable; host-agnostic. SSR not needed at this scale (TTFB met via region + static serving + code-splitting). Client state: React Context (session) + TanStack Query (server cache), per ADR-20. Server uses `date-fns-tz` for Asia/Karachi↔UTC slot math (ADR-21).                                                                                                                                                                                       |
 | **Styling / theming** | Reuse the mockups' CSS-variable tokens (`tokens.css` + `components.css`); React components wrap existing BEM classes | CSS custom properties give the most manageable theming (one var → app-wide reskin) and are pixel-faithful to the approved mockups. MUI rejected: imposes Material look conflicting with the flat/squared design and adds bundle weight.                                                                                 |
 | **Database**          | PostgreSQL + Prisma                                                                                                  | Relational, integrity-heavy, join-heavy data; native `UNIQUE`/FK/transactions satisfy data-integrity invariants directly; cleanest AWS path (RDS/Aurora).                                                                                                                                                               |
 | **Sessions / auth**   | Hand-rolled cookie sessions — `express-session` + `connect-pg-simple` + `argon2` + `express-rate-limit`              | PRD mandates HTTP-only session cookies (not JWT). Auth has bespoke rules; hand-rolling fits the service layer and makes per-event audit-logging trivial, with fewest dependencies.                                                                                                                                      |
-| **Hosting**           | Railway all-in-one (app + Postgres), Mumbai/Singapore region                                                         | Simplest managed setup; private app↔DB networking; always-on for webhooks/cron; under ~USD 50/mo budget.                                                                                                                                                                                                                |
+| **Hosting**           | Railway all-in-one (app + Postgres), Mumbai/Singapore region                                                         | Simplest managed setup; private app↔DB networking; always-on for the single notification cron job (no inbound webhooks); under ~USD 50/mo budget.                                                                                                                                                                        |
 | **Email**             | Resend (free tier)                                                                                                   | Free at ~2–3k/mo; bounce/complaint webhooks satisfy notification requirements.                                                                                                                                                                                                                                          |
 | **Video**             | Daily.co (behind adapter)                                                                                            | Least development; room + time-bound token primitives map 1:1 to requirements; cost scales with paid consults.                                                                                                                                                                                                          |
-| **Payments**          | PayFast (behind adapter)                                                                                             | Most established PK aggregator (first SBP commercial license, APPS-backed, PCI-DSS); one integration + KYC covers cards + JazzCash + Easypaisa + bank; hosted checkout, signed callback/return IPN. PayFast **Pakistan** exposes no programmatic refund or status-query API → those degrade to a manual admin path (ADR-32).                                                                                          |
+| **Payments**          | Offline bank transfer, admin-verified (no gateway, no adapter)                                                       | Patient pays by bank transfer and submits the transfer reference; an admin verifies it and accepts (→`confirmed`) or rejects (→`cancelled`) the booking. No payment gateway, no `Payment` table, and no refund automation in v1 — removing the PayFast integration, its dual-channel confirmation, and the reconciliation/refund machinery (ADR-43).                                                                  |
 | **Scaffold**          | Lean scaffold, no third-party boilerplate                                                                            | No maintained boilerplate matches Express + React-SPA + Prisma + cookie-session RBAC; official Vite `react` + a clean Express/Prisma backend is lower-effort and better-fit. Borrow only config (Dockerfile, ESLint/Prettier/Husky/Zod).                                                                                |
 | **File-upload middleware** | `multer` `^2.1.1` (`memoryStorage`, 2 MB hard cap)                                                              | Multipart parsing for the doctor profile-photo pipeline (Slice G F10). In-memory buffer lets the service magic-byte validate before persisting to the uploads volume; the 2 MB cap bounds request size.                                                                                                                |
 
@@ -78,8 +75,8 @@ flowchart TB
     subgraph Application["Application — Express Monolith (JavaScript)"]
         direction TB
         Routes["API routes → Controllers → Service layer<br/>Role middleware (requireRole) · Rate-limit / Validation"]
-        Workers["In-process workers<br/>(Reconciliation · Notification · Appointment-evaluation)"]
-        Adapters["Integration adapters<br/>(PaymentProvider · VideoProvider · EmailProvider)"]
+        Workers["In-process worker<br/>(Notification dispatch)"]
+        Adapters["Integration adapters<br/>(VideoProvider · EmailProvider)"]
         Routes --> Workers
         Routes --> Adapters
     end
@@ -88,7 +85,7 @@ flowchart TB
         DB["App data + Server sessions"]
     end
 
-    Externals["External services<br/>PayFast · Daily.co · Resend"]
+    Externals["External services<br/>Daily.co · Resend"]
 
     Presentation -- "Same-origin HTTPS (cookies)" --> Application
     Application -- "Prisma client" --> Data
@@ -99,7 +96,7 @@ flowchart TB
 
 The three logical layers above (routes → controllers → services) are organized **feature-first**, not in top-level `routes/`/`controllers/`/`services/` directories (ADR-26). The physical layout:
 
-**Server (`server/src/`):** each domain is a self-contained module — `modules/<domain>/` with `index.js` (routes), `controller.js`, and `service.js` (tests are centralized under `server/test/`, not co-located — ADR-40) — for `auth`, `doctor` (incl. availability), `appointment` (the whole booking → cancellation → refund → evaluation lifecycle in one `service.js`), `payment`, `video`, and `admin` (records, audit, alerts, settings, and the doctor-management write paths; Slice G). A central `routes.js` (`registerRoutes`) mounts every module. Cross-cutting infrastructure stays top-level and folder-grouped: `config/` (flat `constants.js`), `http/` (flat `AppError.js`), `lib/<name>/<name>.js`, `middleware/<name>/<name>.js`, `integrations/`, `workers/`, plus shared cross-module services in `services/` (today: `audit/`). `health/` and `dev/` are standalone.
+**Server (`server/src/`):** each domain is a self-contained module — `modules/<domain>/` with `index.js` (routes), `controller.js`, and `service.js` (tests are centralized under `server/test/`, not co-located — ADR-40) — for `auth`, `doctor` (incl. availability), `appointment` (the whole booking → payment-reference → admin accept/reject lifecycle in one `service.js`), `video`, and `admin` (records, audit, alerts, settings, and the doctor-management write paths; Slice G). A central `routes.js` (`registerRoutes`) mounts every module. Cross-cutting infrastructure stays top-level and folder-grouped: `config/` (flat `constants.js`), `http/` (flat `AppError.js`), `lib/<name>/<name>.js`, `middleware/<name>/<name>.js`, `integrations/`, `workers/`, plus shared cross-module services in `services/` (today: `audit/`). `health/` and `dev/` are standalone.
 
 **Client (`client/src/`):** each feature is `modules/<feature>/` with `views/<View>/`, feature-local `components/`, **one `use<Feature>` hook** owning the feature's data/mutations (views keep render + pure UI state only), and a `*.routes.jsx`. Cross-feature UI primitives live in `shared/<Name>/`; cross-cutting React state in `context/` (`context/session/` for session state; `context/AppProviders.jsx` composing Query + Router + Session providers); pure utilities in `lib/<name>/<name>.js`; page shells in `layouts/<Name>/`. `routes.jsx` aggregates each module's routes via `buildRoutes(session)` and `App.jsx` renders only the route table. One-shot auth actions live in `modules/auth/useAuth.js`; the session **context holds cross-cutting state only**.
 
@@ -113,17 +110,17 @@ The three logical layers above (routes → controllers → services) are organiz
 sequenceDiagram
     participant P as Patient (Browser)
     participant E as Express (service layer)
-    participant PF as PayFast
+    participant A as Admin
     participant DB as PostgreSQL
 
-    P->>E: Pick slot → initiate booking
-    E->>DB: slot_locked appointment (lock_expires_at = now+10 min)
-    Note over DB: Partial unique index prevents double-lock
-    E-->>P: Redirect to PayFast hosted checkout
-    P->>PF: Complete payment
-    PF->>E: Signed payment.success webhook
-    E->>E: Verify webhook signature
-    E->>DB: Atomic transaction — appointment → confirmed<br/>+ fee_at_booking captured + payment record
+    P->>E: Pick slot → book
+    E->>DB: pending appointment (locks slot + snapshots fee_at_booking)
+    Note over DB: Partial unique index prevents double-booking
+    E-->>P: Booking pending — bank-transfer instructions shown
+    P->>E: POST /:id/pay { reference } (bank-transfer reference)
+    E->>DB: Store transfer reference on appointment
+    A->>E: Review reference → accept or reject
+    E->>DB: accept → confirmed (or reject → cancelled)
     E->>E: Enqueue confirmation email (notification worker)
     E-->>P: Confirmation shown on dashboard
 ```
@@ -138,31 +135,18 @@ flowchart TD
     D -- Yes --> E[Doctor submits<br/>immutable prescription]
     E --> F[Prescription-ready<br/>email enqueued]
     F --> G([Patient downloads<br/>client-rendered PDF])
-
-    H([Patient or doctor<br/>cancels appointment]) --> I{Eligibility check}
-    I -- Refund eligible --> J[Compute net-of-fee<br/>refund amount]
-    J --> K[Idempotent refund call<br/>to PayFast adapter]
-    K --> L{Refund succeeded?}
-    L -- Yes --> M([Dashboard shows<br/>refund status])
-    L -- No --> N[Retry with backoff<br/>Admin alert on exhaustion]
-
-    O([Reconciliation worker<br/>hourly]) --> P[Query PayFast for<br/>unconfirmed payments]
-    P --> Q{Missed webhook<br/>found?}
-    Q -- Yes --> R[Atomic commit<br/>or refund if slot taken]
-    Q -- No --> S([No action needed])
 ```
 
 ---
 
 ## 4. Integration points
 
-Three external services, each behind a thin adapter interface:
+Payment is offline (admin-verified bank transfer, ADR-43), so there is no payment integration or adapter. Two external services remain, each behind a thin adapter interface:
 
-- **PayFast (payment adapter)** — Hosted checkout handoff; dual-channel confirmation (signed `CHECKOUT_URL` callback + browser `SUCCESS_URL`/`FAILURE_URL` return) verified on success/failure. PayFast **Pakistan** exposes no refund or status-query API → refunds settle via an admin out-of-band action keyed by `refund_idempotency_key` and reconciliation surfaces stuck payments for manual review (ADR-32). Accessed only through the `PaymentProvider` adapter interface (`server/src/integrations/payment/`). Detailed payload contracts and field descriptions live in doc 14.
-- **Daily.co (video adapter)** — One room per appointment; time-bound meeting tokens scoped to the slot window; browser-only join; participant join/leave events feed the appointment-evaluation worker. Accessed only through the `VideoProvider` adapter interface (`server/src/integrations/video/`). Detailed contracts live in doc 14.
+- **Daily.co (video adapter)** — One room per appointment; time-bound meeting tokens scoped to the slot window; browser-only join. Daily free tier — `createRoom` + `issueToken` only; there is no participant webhook. Accessed only through the `VideoProvider` adapter interface (`server/src/integrations/video/`). Detailed contracts live in doc 14.
 - **Resend (email adapter)** — The 6 transactional email triggers; bounce/complaint webhooks; retry/backoff managed by the notification worker. No PDF attachments in v1. Accessed only through the `EmailProvider` adapter interface (`server/src/integrations/email/`). The 6-email merge-variable catalog and trigger conditions live in doc 14.
 
-There are no message queues or other third-party infrastructure services. The three background workers (reconciliation, notification, appointment-evaluation) are in-process `node-cron` jobs calling the service layer directly.
+There are no message queues or other third-party infrastructure services. The single background worker (`notification-dispatch`) is an in-process `node-cron` job calling the service layer directly.
 
 ---
 
@@ -170,7 +154,7 @@ There are no message queues or other third-party infrastructure services. The th
 
 **Local development** — `docker-compose.yml` runs two services: the app container and a Postgres container. All secrets and URLs are loaded from `.env` (contract: `.env.example`). Prisma migrations run via `npx prisma migrate dev`. Detailed local-environment steps live in doc 10.
 
-**Production** — Railway all-in-one deployment: one app service (Docker image built from the multi-stage `Dockerfile`) + a managed Postgres plugin (auto-injects `DATABASE_URL`). Region: Mumbai or Singapore to minimize Karachi-latency. The same Docker image that runs locally is pushed to Railway; all configuration is injected via environment variables (12-factor). Always-on for webhooks and cron workers. Detailed deploy runbook, environment variable listing, and admin-bootstrap procedure live in doc 10.
+**Production** — Railway all-in-one deployment: one app service (Docker image built from the multi-stage `Dockerfile`) + a managed Postgres plugin (auto-injects `DATABASE_URL`). Region: Mumbai or Singapore to minimize Karachi-latency. The same Docker image that runs locally is pushed to Railway; all configuration is injected via environment variables (12-factor). Always-on for the single notification cron job (there are no inbound webhooks). Detailed deploy runbook, environment variable listing, and admin-bootstrap procedure live in doc 10.
 
 **Persistent uploads (Slice G)** — A third named volume, `dermestha_uploads` (declared in `docker-compose.yml`, mounted at `/app/uploads` on the app service), persists doctor profile photos across container rebuilds. Express serves the directory statically at `/uploads` with `X-Content-Type-Options: nosniff` and `index: false`.
 
@@ -184,7 +168,7 @@ There are no message queues or other third-party infrastructure services. The th
 
 - **Self-hosted video swap** (LiveKit) — contained behind the `VideoProvider` adapter if cost or 3G performance warrants.
 - **Server-side PDF** (v1.2) — enables email-attached, signed prescriptions; the `renderPrescriptionPdf()` boundary is already isolated on the client.
-- **Medicine Ordering Module (PRD §6)** — reuses the payment adapter, audit log, and snapshot discipline; out of v1 scope.
+- **Medicine Ordering Module (PRD §6)** — reuses the audit log and snapshot discipline; out of v1 scope.
 - **Dermestha wallet, SMS/WhatsApp, Urdu, native apps, secondary bank gateway** — accommodated by the adapter seams and the same backend.
 
 ---
@@ -201,3 +185,4 @@ There are no message queues or other third-party infrastructure services. The th
 | 2026-06-13 | Added multer file-upload row (§2), `admin` server module (§3a.1), and the `dermestha_uploads` volume + static `/uploads` serving (§5) | Slice G as-built sweep |
 | 2026-06-13 | Corrected §1/§2/§4 PayFast references SA→Pakistan reality: dual-channel confirmation (CHECKOUT_URL callback + browser return); PayFast PK has no programmatic refund/status API → manual admin path + manual-review surfacing (ADR-32) | Slice H · S1 (PayFast Pakistan adapter) |
 | 2026-06-15 | §3a.1: server module no longer lists a co-located `test.js` — tests centralized under `server/test/` (ADR-40) | Test centralization (ADR-40); behavior unchanged |
+| 2026-06-28 | Removed PayFast/PaymentProvider adapter, dual-channel confirmation, refund flow, reconciliation & appointment-evaluation workers, and the Daily participant webhook across §1–§6; payment is now offline bank transfer (admin-verified, ADR-43); single `notification-dispatch` worker; §3b/§3c flows redrawn to book→pending→reference→admin accept/reject | Manual-payment pivot — as-built sync |

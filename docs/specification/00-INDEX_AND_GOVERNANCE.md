@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------ |
 | Document ID      | `00-INDEX_AND_GOVERNANCE`                                                                              |
 | Status           | Canonical                                                                                              |
-| Version          | 1.0                                                                                                    |
-| Last updated     | 2026-06-01                                                                                             |
+| Version          | 1.1                                                                                                    |
+| Last updated     | 2026-06-28                                                                                             |
 | Sources absorbed | `docs/superpowers/specs/2026-06-01-documentation-suite-design.md §7.1; docs/product/PRD.md Appendix A` |
 | Related docs     | all (00–15)                                                                                            |
 
@@ -70,14 +70,11 @@ All documents in this suite reference the definitions below rather than redefini
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **PMC**                       | Pakistan Medical Commission — official medical licensing body                                                                                                                    |
 | **DRAP**                      | Drug Regulatory Authority of Pakistan                                                                                                                                            |
-| **Slot lock**                 | 10-minute reservation on a slot during the patient's payment flow                                                                                                                |
-| **No-show grace**             | 15-minute window after slot start before an appointment is marked as no-show                                                                                                     |
+| **Slot lock**                 | Booking a slot creates a `pending` appointment that holds (locks) the slot; the slot frees only when a human cancels or rejects the appointment — there is no 10-minute timed auto-expiry (ADR-43).        |
 | **Immutable prescription**    | A submitted prescription cannot be edited; corrections require issuing a new linked prescription                                                                                 |
-| **`feeAtBooking`**            | Snapshot of the doctor's consultation fee taken at the moment the appointment is confirmed; never changes for that appointment thereafter                                        |
+| **`feeAtBooking`**            | Snapshot of the doctor's consultation fee taken at booking/lock time (when the pending appointment is created, for the payment instructions); never changes for that appointment thereafter (ADR-43).      |
 | **`mustChangePassword`**      | Flag on a user record (doctor or admin) requiring a password change before the next protected route is reached; set on creation and on admin reset, cleared on successful change |
-| **`disputed`**                | A boolean flag on an appointment record, set by admin via A5 when a chargeback or unresolved patient claim is recorded. Orthogonal to the §4.3 state machine.                    |
 | **Medicine price snapshot**   | The unit price copied onto a prescription (and onto a medicine order) at issue/placement time; later catalogue price changes never alter it (§3.3 #5).                           |
-| **Refund idempotency key**    | A per-appointment key ensuring a refund settles only once even across automatic retries, the reconciliation path, or an admin's out-of-band gateway action (§3.3 #10).           |
 | **Minimum booking lead time** | Admin-configurable gap required between "now" and a bookable slot's start; default 1 hour, supported down to 30 minutes in v1 (§4.1 #3).                                         |
 
 ---
@@ -126,3 +123,4 @@ The original engineering docs — `docs/product/PRD.md`, `docs/engineering/ARCHI
 | Date       | Change           | Why                                                      |
 | ---------- | ---------------- | -------------------------------------------------------- |
 | 2026-06-01 | Initial creation | First version of the suite entry point + change protocol |
+| 2026-06-28 | Glossary as-built sync: `Slot lock` (no timed expiry), `feeAtBooking` (at booking/lock time); removed `No-show grace`, `disputed`, `Refund idempotency key` (ADR-43) | Manual-payment pivot — as-built sync |

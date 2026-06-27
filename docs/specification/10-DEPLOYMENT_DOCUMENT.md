@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
 | Status           | Canonical                                                                                               |
-| Version          | 1.7                                                                                                     |
-| Last updated     | 2026-06-14                                                                                              |
+| Version          | 1.8                                                                                                     |
+| Last updated     | 2026-06-28                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
 | Related docs     | 03, 08, 15                                                                                              |
 
@@ -59,7 +59,7 @@ The compose file injects a minimal set of env vars (see §4). Developers should 
 
 ### Staging
 
-No dedicated staging environment is configured in v1. If one is added, it should mirror production env vars with `PAYFAST_MODE=sandbox` and separate integration keys.
+No dedicated staging environment is configured in v1. If one is added, it should mirror production env vars with separate integration keys.
 
 ### Production
 
@@ -69,7 +69,6 @@ Hosted on **Railway** in the **Mumbai or Singapore region** (closest to Karachi 
 | ---------------- | ----------------------- | ------------------------------------- |
 | `NODE_ENV`       | `development`           | `production`                          |
 | `APP_BASE_URL`   | `http://localhost:3000` | `https://<railway-domain>`            |
-| `PAYFAST_MODE`   | `sandbox`               | `live`                                |
 | `DATABASE_URL`   | compose service `db`    | Railway-injected managed Postgres     |
 | `SESSION_SECRET` | placeholder value       | Strong random secret, per-environment |
 | Integration keys | dev/sandbox keys        | Live production keys                  |
@@ -90,20 +89,17 @@ Complete every item before triggering a production deploy.
 
   ```sql
   CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
-    WHERE state IN (
-      'slot_locked', 'confirmed', 'in_progress', 'completed',
-      'prescription_issued', 'cancelled_no_refund'
-    );
+    WHERE state IN ('pending', 'confirmed');
   ```
 
   Confirm this index is present in the migration before deploying.
 
 - [ ] **Prisma version pinned** — `package.json` must pin `prisma@6.x` and `@prisma/client@6.x` (Prisma 7 dropped in-schema `datasource.url`). Current pin is `6.19.3`. See doc 15 §7 (Migration Caveats).
 - [ ] **Environment variables set** — all required vars from doc 15 are configured in Railway's environment dashboard; no var is left empty for production.
-- [ ] **Secrets rotated per environment** — `SESSION_SECRET`, `PAYFAST_*`, `DAILY_API_KEY`, `RESEND_API_KEY`, `SENTRY_DSN`.
-- [ ] **PayFast KYC complete** — merchant account must be fully verified before `PAYFAST_MODE=live` can process payments (ARCHITECTURE.md §12).
-- [ ] **Dev provider switches OFF** — `PAYMENT_PROVIDER` and `EMAIL_PROVIDER` are unset or `stub` (NOT `mock`/`console`) so the dev mock payment gateway and the `/dev/checkout` routes are never mounted in production (ADR-22; doc 08; doc 15).
-- [ ] **Dev video switch OFF** — `VIDEO_PROVIDER` is unset or `stub` (NOT `mock`) so the dev mock video provider, the `/dev/video/*` join-simulator routes, and the `/dev/worker/*` evaluation trigger are never mounted in production (ADR-24; doc 08; doc 15).
+- [ ] **Secrets rotated per environment** — `SESSION_SECRET`, `DAILY_API_KEY`, `RESEND_API_KEY`, `SENTRY_DSN`.
+- [ ] **Bank-transfer settings populated** — the admin `settings` row carries the live `bankName` / `bankAccountName` / `bankAccountNumber` / `bankInstructions` shown to patients on a pending booking; verify they are set before taking real bookings (payment is offline, admin-verified — ADR-43).
+- [ ] **Dev provider switch OFF** — `EMAIL_PROVIDER` is unset or `stub` (NOT `console`) so the dev email stub is never used in production (doc 08; doc 15).
+- [ ] **Dev video switch OFF** — `VIDEO_PROVIDER` is unset or `stub` (NOT `mock`) so the dev mock video provider is never used in production. (The only dev route, `POST /dev/worker/notifications`, is mounted solely when `NODE_ENV=development`.) (ADR-24; doc 08; doc 15.)
 - [ ] **Uploads directory configured** — `UPLOADS_DIR` is set (default `./uploads`) and the path is writable and backed by persistent storage (a Railway volume), otherwise doctor profile photos are lost on every redeploy. See doc 15 §8 (File Storage).
 - [ ] **Settings singleton — automatic.** The `settings` row (`id = 1`) is bootstrapped **automatically at server boot** by `ensureSettings()` (`server/src/index.js`), which idempotently upserts `id = 1` (schema defaults fill the row). No manual `INSERT`, seed step, or first-deploy action is required; `GET`/`PUT /api/admin/settings` work on a fresh DB. (Slice H · S6, resolving the prior known gap.)
 - [ ] **First deploy only: admin bootstrap** — run `npm run bootstrap:admin` after the initial deploy (see §9 and §4 step 8).
@@ -249,19 +245,11 @@ Run these checks after every production deploy (or after a Railway redeploy).
 
 2. **Login smoke test** — log in with the admin account; confirm role-based routing lands on the admin dashboard.
 
-3. **Booking happy path** — as a patient, find a doctor, lock a slot, verify the PayFast sandbox checkout redirect fires, confirm the appointment appears in the dashboard.
+3. **Booking happy path** — as a patient, find a doctor, book a slot (appointment goes to `pending`), verify the bank-transfer instructions appear, submit a transfer reference via `POST /api/appointments/:id/pay`, then as an admin accept the booking and confirm it shows as `confirmed` on the dashboard.
 
-4. **Webhook reachability** — verify the PayFast notify URL is publicly reachable:
+4. **Worker liveness** — confirm the single in-process worker started without error. Check application logs in Railway for the `workers started: notification-dispatch (* * * * *)` startup message (exact label matches `server/src/workers/index.js`).
 
-   ```
-   ${APP_BASE_URL}/api/webhooks/payfast
-   ```
-
-   This URL must be registered in the PayFast merchant dashboard as the IPN endpoint. Confirm Railway has not placed the service behind a domain that requires authentication.
-
-5. **Worker liveness** — confirm the three in-process workers (reconciliation, notification, appointment-evaluation) started without error. Check application logs in Railway for `[worker:reconciliation]`, `[worker:notification]`, `[worker:appointmentEval]` startup messages (exact log labels match `server/src/workers/`).
-
-6. **Admin alert feed (A3)** — navigate to the admin dashboard; confirm the alert feed is rendering and no unexpected errors are queued.
+5. **Admin alert feed (A3)** — navigate to the admin dashboard; confirm the alert feed is rendering and no unexpected errors are queued.
 
 ---
 
@@ -277,8 +265,6 @@ The in-app admin alert feed (view A-03) surfaces operational events that require
 
 | Alert category              | Trigger                                                                   |
 | --------------------------- | ------------------------------------------------------------------------- |
-| Webhook mismatch            | PayFast IPN with invalid or missing signature                             |
-| Refund exhaustion           | the refund logic (`modules/appointment/service.js`) has exhausted all retry attempts (`REFUND_MAX_ATTEMPTS`) |
 | Email failure               | Notification worker has exhausted retries for an email trigger            |
 | Awaiting prescription > 12h | Appointment completed but no prescription submitted after 12 hours        |
 | Sustained login abuse       | Failed-login rate exceeds lockout threshold (§3.6 / doc 08)               |
@@ -335,3 +321,4 @@ A formal version scheme and Git tagging convention have not been established. At
 | 2026-06-13 | Added `dermestha_uploads` app-service volume (§2); added pre-deploy checks for `UPLOADS_DIR` persistence + Settings-singleton (id=1) known gap (§3); made `db:seed` required not optional (§4.1); added uploaded-photo rollback note (§6) | Slice G as-built sweep |
 | 2026-06-14 | Added a Node-version-floor note under the Dockerfile build steps: `@daily-co/daily-js@0.91.0` (video UI) requires Node ≥22.14.0; `node:22-slim` satisfies it but must not be pinned below that (doc 07 open-q 11) | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | Settings singleton (id=1) is now bootstrapped automatically at boot via `ensureSettings()` — replaced the manual-insert first-deploy checklist item + adjusted the local-dev seed note (§3, §4.1); renamed `ERROR_TRACKING_DSN` → `SENTRY_DSN` (secrets checklist §3 + error-tracking paragraph §8, now naming Sentry + PII scrub; ADR-36) | Slice H · S6 (launch foundation + hardening) |
+| 2026-06-28 | Removed all PayFast/payment-gateway and refund deploy facts: dropped the `PAYFAST_MODE` env row + staging note (§2), the `PAYFAST_*` secret + PayFast-KYC checklist items + `PAYMENT_PROVIDER`/`/dev/checkout` switch (§3), the PayFast webhook-reachability check (§7), and the Webhook-mismatch + Refund-exhaustion alert rows (§8); booking-validation + worker-liveness now reflect the manual book→pending→reference→admin-accept flow and the single `notification-dispatch` worker; added a bank-transfer-settings checklist item; corrected the `uniq_active_slot` hand-append SQL to the as-built `WHERE state IN ('pending', 'confirmed')` (ADR-43) | Manual-payment pivot — as-built sync |

@@ -1,12 +1,12 @@
 # 2026-06-27-1817 — manual-payment-pivot-design
 
-**Status:** Partial (code implemented + green; spec 00–15 sync pending user approval)
+**Status:** Completed (code + specs synced; verified incl. real-browser; pushed)
 **Goal:** Brainstorm + design the phase-1 pivot to a fully-manual offline payment flow (delete all in-app payment + refund code; admin-verified bank-transfer booking).
 **Skill(s) used:** superpowers:brainstorming (user opted in)
 **Ticket / issue:** None
 **Branch:** main (no code changes yet; design + changelog only)
 **Commits / PR:** ~30 commits on `main` (not pushed): design `c140a68`; plans `04b0521`; backend `31a89dc`→`1baeb27`; frontend `df49d9d`→`730bb1d`; e2e `a5333e2`,`2d88b62`. Tag `pre-manual-payment-pivot` at `cba465e`.
-**Last updated:** 2026-06-28-0305
+**Last updated:** 2026-06-28-0345
 **Tags:** #feature #refactor #design
 
 ## Summary
@@ -39,7 +39,8 @@ plan — removing no-show tracking removes that dependency.
 | `client/src/modules/{booking,appointment,admin,doctor}/**` | Modified/Created | PaymentInstructions screen, AdminReview queue, bank settings, pending card, 4-state labels; removed gateway/refund/dispute UI |
 | `prisma/scripts/seed-baseline.js`, `e2e/support/db.js`, `e2e/global-setup.js`, `playwright.config.js`, `e2e/tests/j*.spec.js` | Modified | seeds + e2e reworked for the 4-state manual model |
 | `.env.example`, `.env.example.dev` | Modified | dropped PAYFAST_*/PAYMENT_PROVIDER/refund/no-show env |
-| `<scratchpad>/ADR-manual-payment.md` | Created (by backend agent) | ADR draft — to be applied into doc 11 at the doc-sync step |
+| `<scratchpad>/ADR-manual-payment.md` | Created (by backend agent) | ADR draft — applied into doc 11 as ADR-43 at the doc-sync step |
+| `docs/specification/00`–`15` (all 16) | Modified | Doc-to-code sync (manual-payment + 3-state): ADR-43 + superseded ADRs (11), enum/schema (04), API+state-machine (05), config (15), integrations/email (14), scope (02), design (06), risk/security/testing (07/08/09), deployment (10), test cases (12), status (13), PRD/glossary (01/00); version bumps + revision footers per doc 00 governance. Controller spot-checked 04/05/11 against as-built. |
 
 ## Dependencies / config / schema
 No schema migration applied yet. The DESIGN specifies (for the build phase): `AppointmentState` enum

@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.12                                                                                      |
-| Last updated     | 2026-06-23                                                                                |
+| Version          | 1.13                                                                                      |
+| Last updated     | 2026-06-28                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -42,7 +42,7 @@ flowchart LR
   P02["P-02<br/>Browse / listing"]
   P03["P-03<br/>Doctor profile"]
   P06["P-06<br/>Booking<br/>(slot + who-for)"]
-  P07["P-07<br/>Payment handoff<br/>& return"]
+  P07["P-07<br/>Payment instructions<br/>(bank transfer)"]
   P08["P-08<br/>Dashboard<br/>Upcoming"]
   P11["P-11<br/>Waiting room"]
   P12["P-12<br/>Video consultation"]
@@ -107,7 +107,7 @@ Appointments — Availability (weekly grid)
 
 ### Admin sidebar links
 
-Doctors — Medicines — Records & audit — System health — Settings
+Doctors — Medicines — Payment review — Records & audit — System health — Settings
 
 `/admin` redirects to `/admin/doctors` — the Doctors list is the admin landing page.
 
@@ -123,7 +123,7 @@ Doctors — Medicines — Records & audit — System health — Settings
 | P-04      | Sign up                                  | Patient                  | P2           |
 | P-05      | Login + password recovery                | Patient / Doctor / Admin | P2, DA2      |
 | P-06      | Booking (slot + who-for)                 | Patient                  | P3, P8       |
-| P-07      | Payment handoff & return                 | Patient                  | P3, edge #6a |
+| P-07      | Payment instructions (bank transfer)     | Patient                  | P3, edge #6a |
 | P-08      | Dashboard — Upcoming                     | Patient                  | P9           |
 | P-09      | Dashboard — Past appointments            | Patient                  | P7           |
 | P-10      | Cancellation modal                       | Patient                  | P6           |
@@ -141,8 +141,9 @@ Doctors — Medicines — Records & audit — System health — Settings
 | A-03      | Alert feed / system health               | Admin                    | A3           |
 | A-04      | Records & Audit Log                      | Admin                    | A5           |
 | A-05      | Settings                                 | Admin                    | A6           |
+| A-06      | Payment review (manual-payment queue)    | Admin                    | A6, ADR-43   |
 
-> **Note (canonical screen-ID registry).** The 24 rows above are the authoritative screen-ID registry — cite these IDs verbatim across the suite. The patient bottom-nav **Profile** destination (§2 navigation, below) is intentionally not a dedicated v1 screen: in v1 it routes to a minimal account view (logout + basic details); richer account management (account deletion / data-export → v1.1; family profiles → v1.2+) is deferred, so it carries no `P-NN` ID.
+> **Note (canonical screen-ID registry).** The 25 rows above are the authoritative screen-ID registry — cite these IDs verbatim across the suite. The patient bottom-nav **Profile** destination (§2 navigation, below) is intentionally not a dedicated v1 screen: in v1 it routes to a minimal account view (logout + basic details); richer account management (account deletion / data-export → v1.1; family profiles → v1.2+) is deferred, so it carries no `P-NN` ID.
 
 ---
 
@@ -188,22 +189,17 @@ Submitting a booking while the patient already holds a live slot lock is rejecte
 
 Centered on a dimmed backdrop (`rgba(15,33,24,.45)`). A 4 px accent bar at the top is colored by intent: spruce for confirmations, danger red for cancellations and deactivation. Actions are right-aligned: ghost "cancel" + filled "confirm". Never left-aligned in a content column.
 
-Confirm-gated actions include: cancellations (P-10), doctor cancel (D-06), admin deactivation (A-01), and the **A-05 platform-settings save** — gated because it alters money-math defaults (fallback fee + minimum booking lead).
+Confirm-gated actions include: cancellations (P-10), doctor cancel (D-06), admin deactivation (A-01), and the **A-05 platform-settings save** — gated because it alters the bank-transfer payment details shown to patients on the payment-instructions screen (P-07) and the minimum booking lead.
 
-### Payment flow states (P-07)
+### Payment instructions (P-07)
 
-Returned as finished centered cards (~520 px, icon circle + title + body + single action):
+As-built (manual-payment pivot, ADR-43), P-07 is a **PaymentInstructions** screen (`/book/pay/:id`, `client/src/modules/booking/views/PaymentInstructions/PaymentInstructions.jsx`): after confirming a booking the patient is routed here for the resulting `pending` appointment. It is a single `.section-card` that shows the slot time + amount due (`formatKarachi` · `formatPkr`) and the clinic bank-transfer details carried from A-05 settings — **Bank** (`bankName`), **Account name** (`bankAccountName`), **Account number** (`bankAccountNumber`), and an optional **Bank instructions** note (`bankInstructions`). Below the details a required **"Bank transaction reference"** text field (submit disabled until ≥ 3 characters) submits the reference from the patient's offline transfer; once submitted the form is replaced by an `info` alert — "Awaiting confirmation … once the admin verifies your payment." A "Back to my appointments" link returns to P-08.
 
-- **Success** — confirmed → redirect to dashboard.
-- **Failure** — retry within lock window.
-- **Lock expired** — "slot released — please pick another".
-- **Platform couldn't secure slot** — full refund message.
+There is **no payment-gateway redirect, hosted-checkout handoff/return page, or status polling** (ADR-43): the prior gateway handoff, the four centered return-state cards (Success / Failure / Lock-expired / couldn't-secure-slot), and the terminal "Payment not completed" card are **removed**; offline bank-transfer + admin verification (A-06) replaces the gateway.
 
-As-built, because a failed payment force-expires the lock (ADR-39), the Failure and Lock-expired cases converge into one terminal **"Payment not completed"** card (the slot hold was released → pick another time). The return page keys this off the appointment's `lockExpiresAt` vs. `serverNow` (doc 05) and **stops polling** on a terminal outcome — it never shows an indefinite "Awaiting payment confirmation…" spinner.
+### Payment-pending card (P-08)
 
-### Payment-pending hold card (P-08)
-
-While a slot lock is live (its hold has not expired), the patient's Upcoming list renders a **"Payment pending — hold expires <time>"** card with a **"Complete payment"** button that resumes the hosted checkout (P-07). The card appears only while the hold is live; once the hold expires it disappears.
+A `pending` appointment renders in the patient Upcoming list with the **"Payment pending"** status badge (`badge--warning`) and a primary action linking to the P-07 payment-instructions screen (`/book/pay/:id`): **"Enter payment reference"** before a reference is submitted, or **"View payment details"** afterwards — in which case a muted **"Awaiting confirmation"** note sits beside it. As-built per ADR-43 there is no hold-expiry countdown or "Complete payment" hosted-checkout resume.
 
 ### Not-found & cross-tenant states
 
@@ -238,26 +234,27 @@ The A-01 add/edit form includes a weekly-template editor and a profile-photo upl
 
 Each catalogue row exposes **Edit** (alongside Deactivate / Reactivate). Edit reuses the add-medicine form pre-filled with the row's values and saves via `PATCH /api/admin/medicines/:id`; edits (name / generic / forms / price) propagate to the prescription-builder view but never alter existing prescriptions' snapshots (F11.03 / §3.3 #5).
 
-### Appointment cancellation modals
+### Payment review (A-06)
 
-- ≥ 2 h before: refund breakdown (paid − gateway fee = refund) with "excludes gateway fee" note → "Cancel & refund".
-- < 2 h before: warning ("No refund; the slot stays blocked") → confirm.
+The admin payment-review queue (`/admin/review`, `client/src/modules/admin/views/AdminReview/AdminReview.jsx`) is the manual-payment verification screen (ADR-43). A single `.section-card` holds a `.table` of `pending` appointments — columns **Slot | Patient | Doctor | Amount | Bank ref** — each row exposing an **Accept** button (`btn--sm`, → `confirmed`) and a ghost **Reject** button (→ `cancelled`, slot freed). An empty queue shows the "No payments awaiting review." empty state. There is **no refund / dispute / chargeback admin UI** (ADR-43).
+
+### Settings (A-05)
+
+The platform-settings form (`AdminSettings.jsx`) holds the **minimum booking lead time** (`minBookingLeadMinutes`) plus the bank-transfer detail fields surfaced on the P-07 payment-instructions screen — **Bank name** (`bankName`), **Account name** (`bankAccountName`), **Account number** (`bankAccountNumber`), and a **Bank instructions** `<textarea>` (`bankInstructions`). Save is confirm-gated (above). There is no payment-gateway / fallback-fee configuration (removed with the gateway, ADR-43).
+
+### Appointment cancellation modal (P-10 / D-06)
+
+As-built per ADR-43 there is **no refund breakdown or no-refund warning** (the gateway-fee math and refund estimate are removed). `CancelModal` is a single danger-accent confirm dialog — "Cancel appointment? This cannot be undone." — with **Keep appointment** (ghost) and **Cancel appointment** (danger). It is offered only on a `confirmed` appointment.
 
 ### Appointment state → badge mapping
 
-| Underlying state                      | Patient-facing label                | Badge variant                              |
-| ------------------------------------- | ----------------------------------- | ------------------------------------------ |
-| `confirmed`                           | Confirmed                           | success                                    |
-| `in_progress`                         | In progress                         | info                                       |
-| `completed` / `prescription_issued`   | Completed · Prescription ready      | success                                    |
-| `cancelled_refunded`                  | Cancelled — refunded                | info                                       |
-| `cancelled_no_refund`                 | Cancelled — no refund               | neutral                                    |
-| `doctor_cancelled` / `doctor_no_show` | Cancelled by doctor — refund issued | danger                                     |
-| `patient_no_show`                     | Missed (no-show)                    | warning                                    |
-| `awaiting_prescription` (derived)     | Awaiting prescription               | warning                                    |
-| `disputed` (admin only)               | Disputed                            | danger outline marker, orthogonal to state |
+| Underlying state | Patient-facing label | Badge variant |
+| ---------------- | -------------------- | ------------- |
+| `pending`        | Payment pending      | warning       |
+| `confirmed`      | Confirmed            | success       |
+| `cancelled`      | Cancelled            | neutral       |
 
-This badge renders on **every row** of the patient Upcoming (P-08), patient Past (P-09), and doctor D-02 lists (the patient Upcoming previously omitted it). The state→variant mapping is applied via `stateBadge(state)`, alongside the F08.01 labels in `client/src/modules/appointment/stateLabel.js`.
+As-built (manual-payment pivot, ADR-43) the appointment lifecycle is exactly these three stored states; `stateLabel.js` carries no `in_progress` / `completed` / no-show / refund / dispute badges. This badge renders on **every row** of the patient Upcoming (P-08), patient Past (P-09), doctor D-02, and admin Records & audit (A-04) lists, applied via `stateBadge(state)` alongside the labels in `client/src/modules/appointment/stateLabel.js`. Separately, the doctor D-02 Today/History view renders a derived, doctor-only **"Awaiting prescription"** nudge (`badge--warning`) on a `confirmed` past appointment that has no prescription yet — orthogonal to the stored state, not produced by `stateBadge`.
 
 ### System banner
 
@@ -330,12 +327,12 @@ All hex values are copied verbatim from `mockups/assets/css/tokens.css`.
 
 | Token       | Text value | Background value | Use                                           |
 | ----------- | ---------- | ---------------- | --------------------------------------------- |
-| success     | `#136B45`  | `#E6F1EA`        | Confirmed, completed, prescription ready      |
-| info        | `#2F6E6E`  | `#E2EFEE`        | In progress, cancelled–refunded               |
-| warning     | `#9A6B1F`  | `#FBF0E0`        | Missed/no-show, awaiting prescription         |
-| danger      | `#B23A2E`  | `#F7E9E6`        | Doctor-cancelled, destructive actions, errors |
+| success     | `#136B45`  | `#E6F1EA`        | Confirmed; submitted-prescription badge       |
+| info        | `#2F6E6E`  | `#E2EFEE`        | Informational alerts (e.g. awaiting payment confirmation) |
+| warning     | `#9A6B1F`  | `#FBF0E0`        | Payment pending; awaiting-prescription nudge  |
+| danger      | `#B23A2E`  | `#F7E9E6`        | Destructive actions, errors                   |
 | danger-deep | `#9A2A20`  | —                | Error text needing higher contrast            |
-| neutral     | `#56625B`  | `#EAEEEA`        | Cancelled–no-refund, generic                  |
+| neutral     | `#56625B`  | `#EAEEEA`        | Cancelled; generic                            |
 
 ### Contrast guardrails
 
@@ -645,3 +642,4 @@ The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`
 | 2026-06-22 | §7: documented the shared in-page tab control (`.tabs`/`.tab`), the appointment row-card component (`.appt-row` family), and the `.btn--danger-ghost` button variant; §3: noted the status badge now renders on every patient/doctor appointment row via `stateBadge` | Appointment list-page redesign (ported mockup design into components.css) |
 | 2026-06-23 | §7: documented the prescription document "paper" family (`.rx-paper`…) and the builder families (`.rx-builder-item`/`.rx-prev`/`.field--wide`/`textarea.input`), added `.rx-item__price` nowrap, and the `formatKarachiDate` formatter; §3: added the P-13/D-05 presentation note (document paper, initials signature, newest-first + "Earlier/Previously" dividers, Print) | Prescription view + builder redesign (ported mockup design into components.css) |
 | 2026-06-23 | §7 Select/picker: documented the D-05 medicine combobox (`.med-search` + leading magnifier) and its floating `.listbox` popover (`--shadow-overlay`) of `.option` rows (name/generic/price, hover/`--active` tint, separated `--freetext` fallback) | Medicine search combobox restyle (classes were referenced but never defined in components.css) |
+| 2026-06-28 | Synced the booking/payment surface to manual bank-transfer: P-07 is now the PaymentInstructions screen (bank details + amount + reference field; gateway redirect / return-state cards / polling removed); added admin Payment review (A-06, Accept/Reject) + Settings bank-detail fields; appointment badges reduced to the 3-state set (`pending`/`confirmed`/`cancelled`); cancellation modal stripped of refund math; removed refund/dispute/no-show/gateway UI references; trimmed §4 colour-use prose | Manual-payment pivot — as-built sync |
