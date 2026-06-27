@@ -16,6 +16,7 @@ import {
 import { generateSlots } from '../doctor/service.js';
 import { paymentProvider } from '../../integrations/payment/index.js';
 import * as notification from '../notification/service.js';
+import * as analytics from '../analytics/service.js';
 import * as audit from '../../services/audit/audit.service.js';
 // Self-import: intra-module calls that tests stub (quoteRefund/transition/initiateRefund/safeRefund)
 // route through the namespace so vi.spyOn can intercept them under ESM (a bare local call cannot be spied).
@@ -250,6 +251,54 @@ export async function submitPaymentReference({ patientUserId, appointmentId, ref
   });
   await notification.enqueuePaymentSubmittedAdmin({ appointment: appt, reference }).catch(() => {});
   return { ok: true };
+}
+
+/**
+ * Admin verifies the manual payment (design §7.2). accept → pending→confirmed + booking
+ * confirmation email; reject → pending→cancelled (frees slot) + "payment not received" email.
+ * @param {{ appointmentId: string, accept: boolean, actorId: string }} args
+ */
+export async function adminDecision({ appointmentId, accept, actorId }) {
+  const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+  if (!appt) throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
+  if (appt.state !== 'pending') {
+    throw new AppError('INVALID_TRANSITION', 'Only pending appointments can be reviewed.', 409);
+  }
+  if (accept) {
+    await self.transition({ appointmentId, to: 'confirmed', actorType: 'admin', actorId });
+    const [patient, doctor] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: appt.patientUserId },
+        select: { email: true, fullName: true },
+      }),
+      prisma.doctor.findUnique({
+        where: { id: appt.doctorId },
+        select: { user: { select: { fullName: true } } },
+      }),
+    ]);
+    await notification
+      .enqueueBookingConfirmation({
+        appointment: appt,
+        patient,
+        doctorName: doctor.user.fullName,
+        fee: appt.feeAtBooking,
+      })
+      .catch(() => {});
+    // KPI #1 conversion event — moved here from the deleted confirmPaidAppointment. Best-effort.
+    await analytics
+      .record({ type: 'booking_confirmed', meta: { doctorId: appt.doctorId, fee: appt.feeAtBooking } })
+      .catch(() => {});
+    return { state: 'confirmed' };
+  }
+  await self.transition({
+    appointmentId,
+    to: 'cancelled',
+    actorType: 'admin',
+    actorId,
+    reason: 'payment not received',
+  });
+  await notification.enqueuePaymentNotReceived({ appointment: appt }).catch(() => {});
+  return { state: 'cancelled' };
 }
 
 /** Legal transitions (manual-payment, doc 05 §5). pending→{confirmed,cancelled};

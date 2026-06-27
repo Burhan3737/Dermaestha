@@ -11,9 +11,9 @@ export const recordsQuerySchema = z.object({
   patient: z.string().trim().max(200).optional(),
   doctorName: z.string().trim().max(200).optional(),
   appointmentId: z.string().trim().max(64).optional(),
-  /** Matches payment providerRef OR refundRef. */
+  /** Matches the patient-entered bank transaction reference. */
   paymentRef: z.string().trim().max(128).optional(),
-  state: z.enum(['slot_locked', 'confirmed', 'in_progress', 'completed', 'prescription_issued', 'cancelled_refunded', 'cancelled_no_refund', 'doctor_cancelled', 'patient_no_show', 'doctor_no_show']).optional(),
+  state: z.enum(['pending', 'confirmed', 'completed', 'cancelled']).optional(),
   from: isoDate.optional(),
   to: isoDate.optional(),
 });
@@ -31,19 +31,13 @@ export const auditQuerySchema = z.object({
   to: isoDate.optional(),
 });
 
-/** PUT /api/admin/settings (F14). Full replace of the three tunables, bounded. */
+/** PUT /api/admin/settings (F14). Full replace of the lead-time + manual-payment bank details. */
 export const settingsUpdateSchema = z.object({
   /** Floor 30 per §4.1 #3; ceiling one day. */
   minBookingLeadMinutes: z.number().int().min(30).max(24 * 60),
-  /** Basis points, 0–100%. */
-  fallbackFeePctBps: z.number().int().min(0).max(10000),
-  /** PKR paisa, non-negative. */
-  fallbackFeeFixed: z.number().int().min(0),
-});
-
-/** POST /api/admin/payments/:appointmentId/record-refund (Slice H S1; manual out-of-band refund). */
-export const recordRefundSchema = z.object({
-  refundRef: z.string().trim().min(1).max(128),
-  /** PKR paisa, positive; optional (the settled payment row already holds the amount). */
-  amount: z.number().int().positive().optional(),
+  /** Manual-payment bank instructions (shown to the patient). Nullable to clear. */
+  bankName: z.string().trim().max(120).nullish(),
+  bankAccountName: z.string().trim().max(120).nullish(),
+  bankAccountNumber: z.string().trim().max(60).nullish(),
+  bankInstructions: z.string().trim().max(2000).nullish(),
 });

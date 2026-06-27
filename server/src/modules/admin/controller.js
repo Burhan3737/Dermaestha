@@ -1,5 +1,6 @@
 // @ts-check
 import * as adminService from './service.js';
+import * as appointmentService from '../appointment/service.js';
 
 export async function records(req, res, next) {
   try {
@@ -57,13 +58,26 @@ export async function putSettings(req, res, next) {
   }
 }
 
-export async function recordRefund(req, res, next) {
+export async function acceptAppointment(req, res, next) {
   try {
     res.json(
-      await adminService.recordManualRefund({
-        appointmentId: req.params.appointmentId,
-        refundRef: req.body.refundRef,
-        amount: req.body.amount,
+      await appointmentService.adminDecision({
+        appointmentId: req.params.id,
+        accept: true,
+        actorId: req.session.userId,
+      }),
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function rejectAppointment(req, res, next) {
+  try {
+    res.json(
+      await appointmentService.adminDecision({
+        appointmentId: req.params.id,
+        accept: false,
         actorId: req.session.userId,
       }),
     );

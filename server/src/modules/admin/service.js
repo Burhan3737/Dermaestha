@@ -3,27 +3,22 @@ import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import * as audit from '../../services/audit/audit.service.js';
 import { karachiWallTimeToUtc } from '../../lib/tz/tz.js';
-import * as notification from '../notification/service.js';
 
-/** Doc-02 F13.01 record row. The settled money figures come from the SUCCESS payment row
- *  (PaymentStatus enum: pending|success|failed — there is no "paid"). */
-const toRecordRow = (a) => {
-  const paid = a.payments.find((p) => p.status === 'success');
-  return {
-    id: a.id,
-    slotStart: a.slotStart,
-    slotEnd: a.slotEnd,
-    state: a.state,
-    disputed: a.disputed,
-    patientName: a.patient.fullName,
-    patientEmail: a.patient.email,
-    subjectName: a.forSelf ? null : a.subjectName,
-    doctorName: a.doctor.user.fullName,
-    amountPaid: paid?.amount ?? null,
-    paymentRef: paid?.providerRef ?? null,
-    refundRef: paid?.refundRef ?? null,
-  };
-};
+/** Doc-02 F13.01 record row (manual-payment model). Money is offline: the fee snapshot is
+ *  `feeAtBooking`; the patient-entered bank transaction reference is `paymentReference`. */
+const toRecordRow = (a) => ({
+  id: a.id,
+  slotStart: a.slotStart,
+  slotEnd: a.slotEnd,
+  state: a.state,
+  patientName: a.patient.fullName,
+  patientEmail: a.patient.email,
+  subjectName: a.forSelf ? null : a.subjectName,
+  doctorName: a.doctor.user.fullName,
+  amountDue: a.feeAtBooking ?? null,
+  paymentReference: a.paymentReference ?? null,
+  paymentSubmittedAt: a.paymentSubmittedAt ?? null,
+});
 
 /** F13.01: unified, filtered, paginated, newest-first. Read-only projection.
  *  `from`/`to` are "YYYY-MM-DD" Karachi calendar dates (inclusive both ends):
@@ -55,9 +50,7 @@ export async function listRecords({
     ...(doctorName
       ? { doctor: { user: { fullName: { contains: doctorName, mode: 'insensitive' } } } }
       : {}),
-    ...(paymentRef
-      ? { payments: { some: { OR: [{ providerRef: paymentRef }, { refundRef: paymentRef }] } } }
-      : {}),
+    ...(paymentRef ? { paymentReference: { contains: paymentRef, mode: 'insensitive' } } : {}),
     ...(from || to
       ? {
           slotStart: {
@@ -76,9 +69,6 @@ export async function listRecords({
       include: {
         patient: { select: { fullName: true, email: true } },
         doctor: { select: { user: { select: { fullName: true } } } },
-        payments: {
-          select: { status: true, amount: true, providerRef: true, refundRef: true },
-        },
       },
     }),
     prisma.appointment.count({ where }),
@@ -155,13 +145,10 @@ export async function resendEmail({ jobId, actorId }) {
 }
 
 const ALERT_EVENT_TYPES = [
-  'payment.reconciliation_mismatch',
-  'payment.refund_exhausted',
+  // Manual-payment: a patient submitted a bank transaction reference awaiting admin review.
+  'payment.submitted',
   'email.send_failed_final',
   'system.unhandled_exception',
-  // Slice H S1: PayFast PK manual-intervention alerts (no gateway status/refund API).
-  'payment.manual_review_required',
-  'payment.refund_manual_required',
 ];
 const AWAITING_PRESCRIPTION_HOURS = 12;
 
@@ -224,8 +211,10 @@ export async function listAlerts(now = new Date()) {
 
 const settingsShape = (s) => ({
   minBookingLeadMinutes: s.minBookingLeadMinutes,
-  fallbackFeePctBps: s.fallbackFeePctBps,
-  fallbackFeeFixed: s.fallbackFeeFixed,
+  bankName: s.bankName,
+  bankAccountName: s.bankAccountName,
+  bankAccountNumber: s.bankAccountNumber,
+  bankInstructions: s.bankInstructions,
 });
 
 /** F14: single seeded row (id=1). Booking + refund code reads it live — no cache to bust.
@@ -255,7 +244,6 @@ export async function getRecordDetail(appointmentId) {
     include: {
       patient: { select: { fullName: true, email: true } },
       doctor: { select: { user: { select: { fullName: true } } } },
-      payments: true,
       prescriptions: { include: { items: true }, orderBy: { issuedAt: 'asc' } },
       notificationJobs: { orderBy: { createdAt: 'asc' } },
     },
@@ -267,47 +255,4 @@ export async function getRecordDetail(appointmentId) {
   });
   const { prescriptions, notificationJobs, ...appointment } = a;
   return { appointment: { ...appointment, ...toRecordRow(a) }, history, prescriptions, notificationJobs };
-}
-
-/** Slice H S1: record an out-of-band (portal) manual refund. Idempotent on rf_<appointmentId>.
- *  This is the glossary "admin out-of-band gateway action" the idempotency key was designed for. */
-export async function recordManualRefund({ appointmentId, refundRef, amount, actorId }) {
-  const payment = await prisma.payment.findFirst({
-    where: { appointmentId, status: 'success' },
-  });
-  if (!payment) throw new AppError('NOT_FOUND', 'No settled payment to record a refund against.', 404);
-  // Idempotent re-POST: already settled → no-op (no double audit / double email).
-  if (payment.refundStatus === 'settled') {
-    return { appointmentId, refundRef: payment.refundRef, refundStatus: 'settled' };
-  }
-  const key = payment.refundIdempotencyKey ?? `rf_${appointmentId}`;
-  await prisma.payment.update({
-    where: { id: payment.id },
-    data: { refundRef, refundStatus: 'settled', refundIdempotencyKey: key, nextRefundRetryAt: null },
-  });
-  await audit.record({
-    eventType: 'payment.manual_refund_recorded',
-    actorType: 'admin',
-    actorId,
-    targetRef: appointmentId,
-    meta: { refundRef, amount: amount ?? null },
-  });
-  // refund_confirmation merge-vars (doc 14 §5): patientName, amount, refundRef, appointmentRef.
-  const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
-  const patient = appt
-    ? await prisma.user.findUnique({
-        where: { id: appt.patientUserId },
-        select: { email: true, fullName: true },
-      })
-    : null;
-  if (patient) {
-    await notification.enqueue({
-      type: 'refund_confirmation',
-      appointmentId,
-      recipientEmail: patient.email,
-      scheduledFor: new Date(),
-      vars: { patientName: patient.fullName, amount: amount ?? payment.amount, refundRef, appointmentRef: appointmentId },
-    });
-  }
-  return { appointmentId, refundRef, refundStatus: 'settled' };
 }

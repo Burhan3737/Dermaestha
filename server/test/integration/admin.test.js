@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-process.env.PAYMENT_PROVIDER = 'mock';
 process.env.EMAIL_PROVIDER = 'console';
-process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
 
 const request = (await import('supertest')).default;
 const { createApp } = await import('#src/index.js');
@@ -158,17 +156,23 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
   it('settings PUT takes effect and floor-validates (F14)', async () => {
     const tooLow = await adminAgent.put('/api/admin/settings').send({
       minBookingLeadMinutes: 15,
-      fallbackFeePctBps: 0,
-      fallbackFeeFixed: 0,
     });
     expect(tooLow.status).toBe(400); // floor 30 enforced by Zod schema (min(30))
 
     await adminAgent
       .put('/api/admin/settings')
-      .send({ minBookingLeadMinutes: 45, fallbackFeePctBps: 250, fallbackFeeFixed: 0 })
+      .send({
+        minBookingLeadMinutes: 45,
+        bankName: 'Test Bank',
+        bankAccountName: 'Dermestha Clinic',
+        bankAccountNumber: '0123456789',
+        bankInstructions: 'Transfer the fee and enter your reference.',
+      })
       .expect(200);
     const after = await adminAgent.get('/api/admin/settings').expect(200);
     expect(after.body.minBookingLeadMinutes).toBe(45);
+    expect(after.body.bankName).toBe('Test Bank');
+    expect(after.body.bankAccountNumber).toBe('0123456789');
     // restore is deferred to afterAll so it survives test failures
   });
 
@@ -178,20 +182,6 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
     expect(records.body.data.length).toBeGreaterThanOrEqual(1);
     // apptId is captured from the 'reactivate' test; confirm it surfaces in records.
     expect(records.body.data.some((r) => r.id === apptId)).toBe(true);
-
-    // dispute toggle is audit-logged and surfaces in the detail
-    await adminAgent
-      .post(`/api/appointments/${apptId}/dispute`)
-      .send({ disputed: true })
-      .expect(200);
-    const detail = await adminAgent.get(`/api/admin/records/${apptId}`).expect(200);
-    expect(detail.body.appointment.disputed).toBe(true);
-    expect(detail.body.history.some((h) => h.eventType === 'appointment.disputed')).toBe(true);
-
-    const auditRes = await adminAgent
-      .get(`/api/admin/audit?appointmentId=${apptId}&eventType=appointment.disputed`)
-      .expect(200);
-    expect(auditRes.body.data).toHaveLength(1);
 
     // a forced-failed email job → appears via alerts enrichment → resend resets it
     // dedupeKey must be unique per [appointmentId, type, dedupeKey] index.
@@ -230,6 +220,61 @@ describe('admin journey — onboard → DA3 → immutability → deactivate (#9)
     // second resend: job is now pending (not failed) → 409 INVALID_STATE
     const second = await adminAgent.post(`/api/admin/emails/${job.id}/resend`);
     expect(second.status).toBe(409); // no longer failed
+  });
+
+  it('manual-payment review: pending shows in records; accept→confirmed, reject→cancelled', async () => {
+    const mk = (offsetH, ref) =>
+      prisma.appointment.create({
+        data: {
+          doctorId,
+          patientUserId: patientId,
+          slotStart: new Date(Date.now() + offsetH * 3600 * 1000),
+          slotEnd: new Date(Date.now() + offsetH * 3600 * 1000 + 30 * 60 * 1000),
+          state: 'pending',
+          feeAtBooking: 250000,
+          paymentReference: ref,
+          paymentSubmittedAt: new Date(),
+        },
+      });
+    const acceptAppt = await mk(48, 'TXN-ACCEPT');
+    const rejectAppt = await mk(72, 'TXN-REJECT');
+
+    const pendingRecords = await adminAgent.get('/api/admin/records?state=pending').expect(200);
+    const row = pendingRecords.body.data.find((r) => r.id === acceptAppt.id);
+    expect(row).toBeTruthy();
+    expect(row.paymentReference).toBe('TXN-ACCEPT');
+    expect(row.amountDue).toBe(250000);
+
+    await adminAgent.post(`/api/admin/appointments/${acceptAppt.id}/accept`).expect(200);
+    expect((await prisma.appointment.findUnique({ where: { id: acceptAppt.id } })).state).toBe(
+      'confirmed',
+    );
+    expect(
+      await prisma.notificationJob.count({
+        where: { appointmentId: acceptAppt.id, type: 'booking_confirmation' },
+      }),
+    ).toBe(1);
+
+    await adminAgent.post(`/api/admin/appointments/${rejectAppt.id}/reject`).expect(200);
+    expect((await prisma.appointment.findUnique({ where: { id: rejectAppt.id } })).state).toBe(
+      'cancelled',
+    );
+    expect(
+      await prisma.notificationJob.count({
+        where: { appointmentId: rejectAppt.id, type: 'payment_not_received' },
+      }),
+    ).toBe(1);
+
+    // accepting a non-pending appointment is rejected
+    const reAccept = await adminAgent.post(`/api/admin/appointments/${acceptAppt.id}/accept`);
+    expect(reAccept.status).toBe(409);
+
+    // cleanup these two appts (FK-safe)
+    for (const id of [acceptAppt.id, rejectAppt.id]) {
+      await prisma.notificationJob.deleteMany({ where: { appointmentId: id } });
+      await prisma.auditLog.deleteMany({ where: { targetRef: id } });
+      await prisma.appointment.delete({ where: { id } });
+    }
   });
 
   it('every admin route 403s for a non-admin (DA6)', async () => {
