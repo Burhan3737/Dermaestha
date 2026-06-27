@@ -153,19 +153,15 @@ describe('availability', () => {
       expect(prisma.availabilityBlock.createMany).toHaveBeenCalled();
     });
 
-    it('excludes expired slot_locked holds from the orphan check (lazy expiry, ADR-23)', async () => {
+    it('the orphan check queries active-state appointments only (no lock-expiry clause)', async () => {
       prisma.doctor.findUnique.mockResolvedValue({ id: 'doc1' });
       prisma.appointment.findMany.mockResolvedValue([]);
       await avail.replaceWeeklyBlocks('user1', [
         { weekday: 1, startTime: '18:00', endTime: '21:00' },
       ]);
-      expect(prisma.appointment.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            NOT: { state: 'slot_locked', lockExpiresAt: { lt: expect.any(Date) } },
-          }),
-        }),
-      );
+      const call = prisma.appointment.findMany.mock.calls[0][0];
+      expect(call.where.state).toEqual({ in: ['pending', 'confirmed', 'completed'] });
+      expect(call.where.NOT).toBeUndefined();
     });
 
     it('rejects with BLOCK_HAS_BOOKINGS when a shortened block no longer fully fits an existing slot', async () => {
@@ -216,8 +212,8 @@ describe('availability', () => {
   });
 });
 
-describe('generateSlots lazy-expiry', () => {
-  it('queries active appointments while excluding expired slot_locked rows', async () => {
+describe('generateSlots active-state filter', () => {
+  it('queries active-state appointments (pending/confirmed/completed), no lock-expiry clause', async () => {
     prisma.availabilityBlock.findMany.mockResolvedValue([
       { weekday: 1, startTime: '18:00', endTime: '19:00' },
     ]);
@@ -226,9 +222,7 @@ describe('generateSlots lazy-expiry', () => {
     const date = '2099-01-04'; // a Monday
     await generateSlots('d1', date);
     const call = prisma.appointment.findMany.mock.calls[0][0];
-    expect(call.where.NOT).toEqual({
-      state: 'slot_locked',
-      lockExpiresAt: { lt: expect.any(Date) },
-    });
+    expect(call.where.state).toEqual({ in: ['pending', 'confirmed', 'completed'] });
+    expect(call.where.NOT).toBeUndefined();
   });
 });

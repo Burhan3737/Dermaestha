@@ -98,20 +98,20 @@ describe('prescription.submit (F08.02)', () => {
     });
   });
 
-  it('first issue transitions completed → prescription_issued inside the tx', async () => {
-    const tx = arrangeTx();
+  it('issuing on completed does NOT change appointment state (no transition)', async () => {
+    arrangeTx();
     await submit({
       appointmentId: 'a1',
       doctorUserId: 'u-doc',
       items: [{ medicineId: 'm1', dosage: '1x', duration: '7d', instructions: 'x' }],
     });
-    expect(appointmentState.transition).toHaveBeenCalledWith(
-      expect.objectContaining({ appointmentId: 'a1', to: 'prescription_issued', client: tx }),
+    expect(appointmentState.transition).not.toHaveBeenCalled();
+    expect(notification.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'prescription_ready', dedupeKey: 'rx1' }),
     );
   });
 
-  it('a correction (state already prescription_issued) does NOT transition but DOES enqueue', async () => {
-    prisma.appointment.findUnique.mockResolvedValue({ ...APPT, state: 'prescription_issued' });
+  it('a correction (second issue on completed) also enqueues prescription_ready, no transition', async () => {
     arrangeTx();
     await submit({
       appointmentId: 'a1',

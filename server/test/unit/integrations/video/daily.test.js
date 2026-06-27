@@ -1,40 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import crypto from 'node:crypto';
-
-// Base64 of the raw secret bytes — Daily returns the hmac as base64; we base64-DECODE it as the key.
-// Computed in vi.hoisted so the hoisted vi.mock factory below can reference it (no TDZ).
-const { SECRET_B64 } = vi.hoisted(() => ({
-  SECRET_B64: Buffer.from('super-secret-bytes').toString('base64'),
-}));
 
 vi.mock('#src/config/env/env.js', () => ({
   env: {
     DAILY_API_KEY: 'dk_test',
     DAILY_DOMAIN: 'dermestha.daily.co',
-    DAILY_WEBHOOK_SECRET: SECRET_B64,
     VIDEO_PROVIDER: 'daily',
     NODE_ENV: 'test',
   },
 }));
 
 import { dailyReal } from '#src/integrations/video/daily.js';
-
-const sign = (ts, raw) =>
-  crypto
-    .createHmac('sha256', Buffer.from(SECRET_B64, 'base64'))
-    .update(`${ts}.${raw}`)
-    .digest('base64');
-
-const signedReq = (bodyObj, { ts = '1700000000', tamper = false } = {}) => {
-  const raw = JSON.stringify(bodyObj);
-  let sig = sign(ts, raw);
-  if (tamper) sig = sign(ts, raw + 'x'); // valid format, wrong content
-  return {
-    headers: { 'x-webhook-timestamp': ts, 'x-webhook-signature': sig },
-    rawBody: raw,
-    body: bodyObj,
-  };
-};
 
 describe('dailyReal.createRoom', () => {
   beforeEach(() => {
@@ -154,103 +129,5 @@ describe('dailyReal.issueToken', () => {
         displayName: 'Pat',
       }),
     ).rejects.toMatchObject({ code: 'VIDEO_TOKEN_FAILED', status: 502 });
-  });
-});
-
-describe('dailyReal.verifyWebhook', () => {
-  it('verifies a valid signature and normalizes a participant.joined event', () => {
-    const evt = dailyReal.verifyWebhook(
-      signedReq({
-        version: '1.0.0',
-        type: 'participant.joined',
-        id: 'evt_1',
-        event_ts: '2026-06-04T10:01:00.000Z',
-        payload: {
-          room: 'appt_a1',
-          user_id: 'patient',
-          user_name: 'Pat',
-          owner: false,
-          joined_at: '2026-06-04T10:01:00.000Z',
-        },
-      }),
-    );
-    expect(evt).toEqual({
-      type: 'participant.joined',
-      appointmentId: 'a1',
-      role: 'patient',
-      timestamp: '2026-06-04T10:01:00.000Z',
-      eventId: 'evt_1',
-    });
-  });
-
-  it('derives role from token user_id even when user_name is a real display name', () => {
-    const evt = dailyReal.verifyWebhook(
-      signedReq({
-        type: 'participant.joined',
-        id: 'evt_2',
-        payload: {
-          room: 'appt_a1',
-          user_id: 'doctor',
-          user_name: 'Sara Khan',
-          owner: true,
-          joined_at: '2026-06-04T10:00:00.000Z',
-        },
-      }),
-    );
-    expect(evt.role).toBe('doctor');
-  });
-
-  it('throws INVALID_SIGNATURE (401) on a tampered signature', () => {
-    expect(() =>
-      dailyReal.verifyWebhook(
-        signedReq(
-          {
-            type: 'participant.joined',
-            id: 'e',
-            payload: { room: 'appt_a1', user_id: 'patient', joined_at: 't' },
-          },
-          { tamper: true },
-        ),
-      ),
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_SIGNATURE', status: 401 }));
-  });
-
-  it('returns null for the create-time test ping {"test":"test"}', () => {
-    expect(dailyReal.verifyWebhook(signedReq({ test: 'test' }))).toBeNull();
-  });
-
-  it('returns null for a tokenless, non-owner participant (never guesses role)', () => {
-    const evt = dailyReal.verifyWebhook(
-      signedReq({
-        type: 'participant.joined',
-        id: 'e',
-        payload: { room: 'appt_a1', owner: false, joined_at: 't' },
-      }),
-    );
-    expect(evt).toBeNull();
-  });
-
-  it('normalizes participant.left (timestamp falls back to event_ts)', () => {
-    const evt = dailyReal.verifyWebhook(
-      signedReq({
-        type: 'participant.left',
-        id: 'evt_3',
-        event_ts: '2026-06-04T10:20:00.000Z',
-        payload: { room: 'appt_a1', user_id: 'doctor', owner: true },
-      }),
-    );
-    expect(evt).toEqual({
-      type: 'participant.left',
-      appointmentId: 'a1',
-      role: 'doctor',
-      timestamp: '2026-06-04T10:20:00.000Z',
-      eventId: 'evt_3',
-    });
-  });
-
-  it('returns null for an unrelated event type', () => {
-    expect(
-      dailyReal.verifyWebhook(signedReq({ type: 'recording.started', id: 'e', payload: {} })),
-    ).toBeNull();
   });
 });

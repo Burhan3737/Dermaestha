@@ -2,10 +2,9 @@
 import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import { videoProvider } from '../../integrations/video/index.js';
-import { env } from '../../config/env/env.js';
 import { VIDEO_TOKEN_PRE_MIN, VIDEO_TOKEN_POST_MIN } from '../../config/constants.js';
 
-const ACTIVE = ['confirmed', 'in_progress'];
+const ACTIVE = ['confirmed'];
 
 async function loadVisible({ id, role, userId }) {
   const a = await prisma.appointment.findUnique({
@@ -45,33 +44,13 @@ export async function issueAppointmentToken({ id, role, userId, now = new Date()
     notAfterIso: new Date(close).toISOString(),
     displayName,
   });
-  const joinSimUrl = env.VIDEO_PROVIDER === 'mock' ? '/dev/video/join' : null;
   return {
     token,
     expiresAt,
     roomName: room.roomName,
     roomUrl: room.roomUrl,
     serverNow: now.toISOString(),
-    joinSimUrl,
+    // Daily free tier: no participant webhook / no join tracking (manual-payment model).
+    joinSimUrl: null,
   };
-}
-
-/**
- * Records a NORMALIZED Daily participant.joined event to the join column (first-join wins).
- * Verification + role normalization happen in the adapter's verifyWebhook (doc 14 §1); this
- * function no longer strips 'appt_' or infers role from user_name (ADR-24 hack removed).
- * @param {import('../../integrations/video/index.js').NormalizedVideoEvent} evt
- */
-export async function recordJoinFromDailyEvent({ type, appointmentId, role, timestamp }) {
-  if (type !== 'participant.joined') return;
-  if (!appointmentId || !role) return;
-  const a = await prisma.appointment.findUnique({ where: { id: appointmentId } });
-  if (!a) return;
-  const field = role === 'doctor' ? 'doctorJoinedAt' : 'patientJoinedAt';
-  if (a[field]) return; // first-join wins
-  // Prefer the event's own timestamp (a delayed webhook must not record server-receipt time).
-  await prisma.appointment.update({
-    where: { id: appointmentId },
-    data: { [field]: timestamp ? new Date(timestamp) : new Date() },
-  });
 }

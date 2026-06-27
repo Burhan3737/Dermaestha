@@ -1,8 +1,6 @@
 // @ts-check
 // Pinned operational constants — source of truth: docs/engineering/CONFIG.md.
-export const SLOT_LOCK_TTL_MIN = Number(process.env.SLOT_LOCK_TTL_MIN ?? 10);
 export const SLOT_GRANULARITY_MIN = Number(process.env.SLOT_GRANULARITY_MIN ?? 30);
-export const NO_SHOW_GRACE_MIN = Number(process.env.NO_SHOW_GRACE_MIN ?? 15);
 export const VIDEO_TOKEN_PRE_MIN = Number(process.env.VIDEO_TOKEN_PRE_MIN ?? 10);
 export const VIDEO_TOKEN_POST_MIN = Number(process.env.VIDEO_TOKEN_POST_MIN ?? 5);
 export const RESET_TOKEN_TTL_MIN = Number(process.env.RESET_TOKEN_TTL_MIN ?? 60);
@@ -16,12 +14,8 @@ export const PAYMENT_INTENT_MAX_PER_PATIENT_HOUR = Number(
   process.env.PAYMENT_INTENT_MAX_PER_PATIENT_HOUR ?? 10,
 );
 
-export const REFUND_MAX_ATTEMPTS = Number(process.env.REFUND_MAX_ATTEMPTS ?? 5);
-export const REFUND_BACKOFF_BASE_SEC = Number(process.env.REFUND_BACKOFF_BASE_SEC ?? 30);
 export const EMAIL_MAX_ATTEMPTS = Number(process.env.EMAIL_MAX_ATTEMPTS ?? 3);
 export const EMAIL_BACKOFF_BASE_SEC = Number(process.env.EMAIL_BACKOFF_BASE_SEC ?? 60);
-export const RECONCILIATION_LOOKBACK_H = Number(process.env.RECONCILIATION_LOOKBACK_H ?? 24);
-export const RECONCILIATION_MIN_AGE_MIN = Number(process.env.RECONCILIATION_MIN_AGE_MIN ?? 60);
 
 export const TIMEZONE = 'Asia/Karachi';
 

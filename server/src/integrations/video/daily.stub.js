@@ -7,7 +7,4 @@ const ni = (m) => async () => {
 export const dailyStub = {
   createRoom: ni('createRoom'),
   issueToken: ni('issueToken'),
-  verifyWebhook() {
-    throw new AppError('NOT_IMPLEMENTED', 'daily.verifyWebhook is M2', 501);
-  },
 };

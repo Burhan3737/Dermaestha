@@ -7,20 +7,10 @@ const schema = z.object({
   APP_BASE_URL: z.string().url(),
   DATABASE_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(16),
-  PAYFAST_MERCHANT_ID: z.string().optional(),
-  PAYFAST_SECURED_KEY: z.string().optional(),
-  PAYFAST_MERCHANT_NAME: z.string().optional(),
-  PAYFAST_STORE_ID: z.string().optional(),
-  // Dev-mock signing only (ADR-22). Real PayFast PK signature does not use a passphrase.
-  PAYFAST_PASSPHRASE: z.string().optional(),
-  PAYFAST_MODE: z.enum(['sandbox', 'live']).default('sandbox'),
-  PAYMENT_PROVIDER: z.enum(['stub', 'mock', 'payfast']).default('stub'),
   EMAIL_PROVIDER: z.enum(['stub', 'console', 'resend']).default('stub'),
+  // Daily free tier: room + token only (no participant webhook).
   DAILY_API_KEY: z.string().optional(),
   DAILY_DOMAIN: z.string().optional(),
-  // Daily webhook HMAC secret (the `hmac` returned by POST /v1/webhooks). Base64; optional until
-  // the webhook is registered. See server/scripts/register-daily-webhook.mjs.
-  DAILY_WEBHOOK_SECRET: z.string().optional(),
   VIDEO_PROVIDER: z.enum(['stub', 'mock', 'daily']).default('stub'),
   VIDEO_MOCK_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),

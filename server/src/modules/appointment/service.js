@@ -6,20 +6,15 @@ import { logger } from '../../lib/logger/logger.js';
 import { KARACHI, karachiWallTimeToUtc } from '../../lib/tz/tz.js';
 import {
   SLOT_GRANULARITY_MIN,
-  SLOT_LOCK_TTL_MIN,
   ACTIVE_APPOINTMENT_STATES,
-  NO_SHOW_GRACE_MIN,
   VIDEO_TOKEN_POST_MIN,
-  REFUND_MAX_ATTEMPTS,
-  REFUND_BACKOFF_BASE_SEC,
 } from '../../config/constants.js';
 import { generateSlots } from '../doctor/service.js';
-import { paymentProvider } from '../../integrations/payment/index.js';
 import * as notification from '../notification/service.js';
 import * as analytics from '../analytics/service.js';
 import * as audit from '../../services/audit/audit.service.js';
-// Self-import: intra-module calls that tests stub (quoteRefund/transition/initiateRefund/safeRefund)
-// route through the namespace so vi.spyOn can intercept them under ESM (a bare local call cannot be spied).
+// Self-import: intra-module calls that tests stub (transition) route through the namespace so
+// vi.spyOn can intercept them under ESM (a bare local call cannot be spied).
 import * as self from './service.js';
 
 // Patient "Upcoming": awaiting payment (pending) or paid/confirmed. History: completed + cancelled.
@@ -348,142 +343,6 @@ export async function transition({
   return updated;
 }
 
-function fallbackFee(amount, s) {
-  const pct = Math.round((amount * (s?.fallbackFeePctBps ?? 0)) / 10000);
-  return pct + (s?.fallbackFeeFixed ?? 0);
-}
-
-/** Pure-ish quote so the cancel modal and dashboard show the identical number (policy #5). */
-export async function quoteRefund(appointmentId) {
-  const payment = await prisma.payment.findFirst({ where: { appointmentId, status: 'success' } });
-  if (!payment) throw new AppError('NOT_FOUND', 'No payment to refund.', 404);
-  const settings = await prisma.settings.findUnique({ where: { id: 1 } });
-  const gatewayFee = payment.gatewayFee ?? fallbackFee(payment.amount, settings);
-  return {
-    amountPaid: payment.amount,
-    gatewayFee,
-    refund: Math.max(0, payment.amount - gatewayFee),
-  };
-}
-
-/** Idempotency-keyed refund (#10). Best-effort caller fires the email post-commit. */
-export async function initiateRefund({ appointmentId }) {
-  const payment = await prisma.payment.findFirst({ where: { appointmentId, status: 'success' } });
-  if (!payment) return null;
-  const { refund } = await quoteRefund(appointmentId);
-  const key = payment.refundIdempotencyKey ?? `rf_${appointmentId}`;
-  let result;
-  try {
-    result = await paymentProvider.refund({
-      providerRef: payment.providerRef,
-      amount: refund,
-      idempotencyKey: key,
-    });
-  } catch (e) {
-    // Edge #30: schedule an exponential-backoff retry; on exhaustion alert the admin and
-    // notify the patient of the delay. Idempotency key (#10) makes every retry safe.
-    const attempts = (payment.refundAttempts ?? 0) + 1;
-    const exhausted = attempts >= REFUND_MAX_ATTEMPTS;
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        refundIdempotencyKey: key,
-        refundStatus: exhausted ? 'failed' : 'retrying',
-        refundAttempts: attempts,
-        nextRefundRetryAt: exhausted
-          ? null
-          : new Date(Date.now() + REFUND_BACKOFF_BASE_SEC * 1000 * 2 ** attempts),
-      },
-    });
-    if (exhausted) {
-      await audit
-        .record({
-          eventType: 'payment.refund_exhausted',
-          actorType: 'system',
-          targetRef: appointmentId,
-          reason: String(e?.message ?? e),
-          meta: { providerRef: payment.providerRef ?? null, attempts },
-        })
-        .catch(() => {});
-      await enqueueRefundDelayed(appointmentId).catch(() => {});
-    }
-    throw e;
-  }
-  if (result.status === 'manual_required') {
-    // Gateway exposes no refund API (PayFast PK). Record once, no retry-spin, notify the patient.
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: { refundIdempotencyKey: key, refundStatus: 'manual_required', nextRefundRetryAt: null },
-    });
-    await audit
-      .record({
-        eventType: 'payment.refund_manual_required',
-        actorType: 'system',
-        targetRef: appointmentId,
-        reason: 'gateway exposes no refund API; awaiting manual admin settlement',
-        meta: { providerRef: payment.providerRef ?? null },
-      })
-      .catch(() => {});
-    await enqueueRefundDelayed(appointmentId).catch(() => {});
-    return result;
-  }
-  await prisma.payment.update({
-    where: { id: payment.id },
-    data: {
-      refundIdempotencyKey: key,
-      refundRef: result.refundRef,
-      refundStatus: result.status,
-      nextRefundRetryAt: null,
-    },
-  });
-  return result;
-}
-
-/** Best-effort refund: never throws; logs + audits failures for reconciliation. */
-export async function safeRefund(appointmentId) {
-  try {
-    await self.initiateRefund({ appointmentId });
-  } catch (e) {
-    logger.warn('refund initiation failed (will be reconciled)', { appointmentId, err: String(e) });
-    await audit
-      .record({
-        eventType: 'payment.refund_failed',
-        actorType: 'system',
-        targetRef: appointmentId,
-        reason: String(e?.message ?? e),
-      })
-      .catch(() => {});
-  }
-}
-
-async function enqueueRefundDelayed(appointmentId) {
-  const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
-  if (!appt) return;
-  const patient = await prisma.user.findUnique({
-    where: { id: appt.patientUserId },
-    select: { email: true, fullName: true },
-  });
-  if (!patient) return;
-  await notification.enqueue({
-    type: 'refund_delayed',
-    appointmentId,
-    recipientEmail: patient.email,
-    scheduledFor: new Date(),
-    vars: { patientName: patient.fullName, appointmentRef: appointmentId },
-  });
-}
-
-/** Minute-cron worker body (F06.03): re-run due refund retries. Clock-injected. */
-export async function retryDueRefunds(now = new Date()) {
-  const due = await prisma.payment.findMany({
-    where: { refundStatus: 'retrying', nextRefundRetryAt: { lte: now } },
-  });
-  for (const p of due) {
-    // Best-effort per row; initiateRefund itself reschedules/exhausts on failure.
-    await self.initiateRefund({ appointmentId: p.appointmentId }).catch(() => {});
-  }
-}
-
 /**
  * Cancel from `pending` or `confirmed` → single `cancelled` state. Money is fully offline (no
  * refund). Who/why is captured in the audit log via transition(actorType, reason).
@@ -541,26 +400,6 @@ async function enqueueCancellationEmail(appt) {
   } catch (e) {
     logger.warn('cancellation email not enqueued', { appointmentId: appt.id, err: String(e) });
   }
-}
-
-/** F13.02: support-workflow flag, orthogonal to the state machine — never a transition. */
-export async function setDisputed({ appointmentId, disputed, actorId }) {
-  const appt = await prisma.appointment.findUnique({
-    where: { id: appointmentId },
-    select: { id: true },
-  });
-  if (!appt) throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
-  const updated = await prisma.appointment.update({
-    where: { id: appointmentId },
-    data: { disputed },
-  });
-  await audit.record({
-    eventType: disputed ? 'appointment.disputed' : 'appointment.dispute_cleared',
-    actorType: 'admin',
-    actorId,
-    targetRef: appointmentId,
-  });
-  return updated;
 }
 
 /**

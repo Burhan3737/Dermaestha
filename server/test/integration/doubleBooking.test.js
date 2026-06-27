@@ -40,7 +40,7 @@ describe('no-double-booking partial index (PRD #1)', () => {
     });
     await expect(
       prisma.appointment.create({
-        data: { doctorId, patientUserId: patient.id, slotStart, slotEnd, state: 'slot_locked' },
+        data: { doctorId, patientUserId: patient.id, slotStart, slotEnd, state: 'pending' },
       }),
     ).rejects.toMatchObject({ code: 'P2002' });
   });

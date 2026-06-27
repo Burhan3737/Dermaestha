@@ -1,5 +1,4 @@
 // @ts-check
-import crypto from 'node:crypto';
 import { env } from '../../config/env/env.js';
 import { AppError } from '../../http/AppError.js';
 
@@ -17,7 +16,6 @@ const API_BASE = 'https://api.daily.co/v1';
 const ROOMS_PATH = '/rooms';
 const TOKENS_PATH = '/meeting-tokens';
 const DEFAULT_ROOM_TTL_SEC = 24 * 60 * 60; // room exp when no slot window is supplied
-const JOIN_EVENTS = new Set(['participant.joined', 'participant.left']);
 
 const roomNameFor = (appointmentId) => `appt_${appointmentId}`;
 const toUnix = (iso) => Math.floor(new Date(iso).getTime() / 1000);
@@ -86,46 +84,5 @@ export const dailyReal = {
     }
     const body = await res.json();
     return { token: body.token, expiresAt: notAfterIso };
-  },
-
-  verifyWebhook(req) {
-    const timestamp = req.headers?.['x-webhook-timestamp'];
-    const signature = req.headers?.['x-webhook-signature'];
-    const rawBody = req.rawBody ?? '';
-    // signedContent = `${timestamp}.${rawBody}`; HMAC-SHA256 keyed on the base64-DECODED secret;
-    // output base64; constant-time compare. RAW bytes, not JSON.stringify (doc 07 live-delivery gate).
-    const key = Buffer.from(env.DAILY_WEBHOOK_SECRET ?? '', 'base64');
-    const expected = crypto.createHmac('sha256', key).update(`${timestamp}.${rawBody}`).digest('base64');
-    const provided = typeof signature === 'string' ? signature : '';
-    const ok =
-      provided.length === expected.length &&
-      crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-    if (!ok) throw new AppError('INVALID_SIGNATURE', 'Webhook signature verification failed.', 401);
-
-    const body = req.body ?? {};
-    // Create-time verification ping — ack with nothing to record.
-    if (body.test === 'test') return null;
-    if (!JOIN_EVENTS.has(body.type)) return null;
-
-    const payload = body.payload ?? {};
-    const appointmentId = String(payload.room ?? '').replace(/^appt_/, '');
-    const role =
-      payload.user_id === 'doctor'
-        ? 'doctor'
-        : payload.user_id === 'patient'
-          ? 'patient'
-          : payload.owner
-            ? 'doctor'
-            : null;
-    // Tokenless / knocking participant — never guess a role.
-    if (!appointmentId || !role) return null;
-    return {
-      type: body.type,
-      appointmentId,
-      role,
-      // joined_at for joins; .left has no confirmed participant ts → fall back to envelope event_ts.
-      timestamp: payload.joined_at ?? body.event_ts,
-      eventId: body.id,
-    };
   },
 };

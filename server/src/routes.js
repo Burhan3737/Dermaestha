@@ -5,14 +5,11 @@ import { mustChangePasswordGate } from './middleware/mustChangePassword/mustChan
 import { authRouter } from './modules/auth/index.js';
 import { doctorsRouter, availabilityRouter } from './modules/doctor/index.js';
 import { appointmentsRouter } from './modules/appointment/index.js';
-import { paymentWebhookRouter, paymentReturnRouter } from './modules/payment/index.js';
-import { videoWebhookRouter } from './modules/video/index.js';
 import { medicinesRouter, adminMedicinesRouter } from './modules/medicine/index.js';
 import { adminRouter } from './modules/admin/index.js';
 import { analyticsRouter } from './modules/analytics/index.js';
 import { prescriptionsRouter } from './modules/prescription/index.js';
 import { healthRouter } from './health/index.js';
-import { devCheckoutRouter } from './dev/devCheckout.js';
 import { devVideoRouter } from './dev/devVideo.js';
 import { devWorkersRouter } from './dev/devWorkers.js';
 
@@ -30,17 +27,12 @@ export function registerRoutes(app) {
   // two-segment path is owned explicitly (mergeParams carries :id through).
   app.use('/api/appointments/:id/prescriptions', prescriptionsRouter);
   app.use('/api/appointments', appointmentsRouter);
-  app.use('/api/payments', paymentReturnRouter); // POST /api/payments/verify-return
-  // Each domain module owns its own webhook route; both mount under /api/webhooks (D11).
-  app.use('/api/webhooks', paymentWebhookRouter); // POST /api/webhooks/payfast
-  app.use('/api/webhooks', videoWebhookRouter); // POST /api/webhooks/daily
   app.use('/api/analytics', analyticsRouter); // POST /api/analytics/events (public)
   app.use('/api', healthRouter);
   // Unknown /api path → JSON 404 envelope (never the SPA HTML).
   app.use('/api', (_req, _res, next) => next(new AppError('NOT_FOUND', 'Not found.', 404)));
 
   // Dev-only simulators. NEVER mounted in production.
-  if (env.PAYMENT_PROVIDER === 'mock') app.use('/dev', devCheckoutRouter);
   if (env.VIDEO_PROVIDER === 'mock') app.use('/dev', devVideoRouter);
   if (env.NODE_ENV === 'development') app.use('/dev', devWorkersRouter);
 }

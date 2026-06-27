@@ -1,18 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-process.env.PAYMENT_PROVIDER = 'mock';
 process.env.EMAIL_PROVIDER = 'console';
 process.env.VIDEO_PROVIDER = 'mock';
-process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
 
 const request = (await import('supertest')).default;
 const { createApp } = await import('#src/index.js');
 const { prisma } = await import('#src/lib/prisma/prisma.js');
-const { evaluateDueAppointments } = await import('#src/modules/appointment/service.js');
+const { completeDueAppointments } = await import('#src/modules/appointment/service.js');
 
 const app = createApp();
 const uniq = () => `sliced_${Date.now()}_${Math.floor(Math.random() * 1e6)}@test.local`;
 
-describe('video + lifecycle integration', () => {
+describe('video + lifecycle integration (free tier, time-based completion)', () => {
   let agent, email, doctorId, userId, liveId, pastId;
 
   beforeAll(async () => {
@@ -45,7 +43,7 @@ describe('video + lifecycle integration', () => {
     });
     liveId = live.id;
 
-    // B: fully-past appointment (ended >5min ago) → join → worker → completed.
+    // B: fully-past appointment (ended >5min ago) → time-based worker → completed.
     const pastStart = new Date(Date.now() - 40 * 60000);
     const past = await prisma.appointment.create({
       data: {
@@ -61,11 +59,11 @@ describe('video + lifecycle integration', () => {
     pastId = past.id;
   });
 
-  it('issues a video token inside the window', async () => {
+  it('issues a video token inside the window; joinSimUrl is null (free tier)', async () => {
     const res = await agent.get(`/api/appointments/${liveId}/video-token`);
     expect(res.status).toBe(200);
     expect(res.body.roomName).toBe(`appt_${liveId}`);
-    expect(res.body.joinSimUrl).toBe('/dev/video/join');
+    expect(res.body.joinSimUrl).toBeNull();
   });
 
   it('rejects a video token outside the window with 422', async () => {
@@ -74,14 +72,8 @@ describe('video + lifecycle integration', () => {
     expect(res.body.error.code).toBe('VIDEO_WINDOW_CLOSED');
   });
 
-  it('records both joins via the daily webhook and completes after cutoff', async () => {
-    await request(app)
-      .post('/api/webhooks/daily')
-      .send({ type: 'participant.joined', room: `appt_${pastId}`, user_name: 'doctor' });
-    await request(app)
-      .post('/api/webhooks/daily')
-      .send({ type: 'participant.joined', room: `appt_${pastId}`, user_name: 'patient' });
-    await evaluateDueAppointments(new Date());
+  it('time-based worker completes a confirmed appointment past slotEnd + cutoff', async () => {
+    await completeDueAppointments(new Date());
     const appt = await prisma.appointment.findUnique({ where: { id: pastId } });
     expect(appt.state).toBe('completed');
   });
