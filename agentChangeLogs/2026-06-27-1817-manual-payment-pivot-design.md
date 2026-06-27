@@ -6,7 +6,7 @@
 **Ticket / issue:** None
 **Branch:** main (no code changes yet; design + changelog only)
 **Commits / PR:** ~30 commits on `main` (not pushed): design `c140a68`; plans `04b0521`; backend `31a89dc`→`1baeb27`; frontend `df49d9d`→`730bb1d`; e2e `a5333e2`,`2d88b62`. Tag `pre-manual-payment-pivot` at `cba465e`.
-**Last updated:** 2026-06-27-1925
+**Last updated:** 2026-06-28-0305
 **Tags:** #feature #refactor #design
 
 ## Summary
@@ -57,6 +57,12 @@ fields added to admin settings. Config to remove later: `PAYFAST_*`, `PAYMENT_PR
   submission. New UI must conform to doc `06` design tokens/components (no new aesthetics).
 - Approach A (minimal reuse of the existing lock/state spine) chosen over explicit new states or a
   payment-claim entity. Future real payments are a revive-and-adapt job (git tag + ADR insurance).
+- FOLLOW-UP (user, 2026-06-28): removed the `completed` state entirely — early-ending calls would
+  block prescribing under time-based completion. Prescriptions now gate on `confirmed` (no time
+  limit); states are `pending/confirmed/cancelled` (3). Completion cron + `/dev/worker/evaluate`
+  removed (cron → 1 job: notification-dispatch). Upcoming/Past split is now time-based in the
+  `listForRole` query (Upcoming = pending ∪ confirmed-future; Past = confirmed-past ∪ cancelled).
+  Built by a lead sub-agent (commit `43857a9`); controller re-verified.
 
 ## Notable findings
 - Daily.co webhooks require a PAID plan (`403 invalid-plan-type` on registration) — they were the
@@ -75,6 +81,8 @@ Implemented via 3 sub-agents (backend lead, frontend lead, e2e/QA), each TDD wit
 - No front/back integration bugs found in the consolidated cycle (as-built contracts relayed between agents held).
 - Final integrated `npm test` re-run in progress at handoff.
 - `npm run lint` is broken repo-wide (ESLint v9 vs legacy `.eslintrc.json`) — PRE-EXISTING; only 2 pre-existing errors, none from these changes.
+- Controller re-verified the manual-payment pivot firsthand: full `npm test` 245→ (re-run green); e2e re-run 17/17; plus a manual real-browser walkthrough (book → bank-instructions → submit reference → admin accept → confirmed) with screenshots in `.playwright-mcp/walkthrough-*.png`.
+- FOLLOW-UP (drop `completed`) re-verified firsthand: grep clean (no functional stragglers); `npm test` **239 passed**; e2e **16/16** (incl. j3 prescribe-on-confirmed + j9 3-state badges). Controller fix: corrected stale `VIDEO_TOKEN_POST_MIN` comment in `.env.example`/`.env.example.dev` (commit after `43857a9`).
 
 ## Risk / rollback
 No runtime risk yet (docs + ignored env file only). The future implementation is a large deletion
