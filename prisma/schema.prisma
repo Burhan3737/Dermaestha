@@ -9,11 +9,9 @@
 // @@unique). After `prisma migrate dev`, hand-edit the generated migration.sql and append:
 //
 //   CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
-//     WHERE state IN ('slot_locked','confirmed','in_progress','completed',
-//                     'prescription_issued','cancelled_no_refund');
+//     WHERE state IN ('pending','confirmed','completed');
 //
-// Releasing/terminal states (cancelled_refunded, doctor_cancelled, patient_no_show, doctor_no_show)
-// are excluded so a freed slot rebooks.
+// The releasing/terminal state (cancelled) is excluded so a freed slot rebooks.
 // A second insert for a held slot then fails at WRITE time, not validation time.
 // See docs/specification/04-DATABASE_DOCUMENT.md §4b (partial-index "Migration caveat").
 // ───────────────────────────────────────────────────────────────────────────────────────────
@@ -40,35 +38,15 @@ enum DoctorStatus {
   active
 }
 
-/// Stored appointment states. NOTE: `slot_available` from PRD §4.3 is intentionally
-/// NOT a value here — availability is the ABSENCE of a row for (doctor, slot). The first
-/// persisted state is `slot_locked`. Keeps the partial unique index small and makes
-/// lock-release a state transition / row-removal rather than a status flip.
+/// Stored appointment states (manual-payment model). NOTE: `slot_available` from PRD §4.3 is
+/// intentionally NOT a value here — availability is the ABSENCE of a row for (doctor, slot). The
+/// first persisted state is `pending` (slot locked, awaiting manual payment verification). Keeps
+/// the partial unique index small and makes lock-release a state transition / row-removal.
 enum AppointmentState {
-  slot_locked
-  confirmed
-  in_progress
-  completed
-  prescription_issued
-  cancelled_refunded
-  cancelled_no_refund
-  doctor_cancelled
-  patient_no_show
-  doctor_no_show
-}
-
-enum PaymentStatus {
   pending
-  success
-  failed
-}
-
-enum RefundStatus {
-  initiated
-  retrying
-  settled
-  failed
-  manual_required
+  confirmed
+  completed
+  cancelled
 }
 
 enum AuditActorType {
@@ -83,9 +61,9 @@ enum NotificationType {
   reminder_24h
   reminder_1h
   prescription_ready
-  refund_confirmation
-  cancellation_apology
-  refund_delayed
+  payment_submitted_admin
+  payment_not_received
+  cancellation
 }
 
 enum NotificationStatus {
@@ -173,25 +151,22 @@ model Appointment {
   patient       User             @relation("PatientAppointments", fields: [patientUserId], references: [id])
   slotStart     DateTime         @map("slot_start") @db.Timestamptz(6)
   slotEnd       DateTime         @map("slot_end") @db.Timestamptz(6)
-  state         AppointmentState @default(slot_locked)
-  /// Fee snapshot captured on transition to `confirmed` (#6). Null while slot_locked.
+  state         AppointmentState @default(pending)
+  /// Fee snapshot captured at lock/booking time (manual-payment model). Drives the amount-due
+  /// shown with the bank instructions.
   feeAtBooking  Int?             @map("fee_at_booking")
+  /// Patient-entered bank transaction reference (manual offline payment); admin matches it.
+  paymentReference   String?     @map("payment_reference")
+  /// When the patient submitted their bank transaction reference.
+  paymentSubmittedAt DateTime?   @map("payment_submitted_at") @db.Timestamptz(6)
   /// "Who is this for?" (P8). When false, subject* describe the third party.
   forSelf         Boolean        @default(true) @map("for_self")
   subjectName     String?        @map("subject_name")
   subjectAge      Int?           @map("subject_age")
   subjectRelation String?        @map("subject_relation")
-  /// Support-workflow marker, orthogonal to the state machine (§3.6). Admin-set via A5.
-  disputed      Boolean          @default(false)
-  /// now()+10min while slot_locked; the lock-release worker reads this.
-  lockExpiresAt   DateTime?        @map("lock_expires_at")   @db.Timestamptz(6)
-  /// Set on FIRST participant join (idempotent). Drives no-show resolution (ADR-12).
-  doctorJoinedAt  DateTime?        @map("doctor_joined_at")  @db.Timestamptz(6)
-  patientJoinedAt DateTime?        @map("patient_joined_at") @db.Timestamptz(6)
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  payments      Payment[]
   prescriptions Prescription[]
   notificationJobs NotificationJob[]
 
@@ -202,36 +177,6 @@ model Appointment {
   @@index([patientUserId])
   @@index([state])
   @@map("appointments")
-}
-
-/// One row per booking attempt. Idempotency lives here (#7, #10).
-model Payment {
-  id                   String        @id @default(cuid())
-  appointmentId        String        @map("appointment_id")
-  appointment          Appointment   @relation(fields: [appointmentId], references: [id])
-  /// Denormalized for the intent-idempotency key below; FK-less by design (scalar only).
-  patientUserId        String        @map("patient_user_id")
-  slotStart            DateTime      @map("slot_start") @db.Timestamptz(6)
-  providerRef          String?       @map("provider_ref")
-  status               PaymentStatus @default(pending)
-  /// Charged amount in PKR paisa.
-  amount               Int
-  /// Gateway-reported fee (paisa); drives refund math + cancellation estimate (policy #5).
-  gatewayFee           Int?          @map("gateway_fee")
-  refundIdempotencyKey String?       @unique @map("refund_idempotency_key")
-  refundRef            String?       @map("refund_ref")
-  refundStatus         RefundStatus? @map("refund_status")
-  /// Refund-retry bookkeeping (F06.03 / edge #30). Worker polls retrying+due rows.
-  refundAttempts    Int       @default(0)  @map("refund_attempts")
-  nextRefundRetryAt DateTime? @map("next_refund_retry_at") @db.Timestamptz(6)
-  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  /// Payment-intent idempotency on (patient, slot) (#7): a retry/double-submit cannot
-  /// open two parallel intents for the same booking attempt.
-  @@unique([patientUserId, slotStart], name: "intent_key")
-  @@index([appointmentId])
-  @@map("payments")
 }
 
 /// Transactional email outbox (F07): the intent-to-send persists in the same DB (and, for
@@ -354,10 +299,11 @@ model Settings {
   id                    Int      @id @default(1)
   /// Floor 30 (PRD); default 60. Booking lead-time filter.
   minBookingLeadMinutes Int      @default(60) @map("min_booking_lead_minutes")
-  /// Fallback gateway-fee model when PayFast reports no fee (policy #5).
-  /// Percentage in basis points (e.g. 250 = 2.50%) + a fixed component in PKR paisa.
-  fallbackFeePctBps     Int      @default(0) @map("fallback_fee_pct_bps")
-  fallbackFeeFixed      Int      @default(0) @map("fallback_fee_fixed")
+  /// Manual-payment bank instructions (admin-editable, shown to the patient with the amount due).
+  bankName          String? @map("bank_name")
+  bankAccountName   String? @map("bank_account_name")
+  bankAccountNumber String? @map("bank_account_number")
+  bankInstructions  String? @map("bank_instructions")
   updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("settings")
