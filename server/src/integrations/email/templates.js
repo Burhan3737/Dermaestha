@@ -86,43 +86,41 @@ export const templates = {
       ]),
   },
 
-  refund_confirmation: {
-    subject: 'Your Dermestha refund has been initiated',
+  payment_submitted_admin: {
+    subject: 'A patient submitted a payment reference for review',
     body: (v) =>
       compose([
-        `Hi ${v.patientName},`,
-        `We've initiated a refund for your appointment (${v.appointmentRef}).`,
+        'Hi admin,',
+        `A patient submitted a bank transaction reference for appointment ${v.appointmentRef}.`,
         lines([
-          v.amount != null ? `Refund amount: ${formatPKR(v.amount)}` : null,
-          v.refundRef != null ? `Reference: ${v.refundRef}` : null,
+          v.reference != null ? `Reference: ${v.reference}` : null,
+          v.reviewUrl != null ? `Review it here: ${v.reviewUrl}` : null,
         ]),
-        'It may take a few business days to appear, depending on your bank or card provider.',
+        'Match it against the bank, then accept or reject the booking.',
       ]),
   },
 
-  cancellation_apology: {
+  payment_not_received: {
+    subject: 'We could not confirm your Dermestha payment',
+    body: (v) =>
+      compose([
+        `Hi ${v.patientName},`,
+        v.slotStartLocal != null
+          ? `We could not match a payment for your booking on ${v.slotStartLocal} (Pakistan time), so it has been cancelled.`
+          : `We could not match a payment for your booking (${v.appointmentRef}), so it has been cancelled.`,
+        "If you believe this is a mistake, please reply with your bank transaction details, or book again whenever suits you.",
+      ]),
+  },
+
+  cancellation: {
     subject: 'Your Dermestha appointment was cancelled',
     body: (v) =>
       compose([
         `Hi ${v.patientName},`,
         v.doctorName != null && v.slotStartLocal != null
-          ? `We're sorry — your consultation with ${v.doctorName} on ${v.slotStartLocal} (Pakistan time) has been cancelled.`
-          : `We're sorry — your consultation has been cancelled.`,
-        v.refundAmount != null
-          ? `A refund of ${formatPKR(v.refundAmount)} has been initiated and may take a few business days to appear.`
-          : null,
+          ? `Your consultation with ${v.doctorName} on ${v.slotStartLocal} (Pakistan time) has been cancelled.`
+          : `Your consultation has been cancelled.`,
         "You're welcome to book another appointment whenever suits you.",
-      ]),
-  },
-
-  refund_delayed: {
-    subject: 'Your Dermestha refund is taking longer than expected',
-    body: (v) =>
-      compose([
-        `Hi ${v.patientName},`,
-        `The refund for your appointment (${v.appointmentRef}) is taking longer than usual to process.`,
-        "We're on it — you don't need to do anything, and we'll confirm as soon as it's complete.",
-        'Thank you for your patience.',
       ]),
   },
 

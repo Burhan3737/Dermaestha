@@ -22,9 +22,9 @@ const ALL = [
   'reminder_24h',
   'reminder_1h',
   'prescription_ready',
-  'refund_confirmation',
-  'cancellation_apology',
-  'refund_delayed',
+  'payment_submitted_admin',
+  'payment_not_received',
+  'cancellation',
   'password_reset',
 ];
 
@@ -36,9 +36,8 @@ const sampleVars = {
   dashboardUrl: 'https://app/appointments',
   joinUrl: 'https://app/appointments',
   prescriptionUrl: 'https://app/rx',
-  amount: 250000,
-  refundAmount: 250000,
-  refundRef: 'rf_1',
+  reference: 'TXN-12345',
+  reviewUrl: 'https://app/admin/records',
   appointmentRef: 'ap_1',
   resetUrl: 'https://app/reset',
   expiresInMinutes: 30,
@@ -63,14 +62,14 @@ describe('render', () => {
   });
 
   it('appends the footer exactly once', () => {
-    const { text } = render('refund_delayed', sampleVars);
+    const { text } = render('payment_not_received', sampleVars);
     expect(text.split('— Dermestha').length - 1).toBe(1);
   });
 
-  it('omits the refund-amount line when refundAmount is null (cancellation_apology)', () => {
-    const { text } = render('cancellation_apology', { ...sampleVars, refundAmount: null });
-    expect(text).not.toMatch(/A refund of/);
-    expect(text).not.toContain('null');
+  it('renders the admin payment-submitted alert with reference + review URL', () => {
+    const { text } = render('payment_submitted_admin', sampleVars);
+    expect(text).toContain('TXN-12345');
+    expect(text).toContain('https://app/admin/records');
   });
 
   it('omits the doctor-name line when doctorName is null (prescription_ready)', () => {
