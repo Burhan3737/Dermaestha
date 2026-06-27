@@ -30,7 +30,7 @@ test.describe('J5 auth role gates', () => {
   test('404 no-leak: patient2 cannot read patient1 appointment', async ({ page }) => {
     await loginUi(page, EMAILS.patient2);
     await expect(page).toHaveURL(/\/browse/);
-    const res = await page.request.get(`/api/appointments/${seedIds.appts.free}`);
+    const res = await page.request.get(`/api/appointments/${seedIds.appts.prescription}`);
     expect(res.status()).toBe(404);
   });
 });

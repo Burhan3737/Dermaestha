@@ -8,61 +8,43 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-// J2 video lifecycle.
-// Tags: F05.03 (TC-F05-004 room/join), §5 worker (TC-F05-011 in_progress, TC-F05-014 completed),
-// §3 no-show (TC-F05-008 doctor_no_show, TC-F05-013 patient_no_show); ADR-12/25.
-test.describe('J2 video lifecycle', () => {
-  // BUG-2 fixed: recordJoin now uses a raw fetch to the dev sim at /dev/video/join (200) instead
-  // of api.post, which prepended "/api" → /api/dev/video/join (404) and silently swallowed it.
-  // Production is unaffected (VIDEO_PROVIDER=daily → joinSimUrl=null → recordJoin not called).
-  test('patient + doctor join the mock room → both joins recorded', async ({ browser }) => {
-    const id = seedIds.appts.liveJoin;
-    const patientCtx = await browser.newContext();
-    const doctorCtx = await browser.newContext();
-    const pPage = await patientCtx.newPage();
-    const dPage = await doctorCtx.newPage();
+// J2 video + time-based completion (manual-payment pivot §7.3, §10, §11).
+// The mock provider no longer simulates an in-call join (joinSimUrl is null); the deterministic,
+// provider-independent surface is the waiting room + the video-token gate (confirmed-only) and the
+// time-based completion pass (the cron's on-demand dev trigger). No join recording, no no-show.
+test.describe('J2 video + completion', () => {
+  test('confirmed appointment renders the video room; the room is gated on confirmed', async ({
+    page,
+  }) => {
+    const confirmedId = seedIds.appts.video;
+    const pendingId = seedIds.appts.pendingRef;
 
-    await loginUi(pPage, EMAILS.patient);
-    await expect(pPage).toHaveURL(/\/browse/);
-    await loginUi(dPage, EMAILS.doctor);
-    await expect(dPage).toHaveURL(/\/doctor/);
+    await loginUi(page, EMAILS.patient);
+    await expect(page).toHaveURL(/\/browse/);
 
-    // VideoRoom auto-fires POST /dev/video/join {appointmentId} on mount (mock joinSimUrl path).
-    // The unique "Leave" control confirms the mock room mounted (and recordJoin fired).
-    await pPage.goto(`/video/${id}`);
-    await expect(pPage.getByRole('button', { name: 'Leave' })).toBeVisible();
-    await dPage.goto(`/video/${id}`);
-    await expect(dPage.getByRole('button', { name: 'Leave' })).toBeVisible();
+    // The patient's "Join Call" lands on the waiting room for a confirmed, in-window appointment.
+    await page.goto(`/video/${confirmedId}/ready`);
+    await expect(page.getByRole('heading', { name: 'Waiting room' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Join Call' })).toBeVisible();
 
-    await expect
-      .poll(
-        async () => {
-          const a = await readAppointmentState(id);
-          return Boolean(a?.doctorJoinedAt && a?.patientJoinedAt);
-        },
-        { timeout: 15_000 },
-      )
-      .toBe(true);
-
-    await patientCtx.close();
-    await doctorCtx.close();
+    // The video-token endpoint authorizes the room only for a confirmed appointment…
+    const okRes = await page.request.get(`/api/appointments/${confirmedId}/video-token`);
+    expect(okRes.status()).toBe(200);
+    // …and refuses a pending one (no room before the admin confirms payment).
+    const pendingRes = await page.request.get(`/api/appointments/${pendingId}/video-token`);
+    expect(pendingRes.ok()).toBeFalsy();
   });
 
-  test('worker drives in_progress, completed, and both no-show variants', async ({ request }) => {
+  test('the completion worker flips a confirmed past-window appointment to completed', async ({
+    request,
+  }) => {
+    const id = seedIds.appts.completedPast;
+    expect((await readAppointmentState(id))?.state).toBe('confirmed');
+
+    // The dev trigger runs completeDueAppointments (mounted in NODE_ENV=development).
     const r = await request.post('/dev/worker/evaluate');
     expect(r.ok()).toBeTruthy();
 
-    await expect
-      .poll(async () => (await readAppointmentState(seedIds.appts.inprogress))?.state)
-      .toBe('in_progress');
-    await expect
-      .poll(async () => (await readAppointmentState(seedIds.appts.completed))?.state)
-      .toBe('completed');
-    await expect
-      .poll(async () => (await readAppointmentState(seedIds.appts.docNoShow))?.state)
-      .toBe('doctor_no_show');
-    await expect
-      .poll(async () => (await readAppointmentState(seedIds.appts.patNoShow))?.state)
-      .toBe('patient_no_show');
+    await expect.poll(async () => (await readAppointmentState(id))?.state).toBe('completed');
   });
 });

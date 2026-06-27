@@ -23,12 +23,13 @@ test.describe('J7 future-day booking', () => {
     await expect(slot).toBeVisible();
     await slot.click();
 
-    // Future-day slot → book → pay → confirm.
-    await expect(page).toHaveURL(/\/book\//);
-    await page.getByRole('button', { name: 'Confirm & Pay' }).click();
-    await expect(page).toHaveURL(/\/dev\/checkout/);
-    await page.getByRole('button', { name: 'Pay' }).click();
-    await expect(page).toHaveURL(/\/pay\/return/);
-    await expect(page.getByRole('heading', { name: 'Booking confirmed' })).toBeVisible();
+    // Future-day slot → "Confirm booking" locks the slot and lands on the manual PaymentInstructions
+    // screen (/book/pay/:id) with the bank details + amount due (manual-payment pivot §7.1).
+    await expect(page).toHaveURL(/\/book\/[^/]+\?/);
+    await page.getByRole('button', { name: 'Confirm booking' }).click();
+    await page.waitForURL(/\/book\/pay\//);
+    await expect(page.getByRole('heading', { name: 'Pay for your appointment' })).toBeVisible();
+    await expect(page.getByText('E2E Test Bank')).toBeVisible();
+    await expect(page.getByText('Rs 2,500')).toBeVisible();
   });
 });

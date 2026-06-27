@@ -20,4 +20,20 @@ test.describe('J9 UI states', () => {
     await page.goto(`/appointments/${seedIds.appts.prescription}/prescriptions`);
     await expect(page.getByText('This prescription is not available.')).toBeVisible();
   });
+
+  test('appointment lists render the 4-state badges (manual-payment model)', async ({ page }) => {
+    await loginUi(page, EMAILS.patient);
+    await expect(page).toHaveURL(/\/browse/);
+
+    // Upcoming holds the active states: a pending booking and a confirmed one.
+    await page.goto('/appointments');
+    await expect(page.getByRole('heading', { name: 'Upcoming appointments' })).toBeVisible();
+    await expect(page.getByText('Payment pending').first()).toBeVisible();
+    await expect(page.getByText('Confirmed').first()).toBeVisible();
+
+    // History holds the terminal states: completed and cancelled.
+    await page.goto('/appointments/history');
+    await expect(page.getByText('Completed').first()).toBeVisible();
+    await expect(page.getByText('Cancelled').first()).toBeVisible();
+  });
 });

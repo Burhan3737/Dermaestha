@@ -8,9 +8,9 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-// J3 prescription.
-// Tags: F08.02 immutable submit (TC-F08-008), F08.01 client-render download (TC-F08-006);
-// invariants #4/#5.
+// J3 prescription (manual-payment pivot: prescriptions stay gated on `completed`; issuing a
+// prescription is a child record and does NOT change appointment state — `prescription_issued`
+// was dropped). Tags: F08.02 immutable submit, F08.01 client-render download; invariants #4/#5.
 test('doctor issues a prescription → patient views it + PDF download', async ({ browser }) => {
   const id = seedIds.appts.prescription;
 
@@ -32,9 +32,10 @@ test('doctor issues a prescription → patient views it + PDF download', async (
   await docPage.getByRole('button', { name: 'Confirm & issue' }).click();
   await expect(docPage).toHaveURL(/\/doctor$/);
 
+  // The appointment stays `completed` — issuing a prescription no longer transitions state.
   await expect
     .poll(async () => (await readAppointmentState(id))?.state)
-    .toBe('prescription_issued');
+    .toBe('completed');
   await docCtx.close();
 
   const patCtx = await browser.newContext();

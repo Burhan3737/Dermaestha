@@ -1,67 +1,88 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import { signupUi, uniqueEmail } from '../support/auth.js';
+import { loginUi, signupUi, uniqueEmail } from '../support/auth.js';
+import { EMAILS, readAppointmentState, prisma } from '../support/db.js';
+import { seedIds } from '../support/seedIds.js';
 
-// J1 book → pay → confirm.
-// Tags: F01.01 (TC-F01-001 consent gate), F03.03 (TC-F03-005 slot-lock),
-// F04.01 (TC-F04-001 pay-at-booking), F04.02 (TC-F04-002 webhook-truth); invariants #2/#6/#7.
-test.describe('J1 book → pay → confirm', () => {
-  test('signup → browse → book → pay → appointment confirmed', async ({ page }) => {
+test.afterAll(async () => {
+  await prisma.$disconnect();
+});
+
+// J1 manual payment: book → submit bank reference → admin accept → confirmed.
+// Manual-payment pivot §7.1/§7.2, §11 acceptance. No gateway, no /dev/checkout, no /pay/return.
+test.describe('J1 book → pay → confirm (manual)', () => {
+  test('patient books, submits a bank reference, admin accepts, appointment confirmed', async ({
+    browser,
+  }) => {
+    const ref = `E2E-TXN-J1-${Date.now()}`;
+    const patientCtx = await browser.newContext();
+    const page = await patientCtx.newPage();
+
     await signupUi(page, { fullName: 'J1 Patient', email: uniqueEmail('j1'), phone: '03007770001' });
     await expect(page).toHaveURL(/\/browse/);
 
-    // Browse → the seeded E2E primary doctor.
+    // Browse → the seeded E2E primary doctor → book a future-day slot via the day picker.
     await page.getByRole('link', { name: /Dr E2E Primary/ }).click();
     await expect(page.getByRole('heading', { name: /Dr E2E Primary/ })).toBeVisible();
-
-    // Book on a future day via the day picker (ISSUE-1) — time-independent vs. a same-day slot.
     await page.getByRole('tab').nth(1).click();
     const slot = page.locator('button.slot').first();
     await expect(slot).toBeVisible();
     await slot.click();
 
-    // Booking → Confirm & Pay → mock hosted checkout.
-    await expect(page).toHaveURL(/\/book\//);
-    await page.getByRole('button', { name: 'Confirm & Pay' }).click();
-    await expect(page).toHaveURL(/\/dev\/checkout/);
+    // Booking → "Confirm booking" locks the slot (pending) and lands on the PaymentInstructions screen.
+    await expect(page).toHaveURL(/\/book\/[^/]+\?/);
+    await page.getByRole('button', { name: 'Confirm booking' }).click();
+    await page.waitForURL(/\/book\/pay\//);
+    const apptId = page.url().split('?')[0].split('/').pop();
 
-    // Pay → signed IPN → real webhook confirm → PaymentReturn polls to confirmed.
-    await page.getByRole('button', { name: 'Pay' }).click();
-    await expect(page).toHaveURL(/\/pay\/return/);
-    await expect(page.getByRole('heading', { name: 'Booking confirmed' })).toBeVisible();
+    // Bank instructions (from Settings) + amount due are shown.
+    await expect(page.getByRole('heading', { name: 'Pay for your appointment' })).toBeVisible();
+    await expect(page.getByText('E2E Test Bank')).toBeVisible();
+    await expect(page.getByText('Rs 2,500')).toBeVisible();
 
-    await page.getByRole('link', { name: 'View my appointments' }).click();
+    // Submit the bank transaction reference → POST /appointments/:id/pay → stays pending, awaiting admin.
+    await page.getByLabel('Bank transaction reference').fill(ref);
+    await page.getByRole('button', { name: /submit reference/i }).click();
+    await expect(page.getByText(/Awaiting confirmation/)).toBeVisible();
+
+    // The appointment is still pending until the admin verifies the transfer.
+    expect((await readAppointmentState(apptId))?.state).toBe('pending');
+
+    // Admin logs in → Payment review → finds this booking by its bank reference → Accept.
+    const adminCtx = await browser.newContext();
+    const adminPage = await adminCtx.newPage();
+    await loginUi(adminPage, EMAILS.admin);
+    await expect(adminPage).toHaveURL(/\/admin/);
+    await adminPage.goto('/admin/review');
+    await expect(adminPage.getByRole('heading', { name: 'Payment review' })).toBeVisible();
+    const adminRow = adminPage.locator('tr', { hasText: ref });
+    await expect(adminRow).toBeVisible();
+    await adminRow.getByRole('button', { name: 'Accept' }).click();
+    await expect(adminPage.locator('tr', { hasText: ref })).toHaveCount(0);
+    await adminCtx.close();
+
+    // Patient now sees the appointment confirmed (state + UI badge).
+    await expect
+      .poll(async () => (await readAppointmentState(apptId))?.state)
+      .toBe('confirmed');
+    await page.goto('/appointments');
     await expect(page.getByRole('heading', { name: 'Upcoming appointments' })).toBeVisible();
-    await expect(page.getByText(/Dr E2E Primary/)).toBeVisible();
+    await expect(page.getByText('Confirmed').first()).toBeVisible();
+    await patientCtx.close();
   });
 
-  // BUG-1 fixed (Option B): the payment.failed webhook path marks the Payment `failed` and
-  // force-expires the slot lock instead of deleting the appointment (Payment.appointment is
-  // ON DELETE RESTRICT — a delete P2003'd, 500'd, and never released the slot). The appointment
-  // row is kept (lock expired), so the slot is reclaimable via lazy-expiry / reclaim-on-conflict.
-  test('Fail at checkout releases the lock (no confirmation)', async ({ page }) => {
-    await signupUi(page, { fullName: 'J1 Fail', email: uniqueEmail('j1fail'), phone: '03007770002' });
-    await expect(page).toHaveURL(/\/browse/);
-    await page.getByRole('link', { name: /Dr E2E Primary/ }).click();
-    await page.getByRole('tab').nth(1).click();
-    await page.locator('button.slot').first().click();
-    await page.getByRole('button', { name: 'Confirm & Pay' }).click();
-    await expect(page).toHaveURL(/\/dev\/checkout/);
+  test('admin reject moves a pending booking to cancelled (slot freed)', async ({ page }) => {
+    const id = seedIds.appts.pendingRef;
+    await loginUi(page, EMAILS.admin);
+    await expect(page).toHaveURL(/\/admin/);
+    await page.goto('/admin/review');
+    await expect(page.getByRole('heading', { name: 'Payment review' })).toBeVisible();
 
-    // payment.failed → no confirmation (the booking is never confirmed). Option B keeps the
-    // slot_locked row with an expired lock, so the return page never reaches "Booking confirmed".
-    await page.getByRole('button', { name: 'Fail' }).click();
-    await expect(page).toHaveURL(/\/pay\/return/);
-    // Positive terminal state (ISSUE-3): a Failure/Lock-released card, not an infinite poll.
-    await expect(page.getByRole('heading', { name: 'Payment not completed' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Booking confirmed' })).toHaveCount(0);
+    const row = page.locator('tr', { hasText: 'E2E-SEED-REJECT-REF' });
+    await expect(row).toBeVisible();
+    await row.getByRole('button', { name: 'Reject' }).click();
+    await expect(page.locator('tr', { hasText: 'E2E-SEED-REJECT-REF' })).toHaveCount(0);
 
-    // The slot is freed: re-book the same earliest slot. This exercises reclaim-on-conflict over
-    // the expired, payment-attached blocker (the FK that P2003'd pre-fix) and lands on /book/.
-    await page.goto('/browse');
-    await page.getByRole('link', { name: /Dr E2E Primary/ }).click();
-    await page.getByRole('tab').nth(1).click();
-    await page.locator('button.slot').first().click();
-    await expect(page).toHaveURL(/\/book\//);
+    await expect.poll(async () => (await readAppointmentState(id))?.state).toBe('cancelled');
   });
 });
