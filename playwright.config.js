@@ -30,7 +30,6 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       NODE_ENV: 'development',
-      PAYMENT_PROVIDER: 'mock',
       VIDEO_PROVIDER: 'mock',
       EMAIL_PROVIDER: 'console',
       PORT: '3000',

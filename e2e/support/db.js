@@ -62,7 +62,6 @@ export async function resetE2eData() {
   await prisma.prescriptionItem.deleteMany({ where: { prescriptionId: { in: presIds } } });
   await prisma.prescription.deleteMany({ where: { id: { in: presIds } } });
   await prisma.notificationJob.deleteMany({ where: { appointmentId: { in: apptIds } } });
-  await prisma.payment.deleteMany({ where: { appointmentId: { in: apptIds } } });
   await prisma.appointment.deleteMany({ where: { id: { in: apptIds } } });
   await prisma.availabilityBlock.deleteMany({ where: { doctorId: { in: doctorIds } } });
   await prisma.doctor.deleteMany({ where: { id: { in: doctorIds } } });
@@ -101,7 +100,10 @@ async function makeDoctor({ email, pmc, fee, fullName, spec, active, mustChange 
   return { user, doctor };
 }
 
-async function seedAppointment({ doctorId, patientUserId, startMs, state, fee, docJoin, patJoin }) {
+/** Seed one appointment for the 4-state manual-payment model. `paymentReference` (and its
+ *  `paymentSubmittedAt`) are set for a `pending` row that has already had a bank reference
+ *  submitted (the admin-review queue). No join columns exist anymore (manual-payment pivot). */
+async function seedAppointment({ doctorId, patientUserId, startMs, state, fee, paymentReference }) {
   const slotStart = rel(startMs);
   const slotEnd = new Date(slotStart.getTime() + 30 * MIN);
   return prisma.appointment.create({
@@ -113,8 +115,8 @@ async function seedAppointment({ doctorId, patientUserId, startMs, state, fee, d
       state,
       feeAtBooking: fee,
       forSelf: true,
-      doctorJoinedAt: docJoin ? new Date(slotStart.getTime() + MIN) : null,
-      patientJoinedAt: patJoin ? new Date(slotStart.getTime() + MIN) : null,
+      paymentReference: paymentReference ?? null,
+      paymentSubmittedAt: paymentReference ? new Date() : null,
     },
   });
 }
@@ -177,7 +179,7 @@ export async function seedAll() {
     pmc: 'E2E-DOC-2',
     fee: 500000,
     fullName: 'Dr E2E Cancel',
-    spec: 'E2E Refunds',
+    spec: 'E2E Cancellations',
     active: true,
   });
   await makeDoctor({
@@ -202,37 +204,21 @@ export async function seedAll() {
   const did = D.doctor.id;
   const pid = patient.id;
 
-  const inprogress = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -2 * MIN, state: 'confirmed', fee: 250000 });
-  const completed = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -45 * MIN, state: 'confirmed', fee: 250000, docJoin: true, patJoin: true });
-  const docNoShow = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -50 * MIN, state: 'confirmed', fee: 250000 });
-  const patNoShow = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -55 * MIN, state: 'confirmed', fee: 250000, docJoin: true });
-  const liveJoin = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -1 * MIN, state: 'confirmed', fee: 250000 });
-  const presAppt = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -180 * MIN, state: 'completed', fee: 250000, docJoin: true, patJoin: true });
-
-  const free = await seedAppointment({ doctorId: Dc.doctor.id, patientUserId: pid, startMs: 180 * MIN, state: 'confirmed', fee: 500000 });
-  await prisma.payment.create({
-    data: {
-      appointmentId: free.id,
-      patientUserId: pid,
-      slotStart: free.slotStart,
-      amount: 500000,
-      gatewayFee: 12500,
-      status: 'success',
-      providerRef: `e2e_free_${free.id}`,
-    },
-  });
-  const late = await seedAppointment({ doctorId: Dc.doctor.id, patientUserId: pid, startMs: 60 * MIN, state: 'confirmed', fee: 600000 });
-  await prisma.payment.create({
-    data: {
-      appointmentId: late.id,
-      patientUserId: pid,
-      slotStart: late.slotStart,
-      amount: 600000,
-      gatewayFee: 15000,
-      status: 'success',
-      providerRef: `e2e_late_${late.id}`,
-    },
-  });
+  // Deterministic fixtures for the 4-state manual-payment model (all owned by patient1):
+  //  - `video`         confirmed + in the video window now → J2 video room renders for confirmed.
+  //  - `completedPast` confirmed + already past slotEnd+5min → J2 dev-worker completion pass.
+  //  - `prescription`  completed → J3 doctor prescribes / patient views; J9 cross-tenant 404.
+  //  - `pendingRef`    pending + a submitted bank reference → J1 admin reject (review queue).
+  //  - `futureConfirmed` confirmed in the future on Dc (fee Rs 5,000, unique) → J4 cancel (no refund).
+  //  - `pendingBadge` / `cancelledSeed` untouched rows so J9 can assert the pending/cancelled badges
+  //    deterministically regardless of suite order.
+  const video = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -1 * MIN, state: 'confirmed', fee: 250000 });
+  const completedPast = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -60 * MIN, state: 'confirmed', fee: 250000 });
+  const presAppt = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -180 * MIN, state: 'completed', fee: 250000 });
+  const pendingRef = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: 220 * MIN, state: 'pending', fee: 250000, paymentReference: 'E2E-SEED-REJECT-REF' });
+  const pendingBadge = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: 260 * MIN, state: 'pending', fee: 250000 });
+  const cancelledSeed = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -240 * MIN, state: 'cancelled', fee: 250000 });
+  const futureConfirmed = await seedAppointment({ doctorId: Dc.doctor.id, patientUserId: pid, startMs: 180 * MIN, state: 'confirmed', fee: 500000 });
 
   return {
     doctorId: did,
@@ -242,14 +228,13 @@ export async function seedAll() {
     patient2Id: patient2.id,
     adminId: admin.id,
     appts: {
-      inprogress: inprogress.id,
-      completed: completed.id,
-      docNoShow: docNoShow.id,
-      patNoShow: patNoShow.id,
-      liveJoin: liveJoin.id,
+      video: video.id,
+      completedPast: completedPast.id,
       prescription: presAppt.id,
-      free: free.id,
-      late: late.id,
+      pendingRef: pendingRef.id,
+      pendingBadge: pendingBadge.id,
+      cancelledSeed: cancelledSeed.id,
+      futureConfirmed: futureConfirmed.id,
     },
   };
 }
@@ -257,6 +242,6 @@ export async function seedAll() {
 export async function readAppointmentState(id) {
   return prisma.appointment.findUnique({
     where: { id },
-    select: { state: true, doctorJoinedAt: true, patientJoinedAt: true },
+    select: { state: true, paymentReference: true },
   });
 }
