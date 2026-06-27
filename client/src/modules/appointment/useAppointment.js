@@ -34,5 +34,15 @@ export function useAppointment(opts = {}) {
     onError: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
   });
 
-  return { list, detail, cancel, resumePayment };
+  // Manual-payment model: the patient submits their bank transaction reference for a `pending`
+  // appointment; the admin verifies it offline (design §7.1). @param {{ id: string, reference: string }}
+  const submitReference = useMutation({
+    mutationFn: ({ id, reference }) => api.post(`/appointments/${id}/pay`, { reference }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointment'] });
+      qc.invalidateQueries({ queryKey: ['appointments'] });
+    },
+  });
+
+  return { list, detail, cancel, resumePayment, submitReference };
 }
