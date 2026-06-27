@@ -21,16 +21,9 @@ import * as audit from '../../services/audit/audit.service.js';
 // route through the namespace so vi.spyOn can intercept them under ESM (a bare local call cannot be spied).
 import * as self from './service.js';
 
-const UPCOMING = ['confirmed', 'in_progress'];
-const TERMINAL = [
-  'completed',
-  'prescription_issued',
-  'patient_no_show',
-  'doctor_no_show',
-  'cancelled_refunded',
-  'cancelled_no_refund',
-  'doctor_cancelled',
-];
+// Patient "Upcoming": awaiting payment (pending) or paid/confirmed. History: completed + cancelled.
+const PATIENT_ACTIVE = ['pending', 'confirmed'];
+const TERMINAL = ['completed', 'cancelled'];
 
 function toPatientRow(a) {
   return {
@@ -38,8 +31,8 @@ function toPatientRow(a) {
     slotStart: a.slotStart.toISOString(),
     slotEnd: a.slotEnd.toISOString(),
     state: a.state,
-    lockExpiresAt: a.lockExpiresAt ? a.lockExpiresAt.toISOString() : null,
     feeAtBooking: a.feeAtBooking,
+    paymentReference: a.paymentReference,
     forSelf: a.forSelf,
     subjectName: a.subjectName,
     doctorName: a.doctor.user.fullName,
@@ -55,15 +48,7 @@ export async function listForRole({ role, userId, scope = 'active' }) {
       where:
         scope === 'history'
           ? { patientUserId: userId, state: { in: TERMINAL } }
-          : {
-              patientUserId: userId,
-              // Active = confirmed/in_progress PLUS a still-live payment hold, so a patient who left
-              // checkout can find and complete it instead of hitting an invisible 10-min dead-end.
-              OR: [
-                { state: { in: UPCOMING } },
-                { state: 'slot_locked', lockExpiresAt: { gt: new Date() } },
-              ],
-            },
+          : { patientUserId: userId, state: { in: PATIENT_ACTIVE } },
       orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
       include: {
         doctor: {
@@ -90,7 +75,7 @@ export async function listForRole({ role, userId, scope = 'active' }) {
       ? { doctorId: doctor.id, state: { in: TERMINAL } }
       : {
           doctorId: doctor.id,
-          state: { in: UPCOMING },
+          state: 'confirmed',
           slotStart: { gte: dayStart, lt: dayEnd },
         };
   const rows = await prisma.appointment.findMany({
@@ -140,11 +125,9 @@ export async function getForRole({ id, role, userId }) {
     slotStart: a.slotStart.toISOString(),
     slotEnd: a.slotEnd.toISOString(),
     state: a.state,
-    // Lets P-07 distinguish a released/expired lock (payment failed or abandoned) from a still-valid
-    // hold that is merely awaiting webhook confirmation — so the return page can show a terminal
-    // failure state instead of polling forever (doc 06 §3 P-07 states).
-    lockExpiresAt: a.lockExpiresAt ? a.lockExpiresAt.toISOString() : null,
     feeAtBooking: a.feeAtBooking,
+    paymentReference: a.paymentReference,
+    paymentSubmittedAt: a.paymentSubmittedAt ? a.paymentSubmittedAt.toISOString() : null,
     forSelf: a.forSelf,
     subjectName: a.subjectName,
     subjectAge: a.subjectAge,
@@ -155,30 +138,37 @@ export async function getForRole({ id, role, userId }) {
     doctorPhotoUrl: a.doctor.photoUrl,
   };
   detail.serverNow = new Date().toISOString();
-  detail.peerJoined =
-    role === 'patient' ? !!a.doctorJoinedAt : role === 'doctor' ? !!a.patientJoinedAt : false;
-  if (a.state === 'confirmed') {
-    detail.refundQuote = await self.quoteRefund(id).catch(() => null);
+  // Manual-payment: a pending appointment shows the patient the bank instructions + amount due
+  // (design §7.1). Bank details come from the single admin-editable Settings row.
+  if (a.state === 'pending') {
+    const s = await prisma.settings.findUnique({ where: { id: 1 } });
+    detail.paymentInstructions = {
+      amountDue: a.feeAtBooking,
+      bankName: s?.bankName ?? null,
+      bankAccountName: s?.bankAccountName ?? null,
+      bankAccountNumber: s?.bankAccountNumber ?? null,
+      bankInstructions: s?.bankInstructions ?? null,
+    };
   }
   return detail;
 }
 
 /**
- * Create a slot_locked hold for a patient. Validates the slot is genuinely bookable,
- * enforces Single-Lock + No-Overlap, then inserts — reclaiming an expired lock on collision.
+ * Create a `pending` hold for a patient (slot locked, awaiting manual payment). Validates the slot
+ * is genuinely bookable, enforces No-Overlap, snapshots the fee, then inserts. With no auto-expiry,
+ * a unique-index collision is simply SLOT_TAKEN.
  * @param {{ patientUserId: string, doctorId: string, slotStart: string,
  *   forSelf: boolean, subject?: { name: string, age: number, relation: string } }} args
  */
 export async function lockSlot({ patientUserId, doctorId, slotStart, forSelf, subject }) {
   const slotStartDate = new Date(slotStart);
   const slotEnd = new Date(slotStartDate.getTime() + SLOT_GRANULARITY_MIN * 60 * 1000);
-  const now = new Date();
 
   // Invariant #9 (F10.03): a deactivated/unknown doctor takes NO new bookings.
   // 404-no-leak — same answer as the public profile route.
   const activeDoctor = await prisma.doctor.findFirst({
     where: { id: doctorId, isActive: true, status: 'active' },
-    select: { id: true },
+    select: { id: true, fee: true },
   });
   if (!activeDoctor) throw new AppError('NOT_FOUND', 'Doctor not found.', 404);
 
@@ -189,21 +179,13 @@ export async function lockSlot({ patientUserId, doctorId, slotStart, forSelf, su
     throw new AppError('SLOT_NOT_BOOKABLE', 'That slot is not available.', 422);
   }
 
-  // 2. Single-Lock: no other live hold for this patient.
-  const liveLock = await prisma.appointment.findFirst({
-    where: { patientUserId, state: 'slot_locked', lockExpiresAt: { gt: now } },
-    select: { id: true },
-  });
-  if (liveLock) throw new AppError('ACTIVE_LOCK_EXISTS', 'Finish your current booking first.', 409);
-
-  // 3. No-Overlap: no active appointment overlapping [slotStart, slotEnd).
+  // 2. No-Overlap: no active appointment overlapping [slotStart, slotEnd).
   const overlap = await prisma.appointment.findFirst({
     where: {
       patientUserId,
       state: { in: ACTIVE_APPOINTMENT_STATES },
       slotStart: { lt: slotEnd },
       slotEnd: { gt: slotStartDate },
-      NOT: { state: 'slot_locked', lockExpiresAt: { lt: now } },
     },
     select: { id: true },
   });
@@ -214,17 +196,17 @@ export async function lockSlot({ patientUserId, doctorId, slotStart, forSelf, su
     patientUserId,
     slotStart: slotStartDate,
     slotEnd,
-    state: 'slot_locked',
-    lockExpiresAt: new Date(now.getTime() + SLOT_LOCK_TTL_MIN * 60 * 1000),
+    state: 'pending',
+    feeAtBooking: activeDoctor.fee,
     forSelf,
     subjectName: subject?.name ?? null,
     subjectAge: subject?.age ?? null,
     subjectRelation: subject?.relation ?? null,
   };
 
-  const created = await createWithReclaim(data, doctorId, slotStartDate, now);
+  const created = await createWithReclaim(data);
   await audit.record({
-    eventType: 'appointment.slot_locked',
+    eventType: 'appointment.pending',
     actorType: 'patient',
     actorId: patientUserId,
     targetRef: created.id,
@@ -232,48 +214,42 @@ export async function lockSlot({ patientUserId, doctorId, slotStart, forSelf, su
   return created;
 }
 
-async function createWithReclaim(data, doctorId, slotStartDate, now) {
+async function createWithReclaim(data) {
   try {
     return await prisma.appointment.create({ data });
   } catch (e) {
-    if (e?.code !== 'P2002') throw e;
-    const blocker = await prisma.appointment.findFirst({
-      where: {
-        doctorId,
-        slotStart: slotStartDate,
-        state: 'slot_locked',
-        lockExpiresAt: { lt: now },
-      },
-      select: { id: true },
-    });
-    if (!blocker) throw new AppError('SLOT_TAKEN', 'That slot was just taken.', 409);
-    // The blocker is an expired, never-confirmed slot_locked hold (a successful pay would have
-    // moved it to `confirmed`, out of this branch). Inspect any Payment it carries before
-    // reclaiming — only `pending`/`failed` is reachable here:
-    //   • `failed` or absent → a dead intent. `Payment.appointment` is ON DELETE RESTRICT (no
-    //     cascade — prisma/schema.prisma), so clear the leftover intent (if any) first, or the
-    //     reclaim delete raises P2003 (ADR-23 lazy-reclaim must actually free the slot).
-    //   • still `pending` → may be a paid-but-lost-IPN. NEVER silently delete possibly-paid money:
-    //     let the booking conflict stand and leave the row + intent intact for the hourly
-    //     reconciliation / the payment.manual_review_required admin path (S1) to resolve.
-    const blockerPayment = await prisma.payment.findFirst({
-      where: { appointmentId: blocker.id },
-      select: { id: true, status: true },
-    });
-    if (blockerPayment?.status === 'pending') {
-      throw new AppError('SLOT_TAKEN', 'That slot was just taken.', 409);
-    }
-    if (blockerPayment) {
-      await prisma.payment.deleteMany({ where: { appointmentId: blocker.id } });
-    }
-    await prisma.appointment.delete({ where: { id: blocker.id } });
-    try {
-      return await prisma.appointment.create({ data });
-    } catch (e2) {
-      if (e2?.code === 'P2002') throw new AppError('SLOT_TAKEN', 'That slot was just taken.', 409);
-      throw e2;
-    }
+    if (e?.code === 'P2002') throw new AppError('SLOT_TAKEN', 'That slot was just taken.', 409);
+    throw e;
   }
+}
+
+/**
+ * Manual offline payment (design §7.1): the patient submits their bank transaction reference.
+ * Stays `pending`; records the reference + timestamp, audits it, and alerts the admin (in-app
+ * audit row + email — the admin matches it against the bank).
+ * @param {{ patientUserId: string, appointmentId: string, reference: string }} args
+ */
+export async function submitPaymentReference({ patientUserId, appointmentId, reference }) {
+  const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+  if (!appt || appt.patientUserId !== patientUserId) {
+    throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
+  }
+  if (appt.state !== 'pending') {
+    throw new AppError('INVALID_STATE', 'This booking is no longer awaiting payment.', 409);
+  }
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { paymentReference: reference, paymentSubmittedAt: new Date() },
+  });
+  await audit.record({
+    eventType: 'payment.submitted',
+    actorType: 'patient',
+    actorId: patientUserId,
+    targetRef: appointmentId,
+    meta: { reference },
+  });
+  await notification.enqueuePaymentSubmittedAdmin({ appointment: appt, reference }).catch(() => {});
+  return { ok: true };
 }
 
 /** Legal transitions (manual-payment, doc 05 §5). pending→{confirmed,cancelled};
@@ -459,9 +435,9 @@ export async function retryDueRefunds(now = new Date()) {
   }
 }
 
-const FREE_CANCEL_MS = 2 * 60 * 60 * 1000;
-
 /**
+ * Cancel from `pending` or `confirmed` → single `cancelled` state. Money is fully offline (no
+ * refund). Who/why is captured in the audit log via transition(actorType, reason).
  * @param {{ appointmentId: string, actorType: 'patient'|'doctor', actorId: string, reason?: string }} args
  */
 export async function cancel({ appointmentId, actorType, actorId, reason }) {
@@ -479,49 +455,18 @@ export async function cancel({ appointmentId, actorType, actorId, reason }) {
     if (!doctor || doctor.id !== appt.doctorId)
       throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
   }
-  if (appt.state !== 'confirmed') {
-    throw new AppError('INVALID_TRANSITION', 'Only confirmed appointments can be cancelled.', 409);
+  if (appt.state !== 'pending' && appt.state !== 'confirmed') {
+    throw new AppError('INVALID_TRANSITION', 'This appointment cannot be cancelled.', 409);
   }
-
-  if (actorType === 'doctor') {
-    if (!reason) throw new AppError('VALIDATION_FAILED', 'A cancellation reason is required.', 400);
-    await self.transition({
-      appointmentId,
-      to: 'doctor_cancelled',
-      actorType: 'doctor',
-      actorId,
-      reason,
-    });
-    await safeRefund(appointmentId);
-    await enqueueCancellationEmail(appt, 'cancellation_apology');
-    return { state: 'doctor_cancelled' };
-  }
-
-  const refundable = appt.slotStart.getTime() - Date.now() >= FREE_CANCEL_MS;
-  if (refundable) {
-    await self.transition({
-      appointmentId,
-      to: 'cancelled_refunded',
-      actorType: 'patient',
-      actorId,
-    });
-    await safeRefund(appointmentId);
-    await enqueueCancellationEmail(appt, 'refund_confirmation');
-    return { state: 'cancelled_refunded' };
-  }
-  await self.transition({
-    appointmentId,
-    to: 'cancelled_no_refund',
-    actorType: 'patient',
-    actorId,
-  });
-  return { state: 'cancelled_no_refund' };
+  await self.transition({ appointmentId, to: 'cancelled', actorType, actorId, reason: reason ?? null });
+  await enqueueCancellationEmail(appt).catch(() => {});
+  return { state: 'cancelled' };
 }
 
-/** Enqueue a cancellation-flow email (outbox). Vars are snapshotted now (doc 14 §5). */
-async function enqueueCancellationEmail(appt, type) {
+/** Enqueue a cancellation email (outbox). Vars are snapshotted now (doc 14 §5). No refund math. */
+async function enqueueCancellationEmail(appt) {
   try {
-    const [patient, doctor, payment] = await Promise.all([
+    const [patient, doctor] = await Promise.all([
       prisma.user.findUnique({
         where: { id: appt.patientUserId },
         select: { email: true, fullName: true },
@@ -530,14 +475,10 @@ async function enqueueCancellationEmail(appt, type) {
         where: { id: appt.doctorId },
         select: { user: { select: { fullName: true } } },
       }),
-      prisma.payment.findFirst({ where: { appointmentId: appt.id, status: 'success' } }),
     ]);
     if (!patient) return;
-    const refundAmount = payment
-      ? Math.max(0, payment.amount - (payment.gatewayFee ?? 0))
-      : null;
     await notification.enqueue({
-      type,
+      type: 'cancellation',
       appointmentId: appt.id,
       recipientEmail: patient.email,
       scheduledFor: new Date(),
@@ -546,13 +487,10 @@ async function enqueueCancellationEmail(appt, type) {
         doctorName: doctor?.user?.fullName ?? null,
         slotStartLocal: notification.slotStartLocal(appt.slotStart),
         appointmentRef: appt.id,
-        amount: refundAmount,
-        refundAmount,
-        refundRef: payment?.refundRef ?? null,
       },
     });
   } catch (e) {
-    logger.warn('cancellation email not enqueued', { appointmentId: appt.id, type, err: String(e) });
+    logger.warn('cancellation email not enqueued', { appointmentId: appt.id, err: String(e) });
   }
 }
 

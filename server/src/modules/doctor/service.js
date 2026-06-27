@@ -124,8 +124,6 @@ export async function generateSlots(doctorId, dateYMD, settings) {
       doctorId,
       state: { in: ACTIVE_APPOINTMENT_STATES },
       slotStart: { in: future.map((s) => s.slotStart) },
-      // Lazy expiry: an expired slot_locked no longer occupies the slot (Slice C, ADR-23).
-      NOT: { state: 'slot_locked', lockExpiresAt: { lt: new Date() } },
     },
     select: { slotStart: true },
   });
@@ -156,9 +154,6 @@ export async function replaceBlocksForDoctor(doctorId, blocks) {
       doctorId,
       state: { in: ACTIVE_APPOINTMENT_STATES },
       slotStart: { gt: new Date() },
-      // Lazy expiry (ADR-23): an expired slot_locked no longer occupies the slot, so it must
-      // not spuriously trigger BLOCK_HAS_BOOKINGS. Mirrors the exclusion in generateSlots.
-      NOT: { state: 'slot_locked', lockExpiresAt: { lt: new Date() } },
     },
     select: { id: true, slotStart: true },
   });

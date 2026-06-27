@@ -1,16 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-process.env.PAYMENT_PROVIDER = 'mock';
 process.env.EMAIL_PROVIDER = 'console';
-process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
 
 const request = (await import('supertest')).default;
 const { createApp } = await import('#src/index.js');
 const { prisma } = await import('#src/lib/prisma/prisma.js');
-const { buildSignedIpn } = await import('#src/integrations/payment/payfast.mock.js');
 const { formatInTimeZone } = await import('date-fns-tz');
 
 const app = createApp();
-const uniq = () => `slicec_${Date.now()}_${Math.floor(Math.random() * 1e6)}@test.local`;
+const uniq = () => `booking_${Date.now()}_${Math.floor(Math.random() * 1e6)}@test.local`;
 
 async function pickSlot(doctorId) {
   for (let i = 1; i <= 14; i += 1) {
@@ -22,16 +19,15 @@ async function pickSlot(doctorId) {
   throw new Error('no slot found');
 }
 
-describe('booking + payment integration', () => {
-  let agent, email, doctorId, slotStart, appointmentId;
+describe('booking — manual payment flow', () => {
+  let agent, email, doctorId, doctorFee, slotStart, appointmentId;
 
   beforeAll(async () => {
-    // First seeded doctor (dr.ayesha): notification.integration pins dr.bilal;
-    // explicit pins on both sides keep the parallel files off each other's slots.
     const d = await prisma.doctor.findFirst({
       where: { isActive: true, status: 'active', user: { email: 'dr.ayesha@dermestha.dev' } },
     });
     doctorId = d.id;
+    doctorFee = d.fee;
     slotStart = await pickSlot(doctorId);
     email = uniq();
     agent = request.agent(app);
@@ -44,12 +40,15 @@ describe('booking + payment integration', () => {
     });
   });
 
-  it('locks a slot', async () => {
+  it('lock creates a pending appointment with feeAtBooking and no payment redirect', async () => {
     const res = await agent
       .post('/api/appointments/lock')
       .send({ doctorId, slotStart, forSelf: true });
     expect(res.status).toBe(201);
     appointmentId = res.body.id;
+    const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+    expect(appt.state).toBe('pending');
+    expect(appt.feeAtBooking).toBe(doctorFee);
   });
 
   it('a second lock on the same slot is rejected (slot already occupied)', async () => {
@@ -65,56 +64,42 @@ describe('booking + payment integration', () => {
     const res = await agent2
       .post('/api/appointments/lock')
       .send({ doctorId, slotStart, forSelf: true });
-    // generateSlots excludes slot_locked rows from ACTIVE_APPOINTMENT_STATES, so the second
-    // patient sees the slot as SLOT_NOT_BOOKABLE (422) rather than SLOT_TAKEN (409).
-    // SLOT_TAKEN (409) is only reachable via a concurrent DB-level unique-constraint race.
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('SLOT_NOT_BOOKABLE');
     await prisma.user.deleteMany({ where: { email: email2 } });
   });
 
-  it('creates a pay intent then confirms via a signed webhook', async () => {
-    const pay = await agent.post(`/api/appointments/${appointmentId}/pay`);
-    expect(pay.status).toBe(200);
-    expect(pay.body.redirectUrl).toContain('/dev/checkout?ref=');
-    const payment = await prisma.payment.findFirst({ where: { appointmentId } });
-    const ipn = buildSignedIpn({
-      event: 'payment.success',
-      providerRef: payment.providerRef,
-      intentKey: `x`,
-      amount: payment.amount,
-      gatewayFee: 5000,
-    });
-    const wh = await request(app).post('/api/webhooks/payfast').send(ipn);
-    expect(wh.status).toBe(200);
+  it('pay submits a bank reference, stays pending, and enqueues an admin email', async () => {
+    const r = await agent
+      .post(`/api/appointments/${appointmentId}/pay`)
+      .send({ reference: 'TXN-12345' });
+    expect(r.status).toBe(200);
     const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
-    expect(appt.state).toBe('confirmed');
-    expect(appt.feeAtBooking).toBe(payment.amount);
+    expect(appt.state).toBe('pending');
+    expect(appt.paymentReference).toBe('TXN-12345');
+    const jobs = await prisma.notificationJob.findMany({
+      where: { appointmentId, type: 'payment_submitted_admin' },
+    });
+    expect(jobs).toHaveLength(1);
   });
 
-  it('rejects a webhook with a bad signature (401)', async () => {
-    const res = await request(app)
-      .post('/api/webhooks/payfast')
-      .send({ event: 'payment.success', providerRef: 'x', signature: 'bad' });
-    expect(res.status).toBe(401);
-  });
-
-  it('shows the appointment in the patient upcoming list', async () => {
-    const res = await agent.get('/api/appointments');
+  it('GET /:id for a pending appointment exposes paymentInstructions + paymentReference', async () => {
+    const res = await agent.get(`/api/appointments/${appointmentId}`);
     expect(res.status).toBe(200);
-    expect(res.body.data.some((a) => a.id === appointmentId && a.state === 'confirmed')).toBe(true);
+    expect(res.body.paymentReference).toBe('TXN-12345');
+    expect(res.body.paymentInstructions).toMatchObject({ amountDue: doctorFee });
   });
 
-  it('cancels ≥2h before → cancelled_refunded with a refund recorded', async () => {
-    const res = await agent.post(`/api/appointments/${appointmentId}/cancel`).send({});
+  it('patient cancels the pending appointment → cancelled, no refund logic', async () => {
+    const res = await agent
+      .post(`/api/appointments/${appointmentId}/cancel`)
+      .send({ reason: 'changed mind' });
     expect(res.status).toBe(200);
-    expect(res.body.state).toBe('cancelled_refunded');
-    const payment = await prisma.payment.findFirst({ where: { appointmentId } });
-    expect(payment.refundStatus).toBe('settled');
+    expect(res.body.state).toBe('cancelled');
   });
 
   afterAll(async () => {
-    await prisma.payment.deleteMany({ where: { appointmentId } });
+    await prisma.notificationJob.deleteMany({ where: { appointmentId } });
     await prisma.appointment.deleteMany({ where: { id: appointmentId } });
     await prisma.auditLog.deleteMany({ where: { targetRef: appointmentId } });
     await prisma.user.deleteMany({ where: { email } });

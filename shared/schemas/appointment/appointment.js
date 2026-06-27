@@ -25,7 +25,7 @@ export const cancelSchema = z.object({
   reason: z.string().min(1).max(500).optional(),
 });
 
-/** POST /api/appointments/:id/dispute (F13.02, admin). One route sets AND clears. */
-export const disputeSchema = z.object({
-  disputed: z.boolean(),
+/** POST /api/appointments/:id/pay — submit the bank transaction reference (manual payment). */
+export const payRefSchema = z.object({
+  reference: z.string().trim().min(3).max(120),
 });

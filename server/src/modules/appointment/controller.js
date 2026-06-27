@@ -1,6 +1,5 @@
 // @ts-check
 import * as bookingService from './service.js';
-import * as paymentService from '../payment/service.js';
 import * as appointmentService from './service.js';
 import * as cancellationService from './service.js';
 import * as videoService from '../video/service.js';
@@ -17,9 +16,10 @@ export async function lock(req, res, next) {
 export async function pay(req, res, next) {
   try {
     res.json(
-      await paymentService.createIntent({
+      await appointmentService.submitPaymentReference({
         patientUserId: req.session.userId,
         appointmentId: req.params.id,
+        reference: req.body.reference,
       }),
     );
   } catch (e) {

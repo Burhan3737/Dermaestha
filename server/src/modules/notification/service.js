@@ -88,6 +88,65 @@ export async function enqueueBookingEmails({
   }
 }
 
+/**
+ * Manual-payment: alert the admin that a patient submitted a bank transaction reference (design §9).
+ * @param {{ appointment: { id: string }, reference: string, now?: Date, client?: any }} args
+ */
+export async function enqueuePaymentSubmittedAdmin({
+  appointment,
+  reference,
+  now = new Date(),
+  client = prisma,
+}) {
+  const admin = await client.user.findFirst({
+    where: { role: 'admin' },
+    select: { email: true },
+  });
+  if (!admin) return;
+  await enqueue({
+    type: 'payment_submitted_admin',
+    appointmentId: appointment.id,
+    recipientEmail: admin.email,
+    scheduledFor: now,
+    vars: {
+      appointmentRef: appointment.id,
+      reference,
+      reviewUrl: `${env.APP_BASE_URL}/admin/records`,
+    },
+    client,
+  });
+}
+
+/** Admin accepted the manual payment → booking confirmation + reminder cadence (design §9). */
+export async function enqueueBookingConfirmation(args) {
+  return enqueueBookingEmails(args);
+}
+
+/**
+ * Admin rejected the manual payment (reference not matched) → "payment not received" (design §9).
+ * @param {{ appointment: { id: string, slotStart: Date, patientUserId: string },
+ *   now?: Date, client?: any }} args
+ */
+export async function enqueuePaymentNotReceived({ appointment, now = new Date(), client = prisma }) {
+  const patient = await client.user.findUnique({
+    where: { id: appointment.patientUserId },
+    select: { email: true, fullName: true },
+  });
+  if (!patient) return;
+  await enqueue({
+    type: 'payment_not_received',
+    appointmentId: appointment.id,
+    recipientEmail: patient.email,
+    scheduledFor: now,
+    vars: {
+      patientName: patient.fullName,
+      appointmentRef: appointment.id,
+      slotStartLocal: slotStartLocal(appointment.slotStart),
+    },
+    client,
+  });
+}
+
 const REMINDER_TYPES = new Set(['reminder_24h', 'reminder_1h']);
 const SENDABLE_STATES = new Set(['confirmed', 'in_progress']);
 const LEASE_MS = 60_000;

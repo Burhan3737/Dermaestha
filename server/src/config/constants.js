@@ -27,11 +27,4 @@ export const TIMEZONE = 'Asia/Karachi';
 
 // States that occupy a slot (mirror the uniq_active_slot partial index). A slot with an
 // appointment in any of these is NOT bookable / not regenerated as available.
-export const ACTIVE_APPOINTMENT_STATES = [
-  'slot_locked',
-  'confirmed',
-  'in_progress',
-  'completed',
-  'prescription_issued',
-  'cancelled_no_refund',
-];
+export const ACTIVE_APPOINTMENT_STATES = ['pending', 'confirmed', 'completed'];
