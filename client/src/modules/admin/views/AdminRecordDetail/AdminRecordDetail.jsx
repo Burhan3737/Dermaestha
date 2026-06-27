@@ -6,21 +6,20 @@ import { Button } from '../../../../shared/Button/Button.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
+import { stateLabel, stateBadge } from '../../../appointment/stateLabel.js';
 import { formatPkr, formatKarachiTable } from '../../../../lib/format/format.js';
 
 const pkr = (paisa) => (paisa == null ? '—' : formatPkr(paisa));
 
 export function AdminRecordDetail() {
   const { id } = useParams();
-  const { recordDetail, resendEmail, setDisputed } = useAdmin({ recordDetailId: id });
-  const [confirming, setConfirming] = useState(null); // null | {kind:'resend', jobId} | {kind:'dispute', disputed}
+  const { recordDetail, resendEmail } = useAdmin({ recordDetailId: id });
+  const [confirming, setConfirming] = useState(null); // null | { jobId }
 
   const d = recordDetail.data;
 
   const confirm = () => {
-    const done = { onSuccess: () => setConfirming(null) };
-    if (confirming.kind === 'resend') resendEmail.mutate({ jobId: confirming.jobId }, done);
-    else setDisputed.mutate({ id, disputed: confirming.disputed }, done);
+    resendEmail.mutate({ jobId: confirming.jobId }, { onSuccess: () => setConfirming(null) });
   };
 
   return (
@@ -41,20 +40,12 @@ export function AdminRecordDetail() {
               <strong>{d.appointment.doctorName}</strong> — {formatKarachiTable(d.appointment.slotStart)}
             </p>
             <p>
-              <span className="badge badge--info">{d.appointment.state}</span>{' '}
-              {d.appointment.disputed && <span className="badge badge--danger">Disputed</span>}{' '}
-              Paid: {pkr(d.appointment.amountPaid)} · Payment ref: {d.appointment.paymentRef ?? '—'} ·
-              Refund ref: {d.appointment.refundRef ?? '—'}
+              <span className={`badge badge--${stateBadge(d.appointment.state)}`}>
+                {stateLabel(d.appointment.state)}
+              </span>{' '}
+              Amount: {pkr(d.appointment.amountDue)} · Payment ref:{' '}
+              {d.appointment.paymentReference ?? '—'}
             </p>
-            {d.appointment.disputed ? (
-              <Button variant="secondary" onClick={() => setConfirming({ kind: 'dispute', disputed: false })}>
-                Clear disputed
-              </Button>
-            ) : (
-              <Button variant="danger" onClick={() => setConfirming({ kind: 'dispute', disputed: true })}>
-                Mark disputed
-              </Button>
-            )}
           </div>
 
           <div className="section-card">
@@ -107,7 +98,7 @@ export function AdminRecordDetail() {
                     <td>{j.lastError ?? '—'}</td>
                     <td>
                       {j.status === 'failed' && (
-                        <Button variant="secondary" onClick={() => setConfirming({ kind: 'resend', jobId: j.id })}>
+                        <Button variant="secondary" onClick={() => setConfirming({ jobId: j.id })}>
                           Resend
                         </Button>
                       )}
@@ -124,19 +115,13 @@ export function AdminRecordDetail() {
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal">
             <div className="modal__body">
-              {confirming.kind === 'resend' ? (
-                <p>Re-queue this failed email? The dispatch worker will retry it within a minute.</p>
-              ) : (
-                <p>{confirming.disputed ? 'Mark' : 'Clear'} the disputed flag on this appointment?</p>
-              )}
-              {(resendEmail.error || setDisputed.error) && (
-                <Alert variant="danger">{(resendEmail.error || setDisputed.error).message}</Alert>
-              )}
+              <p>Re-queue this failed email? The dispatch worker will retry it within a minute.</p>
+              {resendEmail.error && <Alert variant="danger">{resendEmail.error.message}</Alert>}
             </div>
             <div className="modal__actions">
-              <Button variant="ghost" onClick={() => { setConfirming(null); resendEmail.reset(); setDisputed.reset(); }}>Cancel</Button>
-              <Button isLoading={resendEmail.isPending || setDisputed.isPending} onClick={confirm}>
-                {confirming.kind === 'resend' ? 'Resend email' : 'Confirm'}
+              <Button variant="ghost" onClick={() => { setConfirming(null); resendEmail.reset(); }}>Cancel</Button>
+              <Button isLoading={resendEmail.isPending} onClick={confirm}>
+                Resend email
               </Button>
             </div>
           </div>

@@ -15,16 +15,14 @@ const DETAIL = {
     id: 'a1',
     slotStart: '2099-01-02T13:00:00Z',
     slotEnd: '2099-01-02T13:30:00Z',
-    state: 'prescription_issued',
-    disputed: false,
+    state: 'completed',
     patientName: 'Parent P',
     patientEmail: 'p@t.test',
     subjectName: 'Ali',
     doctorName: 'Dr A',
-    amountPaid: 250000,
-    paymentRef: 'pf_ok',
-    refundRef: null,
-    feeAtBooking: 250000,
+    amountDue: 250000,
+    paymentReference: 'bank_txn_77',
+    paymentSubmittedAt: '2099-01-02T12:00:00Z',
   },
   history: [
     {
@@ -82,6 +80,17 @@ describe('AdminRecordDetail (A-04 detail)', () => {
     expect(api.get).toHaveBeenCalledWith('/admin/records/a1');
   });
 
+  it('renders state via the shared label + amount + payment ref, with no refund/dispute UI', async () => {
+    renderView();
+    await screen.findByText('appointment.confirmed');
+    expect(screen.getByText('Completed')).toBeTruthy(); // shared stateLabel, not raw enum
+    expect(screen.getByText(/Rs 2,500/)).toBeTruthy();
+    expect(screen.getByText(/bank_txn_77/)).toBeTruthy();
+    expect(screen.queryByText(/Refund ref/i)).toBeNull();
+    expect(screen.queryByText('Disputed')).toBeNull();
+    expect(screen.queryByRole('button', { name: /disputed/i })).toBeNull();
+  });
+
   it('resend is offered ONLY on failed jobs and confirms before POSTing', async () => {
     api.post.mockResolvedValue({ id: 'n2', status: 'pending' });
     renderView();
@@ -91,17 +100,6 @@ describe('AdminRecordDetail (A-04 detail)', () => {
     fireEvent.click(resendButtons[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Resend email' })); // confirm modal
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/emails/n2/resend'));
-  });
-
-  it('dispute toggle confirms then POSTs the flag', async () => {
-    api.post.mockResolvedValue({ id: 'a1', disputed: true });
-    renderView();
-    await screen.findByText('appointment.confirmed');
-    fireEvent.click(screen.getByRole('button', { name: 'Mark disputed' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/appointments/a1/dispute', { disputed: true }),
-    );
   });
 
   it('resend failure keeps the modal open with the error and the Resend button intact', async () => {
@@ -119,20 +117,5 @@ describe('AdminRecordDetail (A-04 detail)', () => {
     // modal still open (confirm button still there) and table Resend still present
     expect(screen.getByRole('button', { name: 'Resend email' })).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Resend' })).toHaveLength(1);
-  });
-
-  it('clear disputed POSTs disputed:false', async () => {
-    api.get.mockResolvedValue({
-      ...DETAIL,
-      appointment: { ...DETAIL.appointment, disputed: true },
-    });
-    api.post.mockResolvedValue({ id: 'a1', disputed: false });
-    renderView();
-    await screen.findByText('appointment.confirmed');
-    fireEvent.click(screen.getByRole('button', { name: 'Clear disputed' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/appointments/a1/dispute', { disputed: false }),
-    );
   });
 });
