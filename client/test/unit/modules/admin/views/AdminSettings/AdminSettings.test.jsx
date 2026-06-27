@@ -26,38 +26,46 @@ beforeEach(() => {
   api.get.mockResolvedValue({
     id: 1,
     minBookingLeadMinutes: 60,
-    fallbackFeePctBps: 250,
-    fallbackFeeFixed: 5000,
+    bankName: 'Meezan Bank',
+    bankAccountName: 'Dermestha Clinic',
+    bankAccountNumber: '0123456789',
+    bankInstructions: 'Add your name in the transfer note.',
   });
 });
 
 describe('AdminSettings (A-05)', () => {
-  it('pre-fills current values (fee fixed shown in PKR)', async () => {
+  it('pre-fills current values incl. bank details and has no fallback-fee fields', async () => {
     renderView();
     expect(await screen.findByLabelText('Minimum booking lead time (minutes)')).toHaveProperty(
       'value',
       '60',
     );
-    expect(screen.getByLabelText('Fallback fee — percentage (basis points)')).toHaveProperty(
+    expect(screen.getByLabelText('Bank name')).toHaveProperty('value', 'Meezan Bank');
+    expect(screen.getByLabelText('Account name')).toHaveProperty('value', 'Dermestha Clinic');
+    expect(screen.getByLabelText('Account number')).toHaveProperty('value', '0123456789');
+    expect(screen.getByLabelText('Bank instructions')).toHaveProperty(
       'value',
-      '250',
+      'Add your name in the transfer note.',
     );
-    expect(screen.getByLabelText('Fallback fee — fixed (PKR)')).toHaveProperty('value', '50');
+    expect(screen.queryByLabelText(/fallback fee/i)).toBeNull();
   });
 
-  it('save confirms, then PUTs the bounded payload with paisa conversion', async () => {
+  it('save confirms, then PUTs the lead time + bank details', async () => {
     api.put.mockResolvedValue({ id: 1 });
     renderView();
     const lead = await screen.findByLabelText('Minimum booking lead time (minutes)');
     fireEvent.change(lead, { target: { value: '30' } });
+    fireEvent.change(screen.getByLabelText('Account number'), { target: { value: '999' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
-    expect(api.put).not.toHaveBeenCalled(); // confirm gate first — these values steer money math
+    expect(api.put).not.toHaveBeenCalled(); // confirm gate first
     fireEvent.click(screen.getByRole('button', { name: 'Confirm save' }));
     await waitFor(() =>
       expect(api.put).toHaveBeenCalledWith('/admin/settings', {
         minBookingLeadMinutes: 30,
-        fallbackFeePctBps: 250,
-        fallbackFeeFixed: 5000,
+        bankName: 'Meezan Bank',
+        bankAccountName: 'Dermestha Clinic',
+        bankAccountNumber: '999',
+        bankInstructions: 'Add your name in the transfer note.',
       }),
     );
   });
@@ -71,7 +79,7 @@ describe('AdminSettings (A-05)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm save' }));
     expect(await screen.findByText('Validation failed')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Confirm save' })).toBeNull(); // modal closed
+    expect(screen.queryByRole('button', { name: 'Confirm save' })).toBeNull();
   });
 
   it('unseeded settings shows the empty state', async () => {

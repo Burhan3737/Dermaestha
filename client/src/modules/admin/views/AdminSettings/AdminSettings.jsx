@@ -17,9 +17,10 @@ export function AdminSettings() {
       const d = settings.data;
       setForm({
         minBookingLeadMinutes: String(d.minBookingLeadMinutes),
-        fallbackFeePctBps: String(d.fallbackFeePctBps),
-        // display in PKR (paisa / 100)
-        fallbackFeeFixed: String(d.fallbackFeeFixed / 100),
+        bankName: d.bankName ?? '',
+        bankAccountName: d.bankAccountName ?? '',
+        bankAccountNumber: d.bankAccountNumber ?? '',
+        bankInstructions: d.bankInstructions ?? '',
       });
     }
   }, [settings.data, form]);
@@ -27,12 +28,15 @@ export function AdminSettings() {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const save = () => {
+    const lead = parseInt(form.minBookingLeadMinutes, 10);
+    if (Number.isNaN(lead)) return;
     const payload = {
-      minBookingLeadMinutes: parseInt(form.minBookingLeadMinutes, 10),
-      fallbackFeePctBps: parseInt(form.fallbackFeePctBps, 10),
-      fallbackFeeFixed: Math.round(parseFloat(form.fallbackFeeFixed) * 100),
+      minBookingLeadMinutes: lead,
+      bankName: form.bankName.trim(),
+      bankAccountName: form.bankAccountName.trim(),
+      bankAccountNumber: form.bankAccountNumber.trim(),
+      bankInstructions: form.bankInstructions.trim(),
     };
-    if (Object.values(payload).some(Number.isNaN)) return;
     saveSettings.mutate(payload, {
       onSuccess: () => setConfirming(false),
       onError: () => setConfirming(false),
@@ -71,26 +75,37 @@ export function AdminSettings() {
               required
             />
             <Field
-              label="Fallback fee — percentage (basis points)"
-              id="s-pct"
-              type="number"
-              min="0"
-              max="10000"
-              value={form.fallbackFeePctBps}
-              onChange={set('fallbackFeePctBps')}
-              help="Used only when the gateway does not report a per-transaction fee; a reported fee always wins."
-              required
+              label="Bank name"
+              id="s-bank-name"
+              value={form.bankName}
+              onChange={set('bankName')}
+              help="Shown to patients on the payment-instructions screen."
             />
             <Field
-              label="Fallback fee — fixed (PKR)"
-              id="s-fixed"
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.fallbackFeeFixed}
-              onChange={set('fallbackFeeFixed')}
-              required
+              label="Account name"
+              id="s-bank-account-name"
+              value={form.bankAccountName}
+              onChange={set('bankAccountName')}
             />
+            <Field
+              label="Account number"
+              id="s-bank-account-number"
+              value={form.bankAccountNumber}
+              onChange={set('bankAccountNumber')}
+            />
+            <div className="field">
+              <label htmlFor="s-bank-instructions">Bank instructions</label>
+              <textarea
+                id="s-bank-instructions"
+                className="input"
+                rows={3}
+                value={form.bankInstructions}
+                onChange={set('bankInstructions')}
+              />
+              <div className="help">
+                Optional note shown to patients (e.g. add your name in the transfer reference).
+              </div>
+            </div>
             <Button type="submit">Save settings</Button>
           </form>
         )}
@@ -102,7 +117,8 @@ export function AdminSettings() {
             <div className="modal__body">
               <p>
                 Save these values? The lead time changes which slots patients can book from the next
-                request, and the fallback fee model feeds refund amounts.
+                request, and the bank details are shown to patients on the payment-instructions
+                screen.
               </p>
             </div>
             <div className="modal__actions">
