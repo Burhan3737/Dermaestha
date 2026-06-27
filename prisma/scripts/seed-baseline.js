@@ -17,22 +17,19 @@
 //   doctor    baseline.doctor@dermestha.test     (active; weekly availability; pre-seeded appts)
 //   medicine  "Baseline Acne Cream" (active)
 //
-//   Pre-seeded appointments on the baseline doctor (patient1), so the doctor/patient flows need no
-//   live cross-stream dependency:
+//   Pre-seeded appointments on the baseline doctor (patient1), reflecting the manual-payment
+//   4-state model (pending → confirmed → completed, plus cancelled):
 //     - 1 confirmed in the join window  (slot ~now+5m → "Join Call" active; row stays confirmed)
-//     - 1 prescription_issued + a linked prescription  (patient view-prescription + PDF flow)
-//     - 1 confirmed ≥2h future          (cancel → refund;    has a success Payment for the net-of-fee math)
-//     - 1 confirmed <2h future          (cancel → no-refund;  has a success Payment)
+//     - 1 completed + a linked prescription  (patient view-prescription + PDF flow)
+//     - 1 pending with a paymentReference     (admin review queue → accept/reject)
+//     - 1 cancelled                           (history view)
 //
 // NOTES
-//   * "completed with a prescription" is, faithful to the §3 state machine (doc 02/05), the state
-//     `prescription_issued` — the only state where the patient sees the Download-Prescription CTA
-//     (F08.01). Seeding bare `completed` would hide that button, so this appointment is seeded
-//     `prescription_issued` with a linked Prescription row.
-//   * The in-process cron workers (server boot) advance `confirmed`/`in_progress` rows over time.
-//     The cancel appts are kept in the FUTURE so the evaluation worker never touches them; the
-//     join-window appt is intentionally near-future (its join token is valid slot-start−10m …
-//     slot-end+5m). Re-run this seed right before exercising the join flow for the freshest window.
+//   * Money is fully offline (manual bank transfer): there is no Payment table. The fee snapshot
+//     lives on Appointment.feeAtBooking; the patient-entered bank reference is paymentReference.
+//   * The in-process completion cron flips `confirmed` → `completed` at slotEnd + 5m. The join-window
+//     appt is intentionally near-future so its join token is valid; re-run this seed right before
+//     exercising the join flow for the freshest window.
 
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../../server/src/lib/password/password.js';
@@ -49,7 +46,6 @@ const EMAILS = {
 
 const MIN = 60 * 1000;
 const DOCTOR_FEE = 250000; // Rs 2,500 (paisa)
-const GATEWAY_FEE = 6250; //  Rs 62.50 (paisa) — drives the net-of-fee refund breakdown
 
 const rel = (ms) => new Date(Date.now() + ms);
 const slot = (offsetMin) => {
@@ -62,7 +58,6 @@ async function wipeAll() {
   await prisma.prescriptionItem.deleteMany();
   await prisma.prescription.deleteMany();
   await prisma.notificationJob.deleteMany();
-  await prisma.payment.deleteMany();
   await prisma.appointment.deleteMany();
   await prisma.availabilityBlock.deleteMany();
   await prisma.doctor.deleteMany();
@@ -76,9 +71,15 @@ async function wipeAll() {
 async function main() {
   await wipeAll();
 
-  // Settings singleton (A6) — normalize to documented defaults on BOTH create and update so the
-  // baseline is deterministic even when a pre-existing dev Settings row holds non-default values.
-  const SETTINGS_DEFAULTS = { minBookingLeadMinutes: 60, fallbackFeePctBps: 0, fallbackFeeFixed: 0 };
+  // Settings singleton (A6) — normalize lead-time + bank instructions on BOTH create and update so
+  // the baseline is deterministic even when a pre-existing dev Settings row holds other values.
+  const SETTINGS_DEFAULTS = {
+    minBookingLeadMinutes: 60,
+    bankName: 'Baseline Bank',
+    bankAccountName: 'Dermestha Clinic',
+    bankAccountNumber: '0001234567890',
+    bankInstructions: 'Transfer the consultation fee, then enter your bank transaction reference.',
+  };
   await prisma.settings.upsert({
     where: { id: 1 },
     update: SETTINGS_DEFAULTS,
@@ -165,17 +166,15 @@ async function main() {
     },
   });
 
-  // 2) prescription_issued + a linked prescription (patient view-prescription + PDF flow).
+  // 2) completed + a linked prescription (patient view-prescription + PDF flow).
   const rxAppt = await prisma.appointment.create({
     data: {
       doctorId: doctor.id,
       patientUserId: patient1.id,
       ...slot(-180),
-      state: 'prescription_issued',
+      state: 'completed',
       feeAtBooking: DOCTOR_FEE,
       forSelf: true,
-      doctorJoinedAt: rel(-178 * MIN),
-      patientJoinedAt: rel(-178 * MIN),
     },
   });
   await prisma.prescription.create({
@@ -202,49 +201,29 @@ async function main() {
     },
   });
 
-  // 3) confirmed ≥2h future → cancel → refund. Success Payment drives the net-of-fee breakdown.
-  const cancelRefund = await prisma.appointment.create({
+  // 3) pending with a submitted bank reference → admin review queue (accept/reject).
+  const pendingReview = await prisma.appointment.create({
     data: {
       doctorId: doctor.id,
       patientUserId: patient1.id,
       ...slot(180),
-      state: 'confirmed',
+      state: 'pending',
       feeAtBooking: DOCTOR_FEE,
       forSelf: true,
-    },
-  });
-  await prisma.payment.create({
-    data: {
-      appointmentId: cancelRefund.id,
-      patientUserId: patient1.id,
-      slotStart: cancelRefund.slotStart,
-      amount: DOCTOR_FEE,
-      gatewayFee: GATEWAY_FEE,
-      status: 'success',
-      providerRef: `baseline_refund_${cancelRefund.id}`,
+      paymentReference: 'BASELINE-TXN-001',
+      paymentSubmittedAt: new Date(),
     },
   });
 
-  // 4) confirmed <2h future → cancel → no-refund. Success Payment present (no refund is issued).
-  const cancelNoRefund = await prisma.appointment.create({
+  // 4) cancelled (history view).
+  const cancelled = await prisma.appointment.create({
     data: {
       doctorId: doctor.id,
       patientUserId: patient1.id,
-      ...slot(90),
-      state: 'confirmed',
+      ...slot(-300),
+      state: 'cancelled',
       feeAtBooking: DOCTOR_FEE,
       forSelf: true,
-    },
-  });
-  await prisma.payment.create({
-    data: {
-      appointmentId: cancelNoRefund.id,
-      patientUserId: patient1.id,
-      slotStart: cancelNoRefund.slotStart,
-      amount: DOCTOR_FEE,
-      gatewayFee: GATEWAY_FEE,
-      status: 'success',
-      providerRef: `baseline_norefund_${cancelNoRefund.id}`,
     },
   });
 
@@ -267,9 +246,9 @@ async function main() {
         },
         appts: {
           joinWindow: joinWindow.id,
-          prescriptionIssued: rxAppt.id,
-          cancelRefund: cancelRefund.id,
-          cancelNoRefund: cancelNoRefund.id,
+          completedWithPrescription: rxAppt.id,
+          pendingReview: pendingReview.id,
+          cancelled: cancelled.id,
         },
       },
       null,
