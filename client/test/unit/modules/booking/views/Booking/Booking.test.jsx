@@ -20,6 +20,7 @@ function setup() {
       <MemoryRouter initialEntries={[`/book/d1?slot=${encodeURIComponent(slot)}`]}>
         <Routes>
           <Route path="/book/:id" element={<Booking />} />
+          <Route path="/book/pay/:id" element={<div>PAY SCREEN for a1</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -36,18 +37,14 @@ beforeEach(() => {
     bio: 'b',
     photoUrl: null,
   });
-  delete window.location;
-  window.location = { href: '' };
 });
 
 describe('P-06 Booking', () => {
-  it('locks then pays and redirects to the checkout URL on confirm', async () => {
-    api.post
-      .mockResolvedValueOnce({ id: 'a1' }) // lock
-      .mockResolvedValueOnce({ redirectUrl: '/dev/checkout?ref=mock_1' }); // pay
+  it('locks the slot then navigates to the payment-instructions screen (no gateway redirect)', async () => {
+    api.post.mockResolvedValueOnce({ id: 'a1' }); // lock only
     setup();
     await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: /confirm & pay/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm booking/i }));
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/appointments/lock', {
         doctorId: 'd1',
@@ -55,17 +52,15 @@ describe('P-06 Booking', () => {
         forSelf: true,
       }),
     );
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/appointments/a1/pay'));
-    await waitFor(() => expect(window.location.href).toBe('/dev/checkout?ref=mock_1'));
+    expect(api.post).not.toHaveBeenCalledWith('/appointments/a1/pay');
+    await waitFor(() => expect(screen.getByText('PAY SCREEN for a1')).toBeTruthy());
   });
 
   it('emits booking_started once when the slot lock succeeds', async () => {
-    api.post
-      .mockResolvedValueOnce({ id: 'a1' }) // lock
-      .mockResolvedValueOnce({ redirectUrl: '/dev/checkout?ref=mock_1' }); // pay
+    api.post.mockResolvedValueOnce({ id: 'a1' });
     setup();
     await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: /confirm & pay/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm booking/i }));
     await waitFor(() => expect(track).toHaveBeenCalledWith('booking_started', { doctorId: 'd1' }));
     expect(track).toHaveBeenCalledTimes(1);
   });
@@ -84,7 +79,7 @@ describe('P-06 Booking', () => {
     });
     setup();
     await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: /confirm & pay/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm booking/i }));
     await waitFor(() =>
       expect(screen.getByText('Finish your current booking first.')).toBeTruthy(),
     );

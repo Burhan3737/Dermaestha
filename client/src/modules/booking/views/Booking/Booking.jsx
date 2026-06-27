@@ -1,12 +1,13 @@
 // @ts-check
 import { useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PatientLayout } from '../../../../layouts/PatientLayout/PatientLayout.jsx';
 import { formatPkr, formatKarachi } from '../../../../lib/format/format.js';
 import { useBooking } from '../../useBooking.js';
 
 export function Booking() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const slotStart = params.get('slot');
   const [forSelf, setForSelf] = useState(true);
@@ -15,20 +16,20 @@ export function Booking() {
   const [busy, setBusy] = useState(false);
   const [lockBlocked, setLockBlocked] = useState(false);
 
-  const { doctor, confirmAndPay: startPayment } = useBooking({ doctorId: id });
+  const { doctor, confirmBooking } = useBooking({ doctorId: id });
 
-  async function confirmAndPay() {
+  async function onConfirm() {
     setError(null);
     setLockBlocked(false);
     setBusy(true);
     try {
-      const redirectUrl = await startPayment({ doctorId: id, slotStart, forSelf, subject });
-      window.location.href = redirectUrl;
+      const apptId = await confirmBooking({ doctorId: id, slotStart, forSelf, subject });
+      navigate(`/book/pay/${apptId}`);
     } catch (e) {
       // An existing live hold blocks a new booking (Single-Lock). Point the patient to the pending
       // booking in their appointments so they can complete it (instead of a dead-end message).
       if (e.code === 'ACTIVE_LOCK_EXISTS') setLockBlocked(true);
-      setError(e.message ?? 'Could not start payment.');
+      setError(e.message ?? 'Could not create the booking.');
       setBusy(false);
     }
   }
@@ -89,9 +90,9 @@ export function Booking() {
           type="button"
           className="btn btn--primary"
           disabled={busy || !slotStart}
-          onClick={confirmAndPay}
+          onClick={onConfirm}
         >
-          Confirm & Pay
+          Confirm booking
         </button>
       </section>
     </PatientLayout>
