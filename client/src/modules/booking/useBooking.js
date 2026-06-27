@@ -43,16 +43,17 @@ export function useBooking(opts = {}) {
     enabled: Boolean(apptId),
   });
 
-  // Lock the slot, create the payment intent, and return the hosted-checkout redirect URL.
-  const confirmAndPay = async ({ doctorId, slotStart, forSelf, subject }) => {
+  // Manual-payment model: lock the slot (creates a `pending` appointment, snapshots feeAtBooking)
+  // and return the new appointment id. The caller routes the patient to the payment-instructions
+  // screen — there is no gateway redirect (design §7.1).
+  const confirmBooking = async ({ doctorId, slotStart, forSelf, subject }) => {
     const body = { doctorId, slotStart, forSelf };
     if (!forSelf)
       body.subject = { name: subject.name, age: Number(subject.age), relation: subject.relation };
     const appt = await api.post('/appointments/lock', body);
     track('booking_started', { doctorId });
-    const { redirectUrl } = await api.post(`/appointments/${appt.id}/pay`);
-    return redirectUrl;
+    return appt.id;
   };
 
-  return { doctor, appointmentStatus, confirmAndPay };
+  return { doctor, appointmentStatus, confirmBooking };
 }
