@@ -5,14 +5,17 @@ import { record } from '#src/services/audit/audit.service.js';
 
 describe('audit.service', () => {
   it('appends an event row', async () => {
-    const before = await prisma.auditLog.count();
+    // Scope to a unique targetRef so the assertion is immune to audit rows that parallel
+    // integration tests write to the shared DB between a global count() before/after.
+    const targetRef = `audit-unit-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     await audit.record({
       eventType: 'test_event',
       actorType: 'system',
-      targetRef: 'ref-1',
+      targetRef,
       reason: 'unit test',
     });
-    expect(await prisma.auditLog.count()).toBe(before + 1);
+    expect(await prisma.auditLog.count({ where: { targetRef } })).toBe(1);
+    await prisma.auditLog.deleteMany({ where: { targetRef } });
   });
   it('exposes no update or delete function (append-only, §3.6)', () => {
     expect(/** @type {any} */ (audit).update).toBeUndefined();

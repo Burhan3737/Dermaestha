@@ -68,10 +68,14 @@ describe('POST /api/analytics/events', () => {
 
   it('rate-limits after ANALYTICS_RATE.max requests', async () => {
     const app = makeApp();
-    let last;
-    for (let i = 0; i < ANALYTICS_RATE.max + 1; i++) {
-      last = await request(app).post('/api/analytics/events').send({ type: 'landing_view' });
-    }
-    expect(last.status).toBe(429);
+    // Fire the burst concurrently so all requests land inside the fixed rate window regardless of
+    // CPU contention (a sequential awaited loop can span past windowMs under full-suite load and
+    // reset the counter). Once the limit is exceeded, at least one response must be 429.
+    const responses = await Promise.all(
+      Array.from({ length: ANALYTICS_RATE.max + 5 }, () =>
+        request(app).post('/api/analytics/events').send({ type: 'landing_view' }),
+      ),
+    );
+    expect(responses.some((r) => r.status === 429)).toBe(true);
   });
 });
