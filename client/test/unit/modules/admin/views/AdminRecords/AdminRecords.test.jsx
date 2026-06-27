@@ -16,15 +16,14 @@ const RECORDS = {
       id: 'a1',
       slotStart: '2099-01-02T13:00:00Z',
       slotEnd: '2099-01-02T13:30:00Z',
-      state: 'prescription_issued',
-      disputed: true,
+      state: 'confirmed',
       patientName: 'Parent P',
       patientEmail: 'p@t.test',
       subjectName: 'Ali',
       doctorName: 'Dr A',
-      amountPaid: 250000,
-      paymentRef: 'pf_ok',
-      refundRef: null,
+      amountDue: 250000,
+      paymentReference: 'bank_txn_77',
+      paymentSubmittedAt: '2099-01-02T12:00:00Z',
     },
   ],
   page: { number: 1, size: 20, total: 45 },
@@ -63,12 +62,16 @@ beforeEach(() => {
 });
 
 describe('AdminRecords (A-04)', () => {
-  it('renders record rows with who-for, money columns and a disputed badge', async () => {
+  it('renders record rows with who-for, amount + payment ref and the shared state label', async () => {
     renderView();
     expect(await screen.findByText('Parent P')).toBeTruthy();
     expect(screen.getByText(/for: Ali/)).toBeTruthy();
     expect(screen.getByText('Rs 2,500')).toBeTruthy();
-    expect(screen.getByText('Disputed')).toBeTruthy();
+    expect(screen.getByText('bank_txn_77')).toBeTruthy();
+    expect(screen.getByText('Confirmed')).toBeTruthy(); // shared stateLabel, not the raw enum
+    expect(screen.queryByText('confirmed')).toBeNull();
+    expect(screen.queryByText('Disputed')).toBeNull();
+    expect(screen.queryByText('Refund ref')).toBeNull();
     expect(screen.getByText(/Page 1 of 3/)).toBeTruthy(); // 45 / 20
   });
 

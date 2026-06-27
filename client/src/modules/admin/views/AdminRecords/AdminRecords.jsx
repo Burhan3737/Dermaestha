@@ -7,6 +7,7 @@ import { Field } from '../../../../shared/Field/Field.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
 import { Pagination } from '../../../../shared/Pagination/Pagination.jsx';
 import { formatPkr, formatKarachiTable } from '../../../../lib/format/format.js';
+import { stateLabel, stateBadge } from '../../../appointment/stateLabel.js';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
 
@@ -65,7 +66,7 @@ export function AdminRecords() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Slot</th><th>Patient</th><th>Doctor</th><th>State</th><th>Paid</th><th>Payment ref</th><th>Refund ref</th><th />
+                    <th>Slot</th><th>Patient</th><th>Doctor</th><th>State</th><th>Amount</th><th>Payment ref</th><th />
                   </tr>
                 </thead>
                 <tbody>
@@ -78,12 +79,12 @@ export function AdminRecords() {
                       </td>
                       <td>{r.doctorName}</td>
                       <td>
-                        <span className="badge badge--info">{r.state}</span>{' '}
-                        {r.disputed && <span className="badge badge--danger">Disputed</span>}
+                        <span className={`badge badge--${stateBadge(r.state)}`}>
+                          {stateLabel(r.state)}
+                        </span>
                       </td>
-                      <td>{pkr(r.amountPaid)}</td>
-                      <td>{r.paymentRef ?? '—'}</td>
-                      <td>{r.refundRef ?? '—'}</td>
+                      <td>{pkr(r.amountDue)}</td>
+                      <td>{r.paymentReference ?? '—'}</td>
                       <td>
                         <Link to={`/admin/records/${r.id}`}>View</Link>
                       </td>
