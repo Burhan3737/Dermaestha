@@ -276,17 +276,11 @@ async function createWithReclaim(data, doctorId, slotStartDate, now) {
   }
 }
 
-/** Legal transitions (doc 05 §5). Slice C: slot_locked/confirmed. Slice D: in_progress. Slice F: completed. */
-const LEGAL = {
-  slot_locked: new Set(['confirmed']),
-  confirmed: new Set([
-    'cancelled_refunded',
-    'cancelled_no_refund',
-    'doctor_cancelled',
-    'in_progress',
-  ]),
-  in_progress: new Set(['completed', 'patient_no_show', 'doctor_no_show']),
-  completed: new Set(['prescription_issued']),
+/** Legal transitions (manual-payment, doc 05 §5). pending→{confirmed,cancelled};
+ *  confirmed→{completed,cancelled}. completed + cancelled are terminal. */
+export const LEGAL = {
+  pending: new Set(['confirmed', 'cancelled']),
+  confirmed: new Set(['completed', 'cancelled']),
 };
 
 /**
