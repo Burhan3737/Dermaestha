@@ -5,10 +5,8 @@ import { AppError } from '../../http/AppError.js';
 /*
  * Daily.co video adapter (api.daily.co/v1, Bearer DAILY_API_KEY).
  *
- * The REST surface below was researched against the current official docs and is almost entirely
- * CONFIRMED. The ONE byte-sensitive risk is the webhook signed-string serialization (raw received
- * bytes vs JSON.stringify) — verifyWebhook runs HMAC over req.rawBody (the exact received bytes)
- * and MUST be validated against a live Daily delivery before go-live (doc 07 launch gate).
+ * Free-tier usage: create a private slot-bounded room + issue a meeting token. No participant
+ * webhook (the manual-payment model dropped join tracking / no-show resolution).
  * External host + paths live behind named constants so a single correction lands in one place.
  */
 
