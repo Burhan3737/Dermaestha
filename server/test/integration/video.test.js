@@ -5,12 +5,11 @@ process.env.VIDEO_PROVIDER = 'mock';
 const request = (await import('supertest')).default;
 const { createApp } = await import('#src/index.js');
 const { prisma } = await import('#src/lib/prisma/prisma.js');
-const { completeDueAppointments } = await import('#src/modules/appointment/service.js');
 
 const app = createApp();
 const uniq = () => `sliced_${Date.now()}_${Math.floor(Math.random() * 1e6)}@test.local`;
 
-describe('video + lifecycle integration (free tier, time-based completion)', () => {
+describe('video integration (free tier; 3-state model, no completion)', () => {
   let agent, email, doctorId, userId, liveId, pastId;
 
   beforeAll(async () => {
@@ -43,7 +42,7 @@ describe('video + lifecycle integration (free tier, time-based completion)', () 
     });
     liveId = live.id;
 
-    // B: fully-past appointment (ended >5min ago) → time-based worker → completed.
+    // B: fully-past appointment (ended >5min ago) → video-token window is closed.
     const pastStart = new Date(Date.now() - 40 * 60000);
     const past = await prisma.appointment.create({
       data: {
@@ -70,12 +69,6 @@ describe('video + lifecycle integration (free tier, time-based completion)', () 
     const res = await agent.get(`/api/appointments/${pastId}/video-token`);
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('VIDEO_WINDOW_CLOSED');
-  });
-
-  it('time-based worker completes a confirmed appointment past slotEnd + cutoff', async () => {
-    await completeDueAppointments(new Date());
-    const appt = await prisma.appointment.findUnique({ where: { id: pastId } });
-    expect(appt.state).toBe('completed');
   });
 
   afterAll(async () => {

@@ -100,7 +100,7 @@ async function makeDoctor({ email, pmc, fee, fullName, spec, active, mustChange 
   return { user, doctor };
 }
 
-/** Seed one appointment for the 4-state manual-payment model. `paymentReference` (and its
+/** Seed one appointment for the 3-state manual-payment model. `paymentReference` (and its
  *  `paymentSubmittedAt`) are set for a `pending` row that has already had a bank reference
  *  submitted (the admin-review queue). No join columns exist anymore (manual-payment pivot). */
 async function seedAppointment({ doctorId, patientUserId, startMs, state, fee, paymentReference }) {
@@ -204,17 +204,15 @@ export async function seedAll() {
   const did = D.doctor.id;
   const pid = patient.id;
 
-  // Deterministic fixtures for the 4-state manual-payment model (all owned by patient1):
+  // Deterministic fixtures for the 3-state manual-payment model (all owned by patient1):
   //  - `video`         confirmed + in the video window now → J2 video room renders for confirmed.
-  //  - `completedPast` confirmed + already past slotEnd+5min → J2 dev-worker completion pass.
-  //  - `prescription`  completed → J3 doctor prescribes / patient views; J9 cross-tenant 404.
+  //  - `prescription`  confirmed (past slot) → J3 doctor prescribes / patient views; J9 cross-tenant 404.
   //  - `pendingRef`    pending + a submitted bank reference → J1 admin reject (review queue).
   //  - `futureConfirmed` confirmed in the future on Dc (fee Rs 5,000, unique) → J4 cancel (no refund).
   //  - `pendingBadge` / `cancelledSeed` untouched rows so J9 can assert the pending/cancelled badges
   //    deterministically regardless of suite order.
   const video = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -1 * MIN, state: 'confirmed', fee: 250000 });
-  const completedPast = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -60 * MIN, state: 'confirmed', fee: 250000 });
-  const presAppt = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -180 * MIN, state: 'completed', fee: 250000 });
+  const presAppt = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -180 * MIN, state: 'confirmed', fee: 250000 });
   const pendingRef = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: 220 * MIN, state: 'pending', fee: 250000, paymentReference: 'E2E-SEED-REJECT-REF' });
   const pendingBadge = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: 260 * MIN, state: 'pending', fee: 250000 });
   const cancelledSeed = await seedAppointment({ doctorId: did, patientUserId: pid, startMs: -240 * MIN, state: 'cancelled', fee: 250000 });
@@ -229,7 +227,6 @@ export async function seedAll() {
     adminId: admin.id,
     appts: {
       video: video.id,
-      completedPast: completedPast.id,
       prescription: presAppt.id,
       pendingRef: pendingRef.id,
       pendingBadge: pendingBadge.id,

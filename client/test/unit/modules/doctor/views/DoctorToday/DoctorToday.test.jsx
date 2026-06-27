@@ -132,7 +132,7 @@ describe('D-02 DoctorToday', () => {
                 id: 'h1',
                 slotStart: new Date(Date.now() - 9e7).toISOString(),
                 slotEnd: new Date(Date.now() - 9e7).toISOString(),
-                state: 'completed',
+                state: 'confirmed',
                 forSelf: true,
                 subjectName: null,
                 patientName: 'Past P',
@@ -147,7 +147,7 @@ describe('D-02 DoctorToday', () => {
     expect(screen.getByRole('link', { name: /^history$/i }).className).toContain('tab--active');
   });
 
-  it('history: completed row gets Write prescription + Awaiting badge after 12h', async () => {
+  it('history: confirmed past row gets Write prescription + Awaiting badge after 12h', async () => {
     const old = new Date(Date.now() - 13 * 3600 * 1000).toISOString();
     api.get.mockResolvedValue({
       data: [
@@ -155,7 +155,7 @@ describe('D-02 DoctorToday', () => {
           id: 'a-old',
           slotStart: old,
           slotEnd: old,
-          state: 'completed',
+          state: 'confirmed',
           forSelf: true,
           subjectName: null,
           patientName: 'P One',
@@ -165,7 +165,7 @@ describe('D-02 DoctorToday', () => {
           id: 'a-done',
           slotStart: old,
           slotEnd: old,
-          state: 'completed',
+          state: 'confirmed',
           forSelf: true,
           subjectName: null,
           patientName: 'P Two',
@@ -176,7 +176,7 @@ describe('D-02 DoctorToday', () => {
     setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('P One')).toBeTruthy());
     const links = screen.getAllByRole('link', { name: /write prescription/i });
-    expect(links).toHaveLength(2); // both completed rows allow writing/correcting a prescription
+    expect(links).toHaveLength(2); // both confirmed rows allow writing/correcting a prescription
     expect(links[0].getAttribute('href')).toContain('/doctor/appointments/a-old/prescribe');
     expect(screen.getAllByText(/awaiting prescription/i)).toHaveLength(1); // only the unprescribed one
   });
@@ -202,7 +202,7 @@ describe('D-02 DoctorToday', () => {
     expect(screen.queryByText('cancelled')).toBeNull();
   });
 
-  it('history: completed row <12h old shows no Awaiting badge', async () => {
+  it('history: confirmed past row <12h old shows no Awaiting badge', async () => {
     const recent = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
     api.get.mockResolvedValue({
       data: [
@@ -210,7 +210,7 @@ describe('D-02 DoctorToday', () => {
           id: 'a-new',
           slotStart: recent,
           slotEnd: recent,
-          state: 'completed',
+          state: 'confirmed',
           forSelf: true,
           subjectName: null,
           patientName: 'P New',

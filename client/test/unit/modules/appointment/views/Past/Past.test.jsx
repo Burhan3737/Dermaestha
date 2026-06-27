@@ -39,11 +39,10 @@ const row = (state, extra = {}) => ({
   ...extra,
 });
 
-describe('stateLabel (4-state manual-payment mapping)', () => {
+describe('stateLabel (3-state manual-payment mapping)', () => {
   it.each([
     ['pending', 'Payment pending'],
     ['confirmed', 'Confirmed'],
-    ['completed', 'Completed'],
     ['cancelled', 'Cancelled'],
   ])('%s → %s', (state, label) => {
     expect(stateLabel(state)).toBe(label);
@@ -58,15 +57,15 @@ describe('P-09 Past appointments', () => {
     expect(api.get).toHaveBeenCalledWith('/appointments?scope=history');
   });
 
-  it('shows Download Prescription only for completed rows that have a prescription', async () => {
+  it('shows Download Prescription only for confirmed (past) rows that have a prescription', async () => {
     api.get.mockResolvedValue({
       data: [
-        row('completed', { id: 'a-rx', hasPrescription: true }),
-        row('completed', { id: 'a-norx', hasPrescription: false }),
+        row('confirmed', { id: 'a-rx', hasPrescription: true }),
+        row('confirmed', { id: 'a-norx', hasPrescription: false }),
       ],
     });
     setup();
-    await waitFor(() => expect(screen.getAllByText('Completed')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText('Confirmed')).toHaveLength(2));
     const links = screen.getAllByRole('link', { name: /download prescription/i });
     expect(links).toHaveLength(1);
     expect(links[0].getAttribute('href')).toContain('/appointments/a-rx/prescriptions');

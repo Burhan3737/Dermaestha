@@ -46,10 +46,10 @@ export function DoctorToday() {
             const closesAt = new Date(a.slotEnd).getTime() + 5 * 60 * 1000;
             const active = Date.now() >= opensAt && Date.now() <= closesAt;
             const awaiting =
-              a.state === 'completed' &&
+              a.state === 'confirmed' &&
               !a.hasPrescription &&
               Date.now() - new Date(a.slotEnd).getTime() > 12 * 3600 * 1000;
-            const canWriteRx = a.state === 'completed';
+            const canWriteRx = a.state === 'confirmed';
             const showCancel = a.state === 'confirmed' && !isHistory;
             const hasActions = !isHistory || canWriteRx || awaiting;
             return (

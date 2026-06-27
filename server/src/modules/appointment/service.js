@@ -4,11 +4,7 @@ import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import { logger } from '../../lib/logger/logger.js';
 import { KARACHI, karachiWallTimeToUtc } from '../../lib/tz/tz.js';
-import {
-  SLOT_GRANULARITY_MIN,
-  ACTIVE_APPOINTMENT_STATES,
-  VIDEO_TOKEN_POST_MIN,
-} from '../../config/constants.js';
+import { SLOT_GRANULARITY_MIN, ACTIVE_APPOINTMENT_STATES } from '../../config/constants.js';
 import { generateSlots } from '../doctor/service.js';
 import * as notification from '../notification/service.js';
 import * as analytics from '../analytics/service.js';
@@ -17,9 +13,16 @@ import * as audit from '../../services/audit/audit.service.js';
 // vi.spyOn can intercept them under ESM (a bare local call cannot be spied).
 import * as self from './service.js';
 
-// Patient "Upcoming": awaiting payment (pending) or paid/confirmed. History: completed + cancelled.
-const PATIENT_ACTIVE = ['pending', 'confirmed'];
-const TERMINAL = ['completed', 'cancelled'];
+// Time-based Upcoming/Past split (3-state model — no `completed`). Upcoming = pending OR a
+// confirmed appointment whose slot has not yet ended; Past = a confirmed appointment whose slot
+// has ended, OR cancelled. A pending row whose slot has passed stays under Upcoming (the admin
+// still resolves it). These are Prisma `where` fragments so the split happens in the DB, not in JS.
+const upcomingWhere = (now) => ({
+  OR: [{ state: 'pending' }, { state: 'confirmed', slotEnd: { gte: now } }],
+});
+const pastWhere = (now) => ({
+  OR: [{ state: 'confirmed', slotEnd: { lt: now } }, { state: 'cancelled' }],
+});
 
 function toPatientRow(a) {
   return {
@@ -39,12 +42,11 @@ function toPatientRow(a) {
 }
 
 export async function listForRole({ role, userId, scope = 'active' }) {
+  const now = new Date();
   if (role === 'patient') {
+    const stateWhere = scope === 'history' ? pastWhere(now) : upcomingWhere(now);
     const rows = await prisma.appointment.findMany({
-      where:
-        scope === 'history'
-          ? { patientUserId: userId, state: { in: TERMINAL } }
-          : { patientUserId: userId, state: { in: PATIENT_ACTIVE } },
+      where: { patientUserId: userId, ...stateWhere },
       orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
       include: {
         doctor: {
@@ -62,13 +64,14 @@ export async function listForRole({ role, userId, scope = 'active' }) {
   }
   const doctor = await prisma.doctor.findUnique({ where: { userId }, select: { id: true } });
   if (!doctor) return [];
-  // F05.02: the default doctor view is TODAY's appointments (Karachi day); history is separate.
-  const todayYMD = formatInTimeZone(new Date(), KARACHI, 'yyyy-MM-dd');
+  // F05.02: the default doctor view is TODAY's appointments (Karachi day); history is the
+  // time-based Past split (confirmed-and-ended OR cancelled), consistent with the patient view.
+  const todayYMD = formatInTimeZone(now, KARACHI, 'yyyy-MM-dd');
   const dayStart = karachiWallTimeToUtc(todayYMD, '00:00');
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const where =
     scope === 'history'
-      ? { doctorId: doctor.id, state: { in: TERMINAL } }
+      ? { doctorId: doctor.id, ...pastWhere(now) }
       : {
           doctorId: doctor.id,
           state: 'confirmed',
@@ -297,10 +300,10 @@ export async function adminDecision({ appointmentId, accept, actorId }) {
 }
 
 /** Legal transitions (manual-payment, doc 05 §5). pending→{confirmed,cancelled};
- *  confirmed→{completed,cancelled}. completed + cancelled are terminal. */
+ *  confirmed→{cancelled}. cancelled is terminal. */
 export const LEGAL = {
   pending: new Set(['confirmed', 'cancelled']),
-  confirmed: new Set(['completed', 'cancelled']),
+  confirmed: new Set(['cancelled']),
 };
 
 /**
@@ -399,25 +402,6 @@ async function enqueueCancellationEmail(appt) {
     });
   } catch (e) {
     logger.warn('cancellation email not enqueued', { appointmentId: appt.id, err: String(e) });
-  }
-}
-
-/**
- * Time-based completion (manual-payment, design §10). Clock-injected, catch-up-safe. Transitions
- * `confirmed` rows to `completed` once now ≥ slotEnd + VIDEO_TOKEN_POST_MIN. `pending` rows are
- * left untouched (a past slot is not rebookable, so it is harmless until an admin acts).
- */
-export async function completeDueAppointments(now = new Date()) {
-  const cutoffMs = VIDEO_TOKEN_POST_MIN * 60000;
-  const due = await prisma.appointment.findMany({ where: { state: 'confirmed' } });
-  for (const a of due) {
-    if (now.getTime() < a.slotEnd.getTime() + cutoffMs) continue;
-    // One bad row must not poison the batch — a skipped appointment is retried next tick.
-    try {
-      await self.transition({ appointmentId: a.id, to: 'completed', actorType: 'system' });
-    } catch (e) {
-      logger.error('completion failed; retry next tick', { appointmentId: a.id, err: String(e) });
-    }
   }
 }
 

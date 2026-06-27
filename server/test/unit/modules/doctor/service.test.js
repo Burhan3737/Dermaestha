@@ -160,7 +160,7 @@ describe('availability', () => {
         { weekday: 1, startTime: '18:00', endTime: '21:00' },
       ]);
       const call = prisma.appointment.findMany.mock.calls[0][0];
-      expect(call.where.state).toEqual({ in: ['pending', 'confirmed', 'completed'] });
+      expect(call.where.state).toEqual({ in: ['pending', 'confirmed'] });
       expect(call.where.NOT).toBeUndefined();
     });
 
@@ -213,7 +213,7 @@ describe('availability', () => {
 });
 
 describe('generateSlots active-state filter', () => {
-  it('queries active-state appointments (pending/confirmed/completed), no lock-expiry clause', async () => {
+  it('queries active-state appointments (pending/confirmed), no lock-expiry clause', async () => {
     prisma.availabilityBlock.findMany.mockResolvedValue([
       { weekday: 1, startTime: '18:00', endTime: '19:00' },
     ]);
@@ -222,7 +222,7 @@ describe('generateSlots active-state filter', () => {
     const date = '2099-01-04'; // a Monday
     await generateSlots('d1', date);
     const call = prisma.appointment.findMany.mock.calls[0][0];
-    expect(call.where.state).toEqual({ in: ['pending', 'confirmed', 'completed'] });
+    expect(call.where.state).toEqual({ in: ['pending', 'confirmed'] });
     expect(call.where.NOT).toBeUndefined();
   });
 });

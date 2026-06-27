@@ -31,7 +31,7 @@ beforeEach(() => {
     if (path === '/appointments/a1')
       return Promise.resolve({
         id: 'a1',
-        state: 'completed',
+        state: 'confirmed',
         forSelf: false,
         subjectName: 'Ali',
         subjectAge: 9,

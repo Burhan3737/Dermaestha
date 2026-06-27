@@ -164,7 +164,7 @@ export async function listAlerts(now = new Date()) {
     }),
     prisma.appointment.findMany({
       where: {
-        state: 'completed',
+        state: 'confirmed',
         prescriptions: { none: {} },
         slotEnd: { lte: new Date(now.getTime() - AWAITING_PRESCRIPTION_HOURS * 3600 * 1000) },
       },

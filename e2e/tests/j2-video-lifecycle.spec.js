@@ -1,18 +1,18 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { loginUi } from '../support/auth.js';
-import { EMAILS, readAppointmentState, prisma } from '../support/db.js';
+import { EMAILS, prisma } from '../support/db.js';
 import { seedIds } from '../support/seedIds.js';
 
 test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-// J2 video + time-based completion (manual-payment pivot §7.3, §10, §11).
-// The mock provider no longer simulates an in-call join (joinSimUrl is null); the deterministic,
-// provider-independent surface is the waiting room + the video-token gate (confirmed-only) and the
-// time-based completion pass (the cron's on-demand dev trigger). No join recording, no no-show.
-test.describe('J2 video + completion', () => {
+// J2 video (manual-payment pivot §7.3, §11; 3-state model — no `completed` state, no completion
+// cron). The mock provider no longer simulates an in-call join (joinSimUrl is null); the
+// deterministic, provider-independent surface is the waiting room + the video-token gate
+// (confirmed-only). No join recording, no no-show, no completion.
+test.describe('J2 video', () => {
   test('confirmed appointment renders the video room; the room is gated on confirmed', async ({
     page,
   }) => {
@@ -33,18 +33,5 @@ test.describe('J2 video + completion', () => {
     // …and refuses a pending one (no room before the admin confirms payment).
     const pendingRes = await page.request.get(`/api/appointments/${pendingId}/video-token`);
     expect(pendingRes.ok()).toBeFalsy();
-  });
-
-  test('the completion worker flips a confirmed past-window appointment to completed', async ({
-    request,
-  }) => {
-    const id = seedIds.appts.completedPast;
-    expect((await readAppointmentState(id))?.state).toBe('confirmed');
-
-    // The dev trigger runs completeDueAppointments (mounted in NODE_ENV=development).
-    const r = await request.post('/dev/worker/evaluate');
-    expect(r.ok()).toBeTruthy();
-
-    await expect.poll(async () => (await readAppointmentState(id))?.state).toBe('completed');
   });
 });

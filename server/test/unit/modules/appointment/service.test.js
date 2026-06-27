@@ -44,13 +44,12 @@ const {
   submitPaymentReference,
   adminDecision,
   cancel,
-  completeDueAppointments,
 } = svc;
 
 beforeEach(() => vi.clearAllMocks());
 
 describe('appointment.listForRole (patient)', () => {
-  it('returns active rows (pending/confirmed) with doctor card fields, no PII leak', async () => {
+  it('Upcoming = pending OR confirmed-not-yet-ended, time-based at the DB level', async () => {
     prisma.appointment.findMany.mockResolvedValue([
       {
         id: 'a1',
@@ -80,20 +79,21 @@ describe('appointment.listForRole (patient)', () => {
       doctorPhotoUrl: null,
       hasPrescription: false,
     });
-    expect(prisma.appointment.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { patientUserId: 'u1', state: { in: ['pending', 'confirmed'] } },
-      }),
-    );
+    const arg = prisma.appointment.findMany.mock.calls[0][0];
+    expect(arg.where.patientUserId).toBe('u1');
+    expect(arg.where.OR[0]).toEqual({ state: 'pending' });
+    expect(arg.where.OR[1].state).toBe('confirmed');
+    expect(arg.where.OR[1].slotEnd.gte).toBeInstanceOf(Date);
+    expect(arg.orderBy).toEqual({ slotStart: 'asc' });
   });
 
-  it('scope=history returns terminal states (completed/cancelled) newest-first', async () => {
+  it('Past (scope=history) = confirmed-and-ended OR cancelled, newest-first', async () => {
     prisma.appointment.findMany.mockResolvedValue([
       {
         id: 'a2',
         slotStart: new Date('2099-01-02T13:00:00Z'),
         slotEnd: new Date('2099-01-02T13:30:00Z'),
-        state: 'completed',
+        state: 'confirmed',
         feeAtBooking: 250000,
         paymentReference: 'TXN-1',
         forSelf: true,
@@ -104,10 +104,12 @@ describe('appointment.listForRole (patient)', () => {
     ]);
     const out = await listForRole({ role: 'patient', userId: 'u1', scope: 'history' });
     expect(out[0].hasPrescription).toBe(true);
-    expect(out[0].state).toBe('completed');
+    expect(out[0].state).toBe('confirmed');
     const arg = prisma.appointment.findMany.mock.calls[0][0];
-    expect(arg.where.state.in).toEqual(['completed', 'cancelled']);
-    expect(arg.where.state.in).not.toContain('confirmed');
+    expect(arg.where.patientUserId).toBe('u1');
+    expect(arg.where.OR[0].state).toBe('confirmed');
+    expect(arg.where.OR[0].slotEnd.lt).toBeInstanceOf(Date);
+    expect(arg.where.OR[1]).toEqual({ state: 'cancelled' });
     expect(arg.orderBy).toEqual({ slotStart: 'desc' });
   });
 });
@@ -277,22 +279,19 @@ describe('appointmentState.transition', () => {
     expect(out.state).toBe('confirmed');
   });
 
-  it('allows confirmed → completed and confirmed → cancelled', async () => {
-    for (const to of ['completed', 'cancelled']) {
-      vi.clearAllMocks();
-      prisma.appointment.findUnique
-        .mockResolvedValueOnce({ id: 'a1', state: 'confirmed' })
-        .mockResolvedValueOnce({ id: 'a1', state: to });
-      prisma.appointment.updateMany.mockResolvedValue({ count: 1 });
-      const out = await transition({ appointmentId: 'a1', to, actorType: 'system' });
-      expect(out.state).toBe(to);
-    }
+  it('allows confirmed → cancelled (the only legal move from confirmed)', async () => {
+    prisma.appointment.findUnique
+      .mockResolvedValueOnce({ id: 'a1', state: 'confirmed' })
+      .mockResolvedValueOnce({ id: 'a1', state: 'cancelled' });
+    prisma.appointment.updateMany.mockResolvedValue({ count: 1 });
+    const out = await transition({ appointmentId: 'a1', to: 'cancelled', actorType: 'system' });
+    expect(out.state).toBe('cancelled');
   });
 
-  it('rejects an illegal transition (completed is terminal) with INVALID_TRANSITION', async () => {
-    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'completed' });
+  it('rejects an illegal transition (confirmed → pending) with INVALID_TRANSITION', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'confirmed' });
     await expect(
-      transition({ appointmentId: 'a1', to: 'confirmed', actorType: 'system' }),
+      transition({ appointmentId: 'a1', to: 'pending', actorType: 'system' }),
     ).rejects.toMatchObject({ code: 'INVALID_TRANSITION', status: 409 });
   });
 
@@ -307,7 +306,7 @@ describe('appointmentState.transition', () => {
     prisma.appointment.findUnique.mockResolvedValue({ id: 'a1', state: 'confirmed' });
     prisma.appointment.updateMany.mockResolvedValue({ count: 0 }); // raced
     await expect(
-      transition({ appointmentId: 'a1', to: 'completed', actorType: 'system' }),
+      transition({ appointmentId: 'a1', to: 'cancelled', actorType: 'system' }),
     ).rejects.toMatchObject({ code: 'INVALID_TRANSITION', status: 409 });
     expect(audit.record).not.toHaveBeenCalled();
   });
@@ -451,40 +450,14 @@ describe('cancellation.cancel', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 
-  it('cancelling a completed appointment → 409', async () => {
+  it('cancelling an already-cancelled appointment → 409', async () => {
     prisma.appointment.findUnique.mockResolvedValue({
       id: 'a1',
-      state: 'completed',
+      state: 'cancelled',
       patientUserId: 'u1',
     });
     await expect(
       cancel({ appointmentId: 'a1', actorType: 'patient', actorId: 'u1' }),
     ).rejects.toMatchObject({ code: 'INVALID_TRANSITION', status: 409 });
-  });
-});
-
-describe('completeDueAppointments', () => {
-  const start = new Date('2026-06-04T10:00:00.000Z');
-  const end = new Date('2026-06-04T10:30:00.000Z');
-  beforeEach(() => vi.spyOn(svc, 'transition').mockResolvedValue({}));
-
-  it('completes a confirmed appt past slotEnd + cutoff', async () => {
-    prisma.appointment.findMany.mockResolvedValue([{ id: 'a1', slotStart: start, slotEnd: end }]);
-    await completeDueAppointments(new Date(end.getTime() + 6 * 60000));
-    expect(svc.transition).toHaveBeenCalledWith(
-      expect.objectContaining({ appointmentId: 'a1', to: 'completed', actorType: 'system' }),
-    );
-  });
-
-  it('does not complete a confirmed appt before the cutoff', async () => {
-    prisma.appointment.findMany.mockResolvedValue([{ id: 'a1', slotStart: start, slotEnd: end }]);
-    await completeDueAppointments(new Date(end.getTime() + 1 * 60000));
-    expect(svc.transition).not.toHaveBeenCalled();
-  });
-
-  it('only queries confirmed rows (pending past slot is untouched)', async () => {
-    prisma.appointment.findMany.mockResolvedValue([]);
-    await completeDueAppointments(new Date(end.getTime() + 6 * 60000));
-    expect(prisma.appointment.findMany).toHaveBeenCalledWith({ where: { state: 'confirmed' } });
   });
 });

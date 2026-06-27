@@ -13,7 +13,7 @@ export const recordsQuerySchema = z.object({
   appointmentId: z.string().trim().max(64).optional(),
   /** Matches the patient-entered bank transaction reference. */
   paymentRef: z.string().trim().max(128).optional(),
-  state: z.enum(['pending', 'confirmed', 'completed', 'cancelled']).optional(),
+  state: z.enum(['pending', 'confirmed', 'cancelled']).optional(),
   from: isoDate.optional(),
   to: isoDate.optional(),
 });

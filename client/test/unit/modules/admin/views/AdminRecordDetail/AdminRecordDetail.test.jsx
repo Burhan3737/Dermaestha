@@ -15,7 +15,7 @@ const DETAIL = {
     id: 'a1',
     slotStart: '2099-01-02T13:00:00Z',
     slotEnd: '2099-01-02T13:30:00Z',
-    state: 'completed',
+    state: 'confirmed',
     patientName: 'Parent P',
     patientEmail: 'p@t.test',
     subjectName: 'Ali',
@@ -83,7 +83,7 @@ describe('AdminRecordDetail (A-04 detail)', () => {
   it('renders state via the shared label + amount + payment ref, with no refund/dispute UI', async () => {
     renderView();
     await screen.findByText('appointment.confirmed');
-    expect(screen.getByText('Completed')).toBeTruthy(); // shared stateLabel, not raw enum
+    expect(screen.getByText('Confirmed')).toBeTruthy(); // shared stateLabel, not raw enum
     expect(screen.getByText(/Rs 2,500/)).toBeTruthy();
     expect(screen.getByText(/bank_txn_77/)).toBeTruthy();
     expect(screen.queryByText(/Refund ref/i)).toBeNull();

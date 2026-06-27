@@ -42,7 +42,7 @@ const ROW = {
   id: 'a1',
   slotStart: new Date('2099-01-02T13:00:00Z'),
   slotEnd: new Date('2099-01-02T13:30:00Z'),
-  state: 'completed',
+  state: 'confirmed',
   forSelf: false,
   subjectName: 'Ali',
   feeAtBooking: 250000,
@@ -61,7 +61,7 @@ describe('admin.listRecords (F13.01)', () => {
       id: 'a1',
       slotStart: ROW.slotStart,
       slotEnd: ROW.slotEnd,
-      state: 'completed',
+      state: 'confirmed',
       patientName: 'Parent P',
       patientEmail: 'p@t.test',
       subjectName: 'Ali',
@@ -317,9 +317,9 @@ describe('admin.listAlerts (F12.01 — audit sources + awaiting-prescription)', 
     expect(out[0].failedJobs).toEqual([
       { id: 'n9', appointmentId: 'a1', type: 'prescription_ready', status: 'failed' },
     ]);
-    // the derived predicate: completed, no prescription, slot ended >12h before now
+    // the derived predicate: confirmed, no prescription, slot ended >12h before now
     const apptArg = prisma.appointment.findMany.mock.calls[0][0];
-    expect(apptArg.where.state).toBe('completed');
+    expect(apptArg.where.state).toBe('confirmed');
     expect(apptArg.where.prescriptions).toEqual({ none: {} });
     expect(apptArg.where.slotEnd.lte).toEqual(new Date('2099-01-10T00:00:00Z')); // NOW − 12h
     expect(apptArg.take).toBe(100);

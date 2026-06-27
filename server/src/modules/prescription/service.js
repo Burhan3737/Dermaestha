@@ -30,10 +30,11 @@ async function ownedAppointment(appointmentId, doctorUserId) {
  */
 export async function submit({ appointmentId, doctorUserId, items, notes, followUpDate }) {
   const { doctor, appt } = await ownedAppointment(appointmentId, doctorUserId);
-  // Completed-Gate Rule + Chronological Corrections Rule (policy #9). Prescriptions are child
-  // records that do NOT change appointment state (manual-payment: prescription_issued dropped).
-  if (appt.state !== 'completed') {
-    throw new AppError('INVALID_STATE', 'Prescription requires a completed consultation.', 409);
+  // Confirmed-Gate Rule + Chronological Corrections Rule (policy #9). A doctor can prescribe any
+  // time after the admin confirms the appointment (no time restriction — there is no `completed`
+  // state). Prescriptions are child records that do NOT change appointment state.
+  if (appt.state !== 'confirmed') {
+    throw new AppError('INVALID_STATE', 'Prescription requires a confirmed appointment.', 409);
   }
 
   // Medicine Snapshot Rule (#5): name+price resolved server-side; client prices never trusted.

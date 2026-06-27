@@ -10,7 +10,6 @@ import { adminRouter } from './modules/admin/index.js';
 import { analyticsRouter } from './modules/analytics/index.js';
 import { prescriptionsRouter } from './modules/prescription/index.js';
 import { healthRouter } from './health/index.js';
-import { devVideoRouter } from './dev/devVideo.js';
 import { devWorkersRouter } from './dev/devWorkers.js';
 
 /** Mount all API + dev routes onto the app, in order (extracted from index.js, behavior unchanged). */
@@ -33,6 +32,5 @@ export function registerRoutes(app) {
   app.use('/api', (_req, _res, next) => next(new AppError('NOT_FOUND', 'Not found.', 404)));
 
   // Dev-only simulators. NEVER mounted in production.
-  if (env.VIDEO_PROVIDER === 'mock') app.use('/dev', devVideoRouter);
   if (env.NODE_ENV === 'development') app.use('/dev', devWorkersRouter);
 }

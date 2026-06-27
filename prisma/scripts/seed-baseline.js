@@ -18,17 +18,18 @@
 //   medicine  "Baseline Acne Cream" (active)
 //
 //   Pre-seeded appointments on the baseline doctor (patient1), reflecting the manual-payment
-//   4-state model (pending → confirmed → completed, plus cancelled):
-//     - 1 confirmed in the join window  (slot ~now+5m → "Join Call" active; row stays confirmed)
-//     - 1 completed + a linked prescription  (patient view-prescription + PDF flow)
+//   3-state model (pending → confirmed, plus cancelled):
+//     - 1 confirmed in the join window  (slot ~now+5m → "Join Call" active)
+//     - 1 confirmed (past) + a linked prescription  (patient view-prescription + PDF flow)
 //     - 1 pending with a paymentReference     (admin review queue → accept/reject)
 //     - 1 cancelled                           (history view)
 //
 // NOTES
 //   * Money is fully offline (manual bank transfer): there is no Payment table. The fee snapshot
 //     lives on Appointment.feeAtBooking; the patient-entered bank reference is paymentReference.
-//   * The in-process completion cron flips `confirmed` → `completed` at slotEnd + 5m. The join-window
-//     appt is intentionally near-future so its join token is valid; re-run this seed right before
+//   * There is no `completed` state and no completion cron: a confirmed appointment stays confirmed,
+//     and the doctor may write a prescription against it any time. The join-window appt is
+//     intentionally near-future so its video-token window is valid; re-run this seed right before
 //     exercising the join flow for the freshest window.
 
 import { PrismaClient } from '@prisma/client';
@@ -166,13 +167,13 @@ async function main() {
     },
   });
 
-  // 2) completed + a linked prescription (patient view-prescription + PDF flow).
+  // 2) confirmed (past slot) + a linked prescription (patient view-prescription + PDF flow).
   const rxAppt = await prisma.appointment.create({
     data: {
       doctorId: doctor.id,
       patientUserId: patient1.id,
       ...slot(-180),
-      state: 'completed',
+      state: 'confirmed',
       feeAtBooking: DOCTOR_FEE,
       forSelf: true,
     },
@@ -246,7 +247,7 @@ async function main() {
         },
         appts: {
           joinWindow: joinWindow.id,
-          completedWithPrescription: rxAppt.id,
+          confirmedWithPrescription: rxAppt.id,
           pendingReview: pendingReview.id,
           cancelled: cancelled.id,
         },

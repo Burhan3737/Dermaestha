@@ -9,7 +9,7 @@
 // @@unique). After `prisma migrate dev`, hand-edit the generated migration.sql and append:
 //
 //   CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
-//     WHERE state IN ('pending','confirmed','completed');
+//     WHERE state IN ('pending','confirmed');
 //
 // The releasing/terminal state (cancelled) is excluded so a freed slot rebooks.
 // A second insert for a held slot then fails at WRITE time, not validation time.
@@ -45,7 +45,6 @@ enum DoctorStatus {
 enum AppointmentState {
   pending
   confirmed
-  completed
   cancelled
 }
 

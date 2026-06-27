@@ -1,12 +1,11 @@
 // @ts-check
 /**
- * Patient/doctor-facing labels for the 4-state manual-payment model
- * (`pending → confirmed → completed`, plus `cancelled`). State stays the source of truth.
+ * Patient/doctor-facing labels for the 3-state manual-payment model
+ * (`pending → confirmed`, plus `cancelled`). State stays the source of truth.
  */
 const LABELS = {
   pending: 'Payment pending',
   confirmed: 'Confirmed',
-  completed: 'Completed',
   cancelled: 'Cancelled',
 };
 
@@ -16,7 +15,6 @@ export const stateLabel = (state) => LABELS[state] ?? state;
 const VARIANT = {
   pending: 'warning',
   confirmed: 'success',
-  completed: 'info',
   cancelled: 'neutral',
 };
 

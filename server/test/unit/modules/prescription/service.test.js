@@ -31,7 +31,7 @@ const APPT = {
   id: 'a1',
   doctorId: 'd1',
   patientUserId: 'u1',
-  state: 'completed',
+  state: 'confirmed',
   forSelf: false,
   subjectName: 'Ali',
   subjectAge: 9,
@@ -98,7 +98,7 @@ describe('prescription.submit (F08.02)', () => {
     });
   });
 
-  it('issuing on completed does NOT change appointment state (no transition)', async () => {
+  it('issuing on confirmed does NOT change appointment state (no transition)', async () => {
     arrangeTx();
     await submit({
       appointmentId: 'a1',
@@ -111,7 +111,7 @@ describe('prescription.submit (F08.02)', () => {
     );
   });
 
-  it('a correction (second issue on completed) also enqueues prescription_ready, no transition', async () => {
+  it('a correction (second issue on confirmed) also enqueues prescription_ready, no transition', async () => {
     arrangeTx();
     await submit({
       appointmentId: 'a1',
@@ -178,8 +178,8 @@ describe('prescription.submit (F08.02)', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 
-  it('rejects wrong state (confirmed) with 409 INVALID_STATE', async () => {
-    prisma.appointment.findUnique.mockResolvedValue({ ...APPT, state: 'confirmed' });
+  it('rejects wrong state (pending) with 409 INVALID_STATE', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({ ...APPT, state: 'pending' });
     await expect(
       submit({
         appointmentId: 'a1',
