@@ -35,7 +35,7 @@ const DETAIL = {
     {
       id: 'e2',
       at: '2099-01-02T14:00:00Z',
-      eventType: 'appointment.prescription_issued',
+      eventType: 'prescription.issued',
       actorType: 'doctor',
       reason: null,
     },
@@ -75,7 +75,7 @@ describe('AdminRecordDetail (A-04 detail)', () => {
   it('shows the transition history and linked prescriptions', async () => {
     renderView();
     expect(await screen.findByText('appointment.confirmed')).toBeTruthy();
-    expect(screen.getByText('appointment.prescription_issued')).toBeTruthy();
+    expect(screen.getByText('prescription.issued')).toBeTruthy();
     expect(screen.getByText('Adapalene Gel')).toBeTruthy();
     expect(api.get).toHaveBeenCalledWith('/admin/records/a1');
   });
