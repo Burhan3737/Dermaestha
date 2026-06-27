@@ -2,7 +2,6 @@
 import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import { env } from '../../config/env/env.js';
-import * as appointmentState from '../appointment/service.js';
 import * as notification from '../notification/service.js';
 
 /** Owner gate (404-no-leak, same answer as a missing appointment). */
@@ -31,8 +30,9 @@ async function ownedAppointment(appointmentId, doctorUserId) {
  */
 export async function submit({ appointmentId, doctorUserId, items, notes, followUpDate }) {
   const { doctor, appt } = await ownedAppointment(appointmentId, doctorUserId);
-  // Completed-Gate Rule + Chronological Corrections Rule (policy #9).
-  if (appt.state !== 'completed' && appt.state !== 'prescription_issued') {
+  // Completed-Gate Rule + Chronological Corrections Rule (policy #9). Prescriptions are child
+  // records that do NOT change appointment state (manual-payment: prescription_issued dropped).
+  if (appt.state !== 'completed') {
     throw new AppError('INVALID_STATE', 'Prescription requires a completed consultation.', 409);
   }
 
@@ -89,15 +89,6 @@ export async function submit({ appointmentId, doctorUserId, items, notes, follow
       },
       include: { items: true },
     });
-    if (appt.state === 'completed') {
-      await appointmentState.transition({
-        appointmentId,
-        to: 'prescription_issued',
-        actorType: 'doctor',
-        actorId: doctorUserId,
-        client: tx,
-      });
-    }
     await notification.enqueue({
       type: 'prescription_ready',
       appointmentId,

@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-process.env.PAYMENT_PROVIDER = 'mock';
 process.env.EMAIL_PROVIDER = 'console';
-process.env.PAYFAST_PASSPHRASE = 'test-passphrase';
 
 const request = (await import('supertest')).default;
 const { createApp } = await import('#src/index.js');
@@ -95,7 +93,7 @@ describe('prescription flow — immutable submit, corrections, snapshot durabili
     expect(String(res.body.followUpDate)).toContain('2099-01-18');
 
     const appt = await prisma.appointment.findUnique({ where: { id: appointmentId } });
-    expect(appt.state).toBe('prescription_issued');
+    expect(appt.state).toBe('completed'); // prescriptions no longer change appointment state
 
     const jobs = await prisma.notificationJob.findMany({
       where: { appointmentId, type: 'prescription_ready' },
@@ -118,7 +116,7 @@ describe('prescription flow — immutable submit, corrections, snapshot durabili
     expect(jobs).toHaveLength(2);
     expect(new Set(jobs.map((j) => j.dedupeKey)).size).toBe(2); // real-DB dedupe semantics: distinct keys → distinct rows
     expect((await prisma.appointment.findUnique({ where: { id: appointmentId } })).state).toBe(
-      'prescription_issued',
+      'completed',
     );
   });
 
@@ -157,7 +155,7 @@ describe('prescription flow — immutable submit, corrections, snapshot durabili
     const res = await patientAgent.get('/api/appointments').query({ scope: 'history' });
     expect(res.status).toBe(200);
     const row = res.body.data.find((a) => a.id === appointmentId);
-    expect(row.state).toBe('prescription_issued');
+    expect(row.state).toBe('completed');
     expect(row.hasPrescription).toBe(true);
   });
 
@@ -221,7 +219,7 @@ describe('prescription flow — concurrency race guard + forSelf snapshot', () =
       })
     ).id;
 
-    // Dedicated appointment for the Postgres-level race test — must stay 'completed'.
+    // Dedicated appointment for the Postgres-level race test — confirmed → completed.
     raceApptId = (
       await prisma.appointment.create({
         data: {
@@ -229,7 +227,7 @@ describe('prescription flow — concurrency race guard + forSelf snapshot', () =
           patientUserId,
           slotStart: new Date(Date.now() - 8 * 3600 * 1000),
           slotEnd: new Date(Date.now() - 7.5 * 3600 * 1000),
-          state: 'completed',
+          state: 'confirmed',
           feeAtBooking: 250000,
           forSelf: true,
         },
@@ -238,14 +236,14 @@ describe('prescription flow — concurrency race guard + forSelf snapshot', () =
   });
 
   it('the state-guarded transition write loses cleanly when racing (real Postgres row lock)', async () => {
-    // T1: open a transaction, move completed → prescription_issued, then HOLD the row lock.
+    // T1: open a transaction, move confirmed → completed, then HOLD the row lock.
     let signalT1Wrote, signalRelease;
     const t1Wrote = new Promise((r) => (signalT1Wrote = r));
     const release = new Promise((r) => (signalRelease = r));
     const t1 = prisma.$transaction(async (tx) => {
       await tx.appointment.updateMany({
-        where: { id: raceApptId, state: 'completed' },
-        data: { state: 'prescription_issued' },
+        where: { id: raceApptId, state: 'confirmed' },
+        data: { state: 'completed' },
       });
       signalT1Wrote();
       await release; // keep the tx open so T2 blocks on the row lock
@@ -253,10 +251,10 @@ describe('prescription flow — concurrency race guard + forSelf snapshot', () =
 
     await t1Wrote;
     // T2: a real transition() racing the held lock. Under READ COMMITTED its initial read
-    // still sees 'completed' (MVCC), passes LEGAL, then its guarded updateMany blocks on
+    // still sees 'confirmed' (MVCC), passes LEGAL, then its guarded updateMany blocks on
     // T1's row lock. When T1 commits, the WHERE re-evaluates → 0 rows → clean 409.
     const t2 = appointmentService
-      .transition({ appointmentId: raceApptId, to: 'prescription_issued', actorType: 'doctor' })
+      .transition({ appointmentId: raceApptId, to: 'completed', actorType: 'system' })
       .then(
         () => 'won',
         (e) => e.code,
@@ -268,11 +266,11 @@ describe('prescription flow — concurrency race guard + forSelf snapshot', () =
 
     // The loser left nothing behind: no duplicate audit, state stable.
     const audits = await prisma.auditLog.count({
-      where: { eventType: 'appointment.prescription_issued', targetRef: raceApptId },
+      where: { eventType: 'appointment.completed', targetRef: raceApptId },
     });
     expect(audits).toBe(0); // T1 wrote raw (no audit); the losing T2 must not have audited
     expect((await prisma.appointment.findUnique({ where: { id: raceApptId } })).state).toBe(
-      'prescription_issued',
+      'completed',
     );
   });
 
