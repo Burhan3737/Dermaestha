@@ -11,7 +11,7 @@ import { useAppointment } from '../../useAppointment.js';
 
 export function Upcoming() {
   const [cancelId, setCancelId] = useState(null);
-  const { list, detail, cancel: cancelMut, resumePayment } = useAppointment({ detailId: cancelId });
+  const { list, cancel: cancelMut } = useAppointment();
 
   const rows = list.data?.data ?? [];
 
@@ -43,7 +43,7 @@ export function Upcoming() {
         )}
         <div className="appt-list">
           {rows.map((a) => {
-            if (a.state === 'slot_locked') {
+            if (a.state === 'pending') {
               return (
                 <div key={a.id} className="card appt-row">
                   <DoctorAvatar name={a.doctorName} photoUrl={a.doctorPhotoUrl} />
@@ -55,26 +55,23 @@ export function Upcoming() {
                           {a.specialization}
                           {!a.forSelf && a.subjectName ? ` · for: ${a.subjectName}` : ''}
                         </p>
-                        <p className="appt-sub tnum">{formatKarachi(a.slotStart)}</p>
+                        <p className="appt-sub tnum">
+                          {formatKarachi(a.slotStart)} · {formatPkr(a.feeAtBooking)}
+                        </p>
                       </div>
-                      <span className="badge badge--warning">Payment pending</span>
+                      <span className={`badge badge--${stateBadge(a.state)}`}>
+                        {stateLabel(a.state)}
+                      </span>
                     </div>
-                    <p className="help">Hold expires {formatKarachi(a.lockExpiresAt)}</p>
                     <div className="appt-actions">
-                      <button
-                        type="button"
-                        className="btn btn--primary btn--sm"
-                        disabled={resumePayment.isPending}
-                        onClick={() =>
-                          resumePayment.mutate(a.id, {
-                            onSuccess: (d) => {
-                              window.location.href = d.redirectUrl;
-                            },
-                          })
-                        }
-                      >
-                        Complete payment
-                      </button>
+                      <Link className="btn btn--primary btn--sm" to={`/book/pay/${a.id}`}>
+                        {a.paymentReference ? 'View payment details' : 'Enter payment reference'}
+                      </Link>
+                      {a.paymentReference && (
+                        <span className="help" style={{ margin: 0 }}>
+                          Awaiting confirmation
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -140,21 +137,12 @@ export function Upcoming() {
           })}
         </div>
       </section>
-      {cancelId &&
-        detail.data &&
-        (() => {
-          const appt = rows.find((r) => r.id === cancelId);
-          const isLate =
-            appt && new Date(appt.slotStart).getTime() - Date.now() < 2 * 60 * 60 * 1000;
-          return (
-            <CancelModal
-              quote={isLate ? null : detail.data.refundQuote}
-              lateNoRefund={isLate}
-              onClose={() => setCancelId(null)}
-              onConfirm={() => cancelMut.mutate(cancelId, { onSuccess: () => setCancelId(null) })}
-            />
-          );
-        })()}
+      {cancelId && (
+        <CancelModal
+          onClose={() => setCancelId(null)}
+          onConfirm={() => cancelMut.mutate(cancelId, { onSuccess: () => setCancelId(null) })}
+        />
+      )}
     </PatientLayout>
   );
 }

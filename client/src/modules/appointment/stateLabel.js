@@ -1,36 +1,23 @@
 // @ts-check
-/** Patient-facing terminal-state labels — F08.01's exact mapping. State stays source of truth. */
+/**
+ * Patient/doctor-facing labels for the 4-state manual-payment model
+ * (`pending → confirmed → completed`, plus `cancelled`). State stays the source of truth.
+ */
 const LABELS = {
-  completed: 'Completed',
-  prescription_issued: 'Completed',
-  patient_no_show: 'Missed (no-show)',
-  doctor_no_show: 'Cancelled by doctor — refund issued',
-  doctor_cancelled: 'Cancelled by doctor — refund issued',
-  cancelled_refunded: 'Cancelled — refunded',
-  cancelled_no_refund: 'Cancelled — no refund',
-};
-
-/** Active (non-terminal) state labels — used as a fallback so the same helper labels every row. */
-const ACTIVE_LABELS = {
+  pending: 'Payment pending',
   confirmed: 'Confirmed',
-  in_progress: 'In progress',
-  slot_locked: 'Payment pending',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
 };
 
-export const stateLabel = (state) => LABELS[state] ?? ACTIVE_LABELS[state] ?? state;
+export const stateLabel = (state) => LABELS[state] ?? state;
 
 /** Status → `.badge--*` variant (doc 06 §3 "Appointment state → badge mapping"). */
 const VARIANT = {
+  pending: 'warning',
   confirmed: 'success',
-  in_progress: 'info',
-  completed: 'success',
-  prescription_issued: 'success',
-  patient_no_show: 'warning',
-  doctor_no_show: 'danger',
-  doctor_cancelled: 'danger',
-  cancelled_refunded: 'info',
-  cancelled_no_refund: 'neutral',
-  slot_locked: 'warning',
+  completed: 'info',
+  cancelled: 'neutral',
 };
 
 export const stateBadge = (state) => VARIANT[state] ?? 'neutral';
