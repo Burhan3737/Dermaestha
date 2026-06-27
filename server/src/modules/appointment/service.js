@@ -563,75 +563,21 @@ export async function setDisputed({ appointmentId, disputed, actorId }) {
   return updated;
 }
 
-/** Pure-ish, clock-injected, catch-up-safe. The ONLY transitions are via state.transition. */
-export async function evaluateDueAppointments(now = new Date()) {
-  await activateDue(now);
-  await resolveInProgress(now);
-}
-
-async function activateDue(now) {
-  const due = await prisma.appointment.findMany({
-    where: { state: 'confirmed', slotStart: { lte: now } },
-  });
+/**
+ * Time-based completion (manual-payment, design §10). Clock-injected, catch-up-safe. Transitions
+ * `confirmed` rows to `completed` once now ≥ slotEnd + VIDEO_TOKEN_POST_MIN. `pending` rows are
+ * left untouched (a past slot is not rebookable, so it is harmless until an admin acts).
+ */
+export async function completeDueAppointments(now = new Date()) {
+  const cutoffMs = VIDEO_TOKEN_POST_MIN * 60000;
+  const due = await prisma.appointment.findMany({ where: { state: 'confirmed' } });
   for (const a of due) {
+    if (now.getTime() < a.slotEnd.getTime() + cutoffMs) continue;
     // One bad row must not poison the batch — a skipped appointment is retried next tick.
     try {
-      await self.transition({ appointmentId: a.id, to: 'in_progress', actorType: 'system' });
+      await self.transition({ appointmentId: a.id, to: 'completed', actorType: 'system' });
     } catch (e) {
-      logger.error('activation failed; will retry next tick', {
-        appointmentId: a.id,
-        err: String(e),
-      });
-    }
-  }
-}
-
-async function resolveInProgress(now) {
-  const open = await prisma.appointment.findMany({ where: { state: 'in_progress' } });
-  for (const a of open) {
-    // One bad row must not poison the batch — a skipped appointment is retried next tick.
-    try {
-      const graceEnd = a.slotStart.getTime() + NO_SHOW_GRACE_MIN * 60000;
-      const hardCutoff = a.slotEnd.getTime() + VIDEO_TOKEN_POST_MIN * 60000;
-      const both = a.doctorJoinedAt && a.patientJoinedAt;
-      const t = now.getTime();
-      if (t >= hardCutoff) {
-        if (both) {
-          await self.transition({ appointmentId: a.id, to: 'completed', actorType: 'system' });
-        } else {
-          await resolveNoShow(a, true);
-        }
-      } else if (t >= graceEnd && !both) {
-        await resolveNoShow(a, false);
-      }
-    } catch (e) {
-      logger.error('in_progress resolution failed; will retry next tick', {
-        appointmentId: a.id,
-        err: String(e),
-      });
-    }
-  }
-}
-
-async function resolveNoShow(a, atCutoff) {
-  // ADR-12 precedence: doctor never joined → doctor_no_show (whether or not patient joined).
-  const to = !a.doctorJoinedAt ? 'doctor_no_show' : 'patient_no_show';
-  await self.transition({ appointmentId: a.id, to, actorType: 'system' });
-  if (to === 'doctor_no_show') {
-    await self.safeRefund(a.id);
-    await enqueueCancellationEmail(a, 'cancellation_apology');
-    // Scoped to the zero-join-data case (neither party recorded a join at the hard cutoff) —
-    // the strict "resolved blind" subset of ADR-12's "missing/ambiguous". Spec-owner to confirm
-    // at the canon-docs step whether the alert should widen to late doctor-absent resolutions too.
-    if (atCutoff && !a.doctorJoinedAt && !a.patientJoinedAt) {
-      await audit
-        .record({
-          eventType: 'appointment.evaluation_data_gap',
-          actorType: 'system',
-          targetRef: a.id,
-          reason: 'no join data at slot-end+5m; resolved non-penalizing',
-        })
-        .catch(() => {});
+      logger.error('completion failed; retry next tick', { appointmentId: a.id, err: String(e) });
     }
   }
 }

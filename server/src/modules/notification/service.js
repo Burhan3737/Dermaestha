@@ -148,7 +148,7 @@ export async function enqueuePaymentNotReceived({ appointment, now = new Date(),
 }
 
 const REMINDER_TYPES = new Set(['reminder_24h', 'reminder_1h']);
-const SENDABLE_STATES = new Set(['confirmed', 'in_progress']);
+const SENDABLE_STATES = new Set(['confirmed']);
 const LEASE_MS = 60_000;
 
 /** Minute-cron worker body: deliver due outbox rows. Pure w.r.t. the injected clock. */
