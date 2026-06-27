@@ -1,0 +1,74 @@
+# 2026-06-27-1817 — manual-payment-pivot-design
+
+**Status:** Partial
+**Goal:** Brainstorm + design the phase-1 pivot to a fully-manual offline payment flow (delete all in-app payment + refund code; admin-verified bank-transfer booking).
+**Skill(s) used:** superpowers:brainstorming (user opted in)
+**Ticket / issue:** None
+**Branch:** main (no code changes yet; design + changelog only)
+**Commits / PR:** None
+**Last updated:** 2026-06-27-1817
+**Tags:** #feature #refactor #design
+
+## Summary
+Worked through a client-driven scope pivot for phase 1: remove the PayFast gateway, the entire
+refund subsystem, and the no-show/evaluation lifecycle, replacing them with a fully-manual flow —
+patient books (slot locks → `pending`), pays offline via bank transfer, submits their bank
+transaction reference, and the admin accepts (→ `confirmed`) or rejects (→ `cancelled`, slot freed).
+Appointments auto-complete by time (`slotEnd + 5min`) via a slimmed cron; prescriptions stay gated on
+`completed`. Daily.co drops to the free tier (no webhook). Wrote the approved design doc; no code yet.
+
+## Context / why
+Client no longer wants in-app payments for phase 1; bank transfer + manual admin verification is
+preferred, and refunds are removed entirely (money handled offline). This also resolves an earlier
+blocker discovered this session: Daily.co webhooks (which drove no-show/refund logic) require a paid
+plan — removing no-show tracking removes that dependency.
+
+## Files changed
+| File | Action | What & why |
+|---|---|---|
+| `docs/superpowers/specs/2026-06-27-manual-payment-pivot-design.md` | Created | Approved design for the manual-payment pivot (scope, data model, state machine, flows, cron, testing, doc-impact) |
+| `agentChangeLogs/2026-06-27-1817-manual-payment-pivot-design.md` | Created | This session changelog |
+| `agentChangeLogs/index.md` | Modified | Added this session's index line |
+| `.env.daily` | Created (earlier this session) | Git-ignored dedicated env for the (blocked) live Daily Tier-2 test |
+| `.gitignore` | Modified (earlier this session) | Ignore `.env.daily` so the Daily API key cannot be committed |
+
+## Dependencies / config / schema
+No schema migration applied yet. The DESIGN specifies (for the build phase): `AppointmentState` enum
+→ `pending/confirmed/completed/cancelled`; add `paymentReference`/`paymentSubmittedAt`; drop
+`Payment` model, `doctorJoinedAt`/`patientJoinedAt`, `disputed`, `lockExpiresAt`; bank-instruction
+fields added to admin settings. Config to remove later: `PAYFAST_*`, `PAYMENT_PROVIDER`, `REFUND_*`,
+`DAILY_WEBHOOK_SECRET`, `NO_SHOW_GRACE_MIN`.
+
+## Decisions
+- Lock slot on click (no auto-expiry; only a human frees it). No proof-of-payment image. Bank details
+  from admin-editable settings. Patient submits their own bank transaction reference; admin matches.
+- No refunds anywhere; all money offline. Patient + doctor + admin can cancel.
+- Four states only; time-based auto-completion (`slotEnd + VIDEO_TOKEN_POST_MIN`). Drop
+  `prescription_issued`. Daily on free tier (no webhook). Admin gets in-app alert + email on payment
+  submission. New UI must conform to doc `06` design tokens/components (no new aesthetics).
+- Approach A (minimal reuse of the existing lock/state spine) chosen over explicit new states or a
+  payment-claim entity. Future real payments are a revive-and-adapt job (git tag + ADR insurance).
+
+## Notable findings
+- Daily.co webhooks require a PAID plan (`403 invalid-plan-type` on registration) — they were the
+  load-bearing signal for no-show/refund logic; removing no-show removes the paid dependency.
+- The no-show lifecycle was NOT only about refunds: `completed` is the prescription gate
+  (`prescription/service.js:35`). Kept `completed`; only the refund side-effect and join-based
+  detection are removed.
+- The scheduler is in-process `node-cron` (no external infra/cost); the pivot deletes 2 of its 4 jobs.
+
+## Verification
+Not verified (design only; no code changed). Build/tests to run during implementation.
+
+## Risk / rollback
+No runtime risk yet (docs + ignored env file only). The future implementation is a large deletion
+across payment/refund/no-show; mitigations specified in the design: `git tag pre-manual-payment-pivot`
+before deletion, ADRs marked superseded (not deleted), and test-first rewrite of the booking/video/
+prescription/notification suites. Spec edits are tracked and applied only at the END with approval.
+
+## Open items / next session
+- Get user review of the design doc, then invoke superpowers:writing-plans for the implementation plan.
+- Apply the §14 spec doc-impact updates only AFTER code is committed and with explicit approval.
+- Resolve §16 minor items (pay-screen copy, `video-token` confirmed-only restriction, dev-DB row
+  migration).
+- Stop the still-running cloudflared tunnel (PID 37652) from the earlier Daily test if not needed.
