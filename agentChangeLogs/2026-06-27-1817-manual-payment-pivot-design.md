@@ -1,11 +1,11 @@
 # 2026-06-27-1817 — manual-payment-pivot-design
 
-**Status:** Partial
+**Status:** Partial (code implemented + green; spec 00–15 sync pending user approval)
 **Goal:** Brainstorm + design the phase-1 pivot to a fully-manual offline payment flow (delete all in-app payment + refund code; admin-verified bank-transfer booking).
 **Skill(s) used:** superpowers:brainstorming (user opted in)
 **Ticket / issue:** None
 **Branch:** main (no code changes yet; design + changelog only)
-**Commits / PR:** None
+**Commits / PR:** ~30 commits on `main` (not pushed): design `c140a68`; plans `04b0521`; backend `31a89dc`→`1baeb27`; frontend `df49d9d`→`730bb1d`; e2e `a5333e2`,`2d88b62`. Tag `pre-manual-payment-pivot` at `cba465e`.
 **Last updated:** 2026-06-27-1925
 **Tags:** #feature #refactor #design
 
@@ -33,6 +33,13 @@ plan — removing no-show tracking removes that dependency.
 | `agentChangeLogs/index.md` | Modified | Added this session's index line |
 | `.env.daily` | Created (earlier this session) | Git-ignored dedicated env for the (blocked) live Daily Tier-2 test |
 | `.gitignore` | Modified (earlier this session) | Ignore `.env.daily` so the Daily API key cannot be committed |
+| `prisma/schema.prisma` (+ migration) | Modified | 4-state enum; +paymentReference/paymentSubmittedAt + Settings bank fields; dropped Payment/PaymentStatus/RefundStatus, join cols, disputed, lockExpiresAt, fallbackFee*; NotificationType enum reworked |
+| `server/src/modules/{appointment,admin,notification,prescription,video}/*`, `workers/index.js`, `routes.js`, `config/{env,constants}` | Modified | manual-payment flow, admin accept/reject, time-based completion, slim cron, prescription gate; deleted payment/refund/no-show/Daily-webhook code |
+| `server/src/modules/payment/*`, `server/src/integrations/payment/*`, `server/scripts/register-daily-webhook.mjs`, `server/src/dev/devCheckout.js` | Deleted | PayFast gateway + refund + dev checkout removed |
+| `client/src/modules/{booking,appointment,admin,doctor}/**` | Modified/Created | PaymentInstructions screen, AdminReview queue, bank settings, pending card, 4-state labels; removed gateway/refund/dispute UI |
+| `prisma/scripts/seed-baseline.js`, `e2e/support/db.js`, `e2e/global-setup.js`, `playwright.config.js`, `e2e/tests/j*.spec.js` | Modified | seeds + e2e reworked for the 4-state manual model |
+| `.env.example`, `.env.example.dev` | Modified | dropped PAYFAST_*/PAYMENT_PROVIDER/refund/no-show env |
+| `<scratchpad>/ADR-manual-payment.md` | Created (by backend agent) | ADR draft — to be applied into doc 11 at the doc-sync step |
 
 ## Dependencies / config / schema
 No schema migration applied yet. The DESIGN specifies (for the build phase): `AppointmentState` enum
@@ -61,7 +68,13 @@ fields added to admin settings. Config to remove later: `PAYFAST_*`, `PAYMENT_PR
 - Review pass on both plans surfaced gaps now patched: (backend) missing deletions of `reconcileRefund`/`paymentFailed`/`reclaimSafety` integration tests + `doubleBooking`/`admin` test updates; `seed-baseline.js` rewrite (Task 16); explicit env/PAYFAST cleanup (Task 17); orphaned Settings fallback-fee columns (Task 18); `booking_confirmed` analytics moved to admin-accept. (frontend) `AdminRecordDetail.jsx` refund/dispute removal (F12); `DoctorToday.jsx` `canWriteRx` → `completed` only (F13); `Past.jsx`/dead-`appointmentStatus` verification (F14).
 
 ## Verification
-Not verified (design only; no code changed). Build/tests to run during implementation.
+Implemented via 3 sub-agents (backend lead, frontend lead, e2e/QA), each TDD with its own review cycle, then a controller-run consolidated e2e cycle.
+- Server/integration: green (245 passed after backend agent; payment/refund/reconcile/payfast/Daily-webhook suites deleted).
+- Client: green (143/144; the 1 failure is a pre-existing, untouched `PrescriptionBuilder` timing flake on this slow machine).
+- e2e (Playwright): **17/17 pass** against the reworked manual-payment flow (book → reference → admin accept/reject → confirmed; cancel-no-refund; time-based completion via `/dev/worker/evaluate`; 4-state badges).
+- No front/back integration bugs found in the consolidated cycle (as-built contracts relayed between agents held).
+- Final integrated `npm test` re-run in progress at handoff.
+- `npm run lint` is broken repo-wide (ESLint v9 vs legacy `.eslintrc.json`) — PRE-EXISTING; only 2 pre-existing errors, none from these changes.
 
 ## Risk / rollback
 No runtime risk yet (docs + ignored env file only). The future implementation is a large deletion
