@@ -127,12 +127,6 @@ export function useAdmin(opts = {}) {
     onSuccess: invalidateRecord,
   });
 
-  /** Toggle disputed flag on an appointment. @param {{ id: string, disputed: boolean }} args */
-  const setDisputed = useMutation({
-    mutationFn: ({ id, disputed }) => api.post(`/appointments/${id}/dispute`, { disputed }),
-    onSuccess: invalidateRecord,
-  });
-
   /** Manual-payment review queue: `pending` appointments awaiting admin verification (design §7.2). */
   const pendingReview = useQuery({
     queryKey: ['admin-pending-review'],
@@ -164,7 +158,7 @@ export function useAdmin(opts = {}) {
     enabled: settingsEnabled,
   });
 
-  /** Persist platform settings. @param {{ minBookingLeadMinutes: number, fallbackFeePctBps: number, fallbackFeeFixed: number }} body */
+  /** Persist platform settings. @param {{ minBookingLeadMinutes: number, bankName: string, bankAccountName: string, bankAccountNumber: string, bankInstructions: string }} body */
   const saveSettings = useMutation({
     mutationFn: (body) => api.put('/admin/settings', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-settings'] }),
@@ -176,7 +170,7 @@ export function useAdmin(opts = {}) {
     resetDoctorPassword, uploadDoctorPhoto, saveDoctorBlocks,
     alerts,
     records, auditEntries,
-    recordDetail, resendEmail, setDisputed,
+    recordDetail, resendEmail,
     settings, saveSettings,
     pendingReview, acceptAppointment, rejectAppointment,
   };

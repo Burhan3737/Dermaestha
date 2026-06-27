@@ -42,7 +42,7 @@ export function Past() {
                     {stateLabel(a.state)}
                   </span>
                 </div>
-                {a.state === 'prescription_issued' && (
+                {a.state === 'completed' && a.hasPrescription && (
                   <div className="appt-actions">
                     <Link
                       className="btn btn--secondary btn--sm"

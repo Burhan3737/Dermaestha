@@ -39,15 +39,12 @@ const row = (state, extra = {}) => ({
   ...extra,
 });
 
-describe('stateLabel (F08.01 exact mapping)', () => {
+describe('stateLabel (4-state manual-payment mapping)', () => {
   it.each([
+    ['pending', 'Payment pending'],
+    ['confirmed', 'Confirmed'],
     ['completed', 'Completed'],
-    ['prescription_issued', 'Completed'],
-    ['patient_no_show', 'Missed (no-show)'],
-    ['doctor_no_show', 'Cancelled by doctor — refund issued'],
-    ['doctor_cancelled', 'Cancelled by doctor — refund issued'],
-    ['cancelled_refunded', 'Cancelled — refunded'],
-    ['cancelled_no_refund', 'Cancelled — no refund'],
+    ['cancelled', 'Cancelled'],
   ])('%s → %s', (state, label) => {
     expect(stateLabel(state)).toBe(label);
   });
@@ -55,22 +52,23 @@ describe('stateLabel (F08.01 exact mapping)', () => {
 
 describe('P-09 Past appointments', () => {
   it('fetches scope=history and renders labelled rows', async () => {
-    api.get.mockResolvedValue({ data: [row('cancelled_refunded')] });
+    api.get.mockResolvedValue({ data: [row('cancelled')] });
     setup();
-    await waitFor(() => expect(screen.getByText('Cancelled — refunded')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Cancelled')).toBeTruthy());
     expect(api.get).toHaveBeenCalledWith('/appointments?scope=history');
   });
 
-  it('shows Download Prescription only for prescription_issued', async () => {
+  it('shows Download Prescription only for completed rows that have a prescription', async () => {
     api.get.mockResolvedValue({
-      data: [row('prescription_issued', { hasPrescription: true }), row('completed')],
+      data: [
+        row('completed', { id: 'a-rx', hasPrescription: true }),
+        row('completed', { id: 'a-norx', hasPrescription: false }),
+      ],
     });
     setup();
     await waitFor(() => expect(screen.getAllByText('Completed')).toHaveLength(2));
     const links = screen.getAllByRole('link', { name: /download prescription/i });
     expect(links).toHaveLength(1);
-    expect(links[0].getAttribute('href')).toContain(
-      '/appointments/a-prescription_issued/prescriptions',
-    );
+    expect(links[0].getAttribute('href')).toContain('/appointments/a-rx/prescriptions');
   });
 });
