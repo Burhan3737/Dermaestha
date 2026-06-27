@@ -8,7 +8,8 @@ export function DoctorCancelModal({ onClose, onConfirm }) {
       <div className="modal modal--danger">
         <h2>Cancel appointment</h2>
         <p className="help">
-          The patient is refunded automatically (net of the gateway fee) and emailed an apology.
+          The slot is freed and the patient is emailed. Any payment is handled offline — there is no
+          in-app refund.
         </p>
         <label htmlFor="cancel-reason">Reason (internal)</label>
         <textarea id="cancel-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -22,7 +23,7 @@ export function DoctorCancelModal({ onClose, onConfirm }) {
             disabled={!reason.trim()}
             onClick={() => onConfirm(reason.trim())}
           >
-            Cancel &amp; refund
+            Cancel appointment
           </button>
         </div>
       </div>

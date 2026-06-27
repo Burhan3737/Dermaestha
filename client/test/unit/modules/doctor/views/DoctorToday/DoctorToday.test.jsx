@@ -85,12 +85,12 @@ describe('D-02 DoctorToday', () => {
         },
       ],
     });
-    api.post.mockResolvedValue({ state: 'doctor_cancelled' });
+    api.post.mockResolvedValue({ state: 'cancelled' });
     setup();
     await waitFor(() => expect(screen.getByText('Parent P')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
     fireEvent.change(screen.getByLabelText(/reason/i), { target: { value: 'Unwell' } });
-    fireEvent.click(screen.getByRole('button', { name: /cancel & refund/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cancel appointment/i }));
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/appointments/a1/cancel', { reason: 'Unwell' }),
     );
@@ -165,7 +165,7 @@ describe('D-02 DoctorToday', () => {
           id: 'a-done',
           slotStart: old,
           slotEnd: old,
-          state: 'prescription_issued',
+          state: 'completed',
           forSelf: true,
           subjectName: null,
           patientName: 'P Two',
@@ -176,7 +176,7 @@ describe('D-02 DoctorToday', () => {
     setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('P One')).toBeTruthy());
     const links = screen.getAllByRole('link', { name: /write prescription/i });
-    expect(links).toHaveLength(2); // completed AND prescription_issued (corrections)
+    expect(links).toHaveLength(2); // both completed rows allow writing/correcting a prescription
     expect(links[0].getAttribute('href')).toContain('/doctor/appointments/a-old/prescribe');
     expect(screen.getAllByText(/awaiting prescription/i)).toHaveLength(1); // only the unprescribed one
   });
@@ -189,7 +189,7 @@ describe('D-02 DoctorToday', () => {
           id: 'h2',
           slotStart: old,
           slotEnd: old,
-          state: 'cancelled_refunded',
+          state: 'cancelled',
           forSelf: true,
           subjectName: null,
           patientName: 'Past Q',
@@ -198,8 +198,8 @@ describe('D-02 DoctorToday', () => {
     });
     setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('Past Q')).toBeTruthy());
-    expect(screen.getByText('Cancelled — refunded')).toBeTruthy();
-    expect(screen.queryByText('cancelled_refunded')).toBeNull();
+    expect(screen.getByText('Cancelled')).toBeTruthy();
+    expect(screen.queryByText('cancelled')).toBeNull();
   });
 
   it('history: completed row <12h old shows no Awaiting badge', async () => {

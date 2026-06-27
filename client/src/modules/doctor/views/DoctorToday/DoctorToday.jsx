@@ -49,7 +49,7 @@ export function DoctorToday() {
               a.state === 'completed' &&
               !a.hasPrescription &&
               Date.now() - new Date(a.slotEnd).getTime() > 12 * 3600 * 1000;
-            const canWriteRx = a.state === 'completed' || a.state === 'prescription_issued';
+            const canWriteRx = a.state === 'completed';
             const showCancel = a.state === 'confirmed' && !isHistory;
             const hasActions = !isHistory || canWriteRx || awaiting;
             return (
