@@ -18,13 +18,16 @@ const h = vi.hoisted(() => {
     destroy: vi.fn().mockResolvedValue(undefined),
   };
   state.createFrame = vi.fn(() => state.frame);
+  state.getCallInstance = vi.fn(() => null);
   return state;
 });
 vi.mock('#src/lib/apiClient/apiClient.js', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 vi.mock('#src/context/session/session.jsx', () => ({
   useSession: () => ({ session: { role: h.role } }),
 }));
-vi.mock('@daily-co/daily-js', () => ({ default: { createFrame: h.createFrame } }));
+vi.mock('@daily-co/daily-js', () => ({
+  default: { createFrame: h.createFrame, getCallInstance: h.getCallInstance },
+}));
 
 function tokenResp({ mock = false } = {}) {
   return {

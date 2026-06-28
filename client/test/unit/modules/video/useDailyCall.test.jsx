@@ -7,7 +7,7 @@ import { track } from '#src/lib/analytics/track.js';
 
 vi.mock('#src/lib/analytics/track.js', () => ({ track: vi.fn() }));
 
-const h = vi.hoisted(() => ({ handlers: {}, frame: null, createFrame: null }));
+const h = vi.hoisted(() => ({ handlers: {}, frame: null, createFrame: null, getCallInstance: vi.fn(() => null) }));
 vi.mock('@daily-co/daily-js', () => {
   h.frame = {
     on: vi.fn((evt, cb) => {
@@ -18,7 +18,7 @@ vi.mock('@daily-co/daily-js', () => {
     destroy: vi.fn().mockResolvedValue(undefined),
   };
   h.createFrame = vi.fn(() => h.frame);
-  return { default: { createFrame: h.createFrame } };
+  return { default: { createFrame: h.createFrame, getCallInstance: h.getCallInstance } };
 });
 
 function Harness(props) {
@@ -37,6 +37,7 @@ function Inner(props) {
 beforeEach(() => {
   vi.clearAllMocks();
   h.handlers = {};
+  h.getCallInstance.mockReturnValue(null);
 });
 
 const base = {
@@ -93,5 +94,23 @@ describe('useDailyCall', () => {
     await waitFor(() => expect(h.createFrame).toHaveBeenCalled());
     unmount();
     await waitFor(() => expect(h.frame.destroy).toHaveBeenCalled());
+  });
+
+  it('does not rebuild the live call when only the token changes (token-refetch churn)', async () => {
+    const { rerender } = render(<Harness {...base} token="tok-1" />);
+    await waitFor(() => expect(h.createFrame).toHaveBeenCalledTimes(1));
+    // A window-focus refetch mints a new Daily token; that must NOT tear down + recreate the frame
+    // (the teardown/recreate race is what throws "Duplicate DailyIframe instances are not allowed").
+    rerender(<Harness {...base} token="tok-2" />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.createFrame).toHaveBeenCalledTimes(1);
+  });
+
+  it('tears down a leftover Daily instance before creating a new one (no Duplicate error)', async () => {
+    const leftover = { destroy: vi.fn().mockResolvedValue(undefined) };
+    h.getCallInstance.mockReturnValueOnce(leftover);
+    render(<Harness {...base} />);
+    await waitFor(() => expect(h.createFrame).toHaveBeenCalledTimes(1));
+    expect(leftover.destroy).toHaveBeenCalled();
   });
 });

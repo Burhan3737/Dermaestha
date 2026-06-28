@@ -54,6 +54,12 @@ export function useDailyCall({ enabled, roomUrl, token, containerRef, appointmen
     (async () => {
       const DailyIframe = (await import('@daily-co/daily-js')).default;
       if (cancelled || !containerRef.current) return;
+      // Daily permits a single call instance per page. A leftover from a prior mount whose
+      // destroy() hasn't settled (StrictMode re-invoke, fast leave→rejoin) would make createFrame
+      // throw "Duplicate DailyIframe instances are not allowed". Tear any leftover down first.
+      const leftover = DailyIframe.getCallInstance();
+      if (leftover) await leftover.destroy();
+      if (cancelled || !containerRef.current) return;
       const frame = DailyIframe.createFrame(containerRef.current, {
         showLeaveButton: true,
         iframeStyle: { width: '100%', height: '100%', border: '0' },
@@ -62,7 +68,11 @@ export function useDailyCall({ enabled, roomUrl, token, containerRef, appointmen
       frameRef.current = frame;
       frame.on('joined-meeting', () => track('video_join_success', { appointmentId, role }));
       frame.on('left-meeting', () => onLeave?.());
-      frame.on('error', () => onLeave?.());
+      // Log the Daily error payload before leaving so the reason a call ended is diagnosable.
+      frame.on('error', (ev) => {
+        console.error('[video] Daily ended the call with an error', ev);
+        onLeave?.();
+      });
       await frame.join({ url: roomUrl, token });
     })();
     return () => {
@@ -71,6 +81,10 @@ export function useDailyCall({ enabled, roomUrl, token, containerRef, appointmen
       frameRef.current = null;
       if (f) f.destroy();
     };
+    // `token` is intentionally NOT a dependency: it is a one-time join credential delivered in the
+    // same response as `roomUrl`, so it is always present when the effect runs. Including it would
+    // tear down + recreate the live call whenever the token query refetches (e.g. on window focus),
+    // which races the un-awaited destroy() above and throws the Daily duplicate-instance error.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, roomUrl, token]);
+  }, [enabled, roomUrl]);
 }
