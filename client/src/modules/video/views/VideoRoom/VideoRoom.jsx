@@ -21,15 +21,8 @@ export function VideoRoom() {
     return () => clearInterval(t);
   }, []);
 
-  const { token, detail, recordJoin } = useVideo({ appointmentId: id });
-  const isMock = Boolean(token.data?.joinSimUrl);
+  const { token, detail } = useVideo({ appointmentId: id });
   const containerRef = useRef(null);
-
-  // Mock mode only: entering the room records this participant's join (server-provided URL).
-  useEffect(() => {
-    if (token.data?.joinSimUrl) recordJoin(token.data.joinSimUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token.data?.joinSimUrl, id]);
 
   const slotEnd = detail.data?.slotEnd ? new Date(detail.data.slotEnd).getTime() : null;
   const hardCutoff = slotEnd != null ? slotEnd + 5 * 60 * 1000 : null;
@@ -38,12 +31,11 @@ export function VideoRoom() {
   const isDoctor = session?.role === 'doctor';
   const leaveTo = isDoctor ? '/doctor' : `/video/${id}/ready`;
   const leave = () => navigate(leaveTo, { replace: true });
-  const peerJoined = detail.data?.peerJoined;
   const ready = !token.isError && !token.isPending && !detail.isPending;
 
-  // Real Daily Prebuilt path (joinSimUrl == null). Mounts when the room is open and the call is live.
+  // Daily Prebuilt mounts when the room is open and the call is live.
   useDailyCall({
-    enabled: ready && !isMock && !ended && Boolean(token.data?.roomUrl),
+    enabled: ready && !ended && Boolean(token.data?.roomUrl),
     roomUrl: token.data?.roomUrl,
     token: token.data?.token,
     containerRef,
@@ -89,27 +81,7 @@ export function VideoRoom() {
           5 minutes remaining
         </p>
       )}
-      <div className="video-stage" ref={containerRef}>
-        {isMock && (
-          <>
-            {peerJoined ? (
-              <p style={{ color: 'var(--color-on-dark)' }}>● Live — connected</p>
-            ) : (
-              <p style={{ color: 'var(--color-on-dark)' }}>
-                {isDoctor ? 'Waiting for the patient to join…' : 'Doctor will be with you shortly…'}
-              </p>
-            )}
-            <div className="video-self" />
-          </>
-        )}
-      </div>
-      {isMock && (
-        <div className="video-controls">
-          <button type="button" className="video-ctrl video-ctrl--leave" onClick={leave}>
-            Leave
-          </button>
-        </div>
-      )}
+      <div className="video-stage" ref={containerRef} />
     </main>
   );
 }

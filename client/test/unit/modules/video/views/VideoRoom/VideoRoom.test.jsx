@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { VideoRoom } from '#src/modules/video/views/VideoRoom/VideoRoom.jsx';
 import { api } from '#src/lib/apiClient/apiClient.js';
 
-// The Daily mock fns live in vi.hoisted (not the vi.mock factory) so they exist even when
-// `@daily-co/daily-js` is never imported — i.e. in mock mode, where the factory never runs.
+// The Daily mock fns live in vi.hoisted so they stay stable regardless of when useDailyCall
+// lazy-imports `@daily-co/daily-js`.
 const h = vi.hoisted(() => {
   const state = { role: 'patient', handlers: {}, frame: null, createFrame: null };
   state.frame = {
@@ -29,30 +29,28 @@ vi.mock('@daily-co/daily-js', () => ({
   default: { createFrame: h.createFrame, getCallInstance: h.getCallInstance },
 }));
 
-function tokenResp({ mock = false } = {}) {
+function tokenResp() {
   return {
     token: 't',
     roomName: 'appt_a1',
     roomUrl: 'https://x.daily.co/appt_a1',
     serverNow: new Date().toISOString(),
-    joinSimUrl: mock ? '/dev/video/join' : null,
   };
 }
-function detailResp({ peerJoined = false, endOffsetMs = 18e5 } = {}) {
+function detailResp({ endOffsetMs = 18e5 } = {}) {
   return {
     id: 'a1',
     state: 'in_progress',
-    peerJoined,
     slotStart: new Date().toISOString(),
     slotEnd: new Date(Date.now() + endOffsetMs).toISOString(),
     serverNow: new Date().toISOString(),
   };
 }
-function mock({ peerJoined, endOffsetMs, mockMode = false } = {}) {
+function mock({ endOffsetMs } = {}) {
   api.get.mockImplementation((path) =>
     path.includes('video-token')
-      ? Promise.resolve(tokenResp({ mock: mockMode }))
-      : Promise.resolve(detailResp({ peerJoined, endOffsetMs })),
+      ? Promise.resolve(tokenResp())
+      : Promise.resolve(detailResp({ endOffsetMs })),
   );
 }
 // Probe renders the current pathname so tests can assert where leave navigated to.
@@ -82,61 +80,22 @@ beforeEach(() => {
 });
 
 describe('VideoRoom', () => {
-  // --- mock/simulator path (dev/CI): placeholder stage retained ---
-  it('mock mode: shows the waiting placeholder until the peer joins', async () => {
-    mock({ peerJoined: false, mockMode: true });
-    setup();
-    await waitFor(() => expect(screen.getByText(/will be with you shortly/i)).toBeTruthy());
-    expect(h.createFrame).not.toHaveBeenCalled();
-  });
-
-  it('mock mode: doctor sees a patient-perspective waiting message before the peer joins', async () => {
-    h.role = 'doctor';
-    mock({ peerJoined: false, mockMode: true });
-    setup();
-    await waitFor(() => expect(screen.getByText(/waiting for the patient to join/i)).toBeTruthy());
-    expect(screen.queryByText(/will be with you shortly/i)).toBeNull();
-  });
-
-  it('mock mode: shows the live stage once the peer has joined', async () => {
-    mock({ peerJoined: true, mockMode: true });
-    setup();
-    await waitFor(() => expect(screen.getByText(/live|connected/i)).toBeTruthy());
-  });
-
-  it('mock mode: records this participant join via the sim URL', async () => {
-    // recordJoin uses a raw fetch (not api.post) so it hits the dev sim at /dev/video/join,
-    // not /api/dev/video/join (the api client's /api prefix would 404). See useVideo.js.
-    const fetchSpy = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal('fetch', fetchSpy);
-    mock({ peerJoined: false, mockMode: true });
-    setup();
-    await waitFor(() =>
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/dev/video/join',
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({ appointmentId: 'a1' }) }),
-      ),
-    );
-    vi.unstubAllGlobals();
-  });
-
-  // --- real Daily path (joinSimUrl null): iframe mounts, chrome around it ---
-  it('real mode: mounts the Daily Prebuilt frame', async () => {
-    mock({ peerJoined: false });
+  // --- real Daily path: iframe mounts, app chrome around it ---
+  it('mounts the Daily Prebuilt frame', async () => {
+    mock();
     setup();
     await waitFor(() => expect(h.createFrame).toHaveBeenCalledTimes(1));
     expect(h.frame.join).toHaveBeenCalledWith({ url: 'https://x.daily.co/appt_a1', token: 't' });
   });
 
-  // --- app chrome (both modes) ---
   it('shows a countdown timer during the call', async () => {
-    mock({ peerJoined: true, endOffsetMs: 6e5 });
+    mock({ endOffsetMs: 6e5 });
     setup();
     await waitFor(() => expect(screen.getByText(/time remaining/i)).toBeTruthy());
   });
 
   it('shows the ended state after the hard cutoff (and does not mount Daily)', async () => {
-    mock({ peerJoined: true, endOffsetMs: -6e5 });
+    mock({ endOffsetMs: -6e5 });
     setup();
     await waitFor(() => expect(screen.getByText(/session has ended/i)).toBeTruthy());
     expect(h.createFrame).not.toHaveBeenCalled();
@@ -144,27 +103,27 @@ describe('VideoRoom', () => {
 
   it('shows the doctor 5-minute soft warning near slot end', async () => {
     h.role = 'doctor';
-    mock({ peerJoined: true, endOffsetMs: 3 * 60 * 1000 });
+    mock({ endOffsetMs: 3 * 60 * 1000 });
     setup();
     await waitFor(() => expect(screen.getByText(/5 minutes remaining/i)).toBeTruthy());
   });
 
-  // --- role-aware leave navigation ---
+  // --- role-aware leave navigation (driven by Daily's left-meeting event) ---
   it('patient leave returns to the waiting room (/video/:id/ready)', async () => {
     h.role = 'patient';
-    mock({ peerJoined: false, mockMode: true });
+    mock();
     setup();
-    const leave = await screen.findByRole('button', { name: /leave/i });
-    fireEvent.click(leave);
+    await waitFor(() => expect(h.handlers['left-meeting']).toBeTypeOf('function'));
+    act(() => h.handlers['left-meeting']());
     expect(screen.getByTestId('location').textContent).toBe('/video/a1/ready');
   });
 
   it('doctor leave returns to the dashboard (/doctor)', async () => {
     h.role = 'doctor';
-    mock({ peerJoined: false, mockMode: true });
+    mock();
     setup();
-    const leave = await screen.findByRole('button', { name: /leave/i });
-    fireEvent.click(leave);
+    await waitFor(() => expect(h.handlers['left-meeting']).toBeTypeOf('function'));
+    act(() => h.handlers['left-meeting']());
     expect(screen.getByTestId('location').textContent).toBe('/doctor');
   });
 });

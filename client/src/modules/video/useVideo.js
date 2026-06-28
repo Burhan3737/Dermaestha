@@ -29,16 +29,5 @@ export function useVideo(opts = {}) {
     enabled: Boolean(appointmentId),
   });
 
-  // Mock mode: record this participant's join via the server-provided sim URL (fire-and-forget).
-  // joinSimUrl is the dev simulator path '/dev/video/join' — a raw fetch, NOT the api client,
-  // because api.post prepends '/api' (→ '/api/dev/video/join', 404). Same-origin fetch carries
-  // the session cookie so the dev route can derive the participant role.
-  const recordJoin = (joinSimUrl) =>
-    fetch(joinSimUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appointmentId }),
-    }).catch(() => {});
-
-  return { token, detail, recordJoin };
+  return { token, detail };
 }

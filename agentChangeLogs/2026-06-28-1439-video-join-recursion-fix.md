@@ -22,15 +22,17 @@ User reported video joining broken for patient and doctor and asked whether Dail
 | `client/test/unit/modules/video/useDailyCall.test.jsx` | Modified | Added failing-then-passing test: refuses a non-Daily room url (waits long enough that an unguarded mount would have fired). |
 | `client/test/unit/modules/video/views/VideoRoom/VideoRoom.test.jsx` | Modified | Fixture `roomUrl` placeholder `'u'` → `https://x.daily.co/appt_a1` so the real-Daily mount test satisfies the new guard; added `getCallInstance` to the daily-js mock (now called by the hook). |
 | `client/src/modules/video/useDailyCall.js` | Modified (2nd fix) | Duplicate-iframe + kick fix: tear down any leftover Daily instance via `getCallInstance()` before `createFrame` (kills "Duplicate DailyIframe instances are not allowed"); log the Daily `error` payload before leaving; drop `token` from effect deps so a token refetch no longer rebuilds the live call. |
-| `client/src/modules/video/useVideo.js` | Modified (2nd fix) | Pin the `video-token` query: `staleTime: Infinity`, `refetchOnWindowFocus:false`, `refetchOnReconnect:false` — the one-time join credential must not be re-minted mid-call. |
+| `client/src/modules/video/useVideo.js` | Modified (2nd fix + cleanup) | Pin the `video-token` query (`staleTime: Infinity`, no focus/reconnect refetch). Cleanup: removed dead `recordJoin` (`/dev/video/join` fetch); returns `{ token, detail }`. |
 | `client/test/unit/modules/video/useDailyCall.test.jsx` | Modified (2nd fix) | Added 2 regression tests: token change must not rebuild the frame; a leftover instance is destroyed before createFrame. Added `getCallInstance` to the daily-js mock. |
+| `client/src/modules/video/views/VideoRoom/VideoRoom.jsx` | Modified (cleanup) | Removed the dead mock branch (`isMock`/`peerJoined`/recordJoin-effect + both `{isMock && …}` blocks); now real-Daily-only. |
+| `client/test/unit/modules/video/views/VideoRoom/VideoRoom.test.jsx` | Modified (cleanup) | Dropped the 4 dead mock-mode tests + `mock`/`mockMode`/`joinSimUrl` scaffolding; re-pointed the 2 leave tests to drive leave via Daily's `left-meeting` handler. |
 
 ## Dependencies / config / schema
 No code/config files changed for provider selection. Runtime guidance: dev server must be relaunched with `--env-file=.env.daily` (`VIDEO_PROVIDER=daily`, real key present) to exercise real video locally. `.env` (stub) and `.env.example.dev` (mock) do not give a working in-browser call.
 
 ## Decisions
 - Fix direction chosen by user: run the real Daily free tier in dev; treat `mock` as CI/unit-test-only; harden the client so a non-Daily URL can never recurse.
-- Kept the dead client mock path (`isMock`/`joinSimUrl`/`recordJoin` + its VideoRoom tests) untouched per surgical-changes rule — flagged for optional cleanup rather than removed.
+- Dead client mock path REMOVED (user-approved, client-only scope): deleted `useVideo.recordJoin`, and `VideoRoom`'s `isMock`/`peerJoined`/recordJoin-effect + the two `{isMock && …}` UI blocks (mock placeholder + mock Leave button); `VideoRoom` is now real-Daily-only. Server `service.js` still emits the documented `joinSimUrl: null` (harmless, client no longer reads it) — left in place to keep the cleanup doc-free (removing it would touch spec 14 §3). The `daily.mock` server adapter stays for CI/unit tests.
 
 ## Notable findings
 - Active provider proven `mock` from the live `video-token` response (200 OK + mock HMAC token format in the Daily iframe URL); not stub (would 501).
