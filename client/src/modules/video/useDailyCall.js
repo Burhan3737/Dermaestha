@@ -19,6 +19,22 @@ const THEME = {
 };
 
 /**
+ * A real Daily room is served over https on a `*.daily.co` host. Anything else — e.g. a
+ * misconfigured provider returning the app's own `/video/:id` URL — must NEVER be handed to
+ * Daily Prebuilt: it would load the SPA inside the call iframe and recurse until the request
+ * headers overflow (HTTP 431). This guard is the safety net regardless of which provider is wired.
+ * @param {string} [url]
+ */
+function isDailyRoomUrl(url) {
+  try {
+    const u = new URL(/** @type {string} */ (url));
+    return u.protocol === 'https:' && u.hostname.endsWith('.daily.co');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Mounts a brand-themed Daily Prebuilt iframe into `containerRef` and joins the room.
  * Daily owns the in-call tiles/controls/device pickers + reconnection/3G adaptation.
  * `@daily-co/daily-js` is lazy-imported so it never enters the main bundle (mirrors pdf-lib).
@@ -30,6 +46,10 @@ export function useDailyCall({ enabled, roomUrl, token, containerRef, appointmen
   const frameRef = useRef(null);
   useEffect(() => {
     if (!enabled || !roomUrl || !containerRef.current) return undefined;
+    if (!isDailyRoomUrl(roomUrl)) {
+      console.warn(`[video] refusing to join non-Daily room url: ${roomUrl}`);
+      return undefined;
+    }
     let cancelled = false;
     (async () => {
       const DailyIframe = (await import('@daily-co/daily-js')).default;

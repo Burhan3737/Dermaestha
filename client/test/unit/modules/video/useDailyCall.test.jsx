@@ -81,6 +81,13 @@ describe('useDailyCall', () => {
     expect(h.createFrame).not.toHaveBeenCalled();
   });
 
+  it('refuses a non-Daily room url (prevents recursive self-embed → HTTP 431)', async () => {
+    render(<Harness {...base} roomUrl="http://localhost:3000/video/a1" />);
+    // Wait long enough that the lazy import would have resolved and createFrame fired if unguarded.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.createFrame).not.toHaveBeenCalled();
+  });
+
   it('destroys the frame on unmount', async () => {
     const { unmount } = render(<Harness {...base} />);
     await waitFor(() => expect(h.createFrame).toHaveBeenCalled());

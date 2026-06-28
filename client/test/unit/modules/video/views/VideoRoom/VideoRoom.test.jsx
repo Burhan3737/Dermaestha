@@ -30,7 +30,7 @@ function tokenResp({ mock = false } = {}) {
   return {
     token: 't',
     roomName: 'appt_a1',
-    roomUrl: 'u',
+    roomUrl: 'https://x.daily.co/appt_a1',
     serverNow: new Date().toISOString(),
     joinSimUrl: mock ? '/dev/video/join' : null,
   };
@@ -122,7 +122,7 @@ describe('VideoRoom', () => {
     mock({ peerJoined: false });
     setup();
     await waitFor(() => expect(h.createFrame).toHaveBeenCalledTimes(1));
-    expect(h.frame.join).toHaveBeenCalledWith({ url: 'u', token: 't' });
+    expect(h.frame.join).toHaveBeenCalledWith({ url: 'https://x.daily.co/appt_a1', token: 't' });
   });
 
   // --- app chrome (both modes) ---
