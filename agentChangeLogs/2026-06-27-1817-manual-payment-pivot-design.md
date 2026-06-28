@@ -38,7 +38,8 @@ plan — removing no-show tracking removes that dependency.
 | `server/src/modules/payment/*`, `server/src/integrations/payment/*`, `server/scripts/register-daily-webhook.mjs`, `server/src/dev/devCheckout.js` | Deleted | PayFast gateway + refund + dev checkout removed |
 | `client/src/modules/{booking,appointment,admin,doctor}/**` | Modified/Created | PaymentInstructions screen, AdminReview queue, bank settings, pending card, 4-state labels; removed gateway/refund/dispute UI |
 | `prisma/scripts/seed-baseline.js`, `e2e/support/db.js`, `e2e/global-setup.js`, `playwright.config.js`, `e2e/tests/j*.spec.js` | Modified | seeds + e2e reworked for the 4-state manual model |
-| `.env.example`, `.env.example.dev` | Modified | dropped PAYFAST_*/PAYMENT_PROVIDER/refund/no-show env |
+| `.env.example`, `.env.example.dev` | Modified | dropped PAYFAST_*/PAYMENT_PROVIDER/refund/no-show env; later fixed two stale comments (APP_BASE_URL webhook ref; "until daily.js is wired") |
+| `.env`, `.env.daily` (git-ignored, local) | Rewritten | removed PAYFAST_*/PAYMENT_PROVIDER/DAILY_WEBHOOK_SECRET/SLOT_LOCK_TTL_MIN/NO_SHOW_GRACE_MIN/REFUND_* to match env.js/constants.js; `.env` boot-verified; `.env.daily` re-scoped to free-tier Daily room+token test |
 | `<scratchpad>/ADR-manual-payment.md` | Created (by backend agent) | ADR draft — applied into doc 11 as ADR-43 at the doc-sync step |
 | `docs/specification/00`–`15` (all 16) | Modified | Doc-to-code sync (manual-payment + 3-state): ADR-43 + superseded ADRs (11), enum/schema (04), API+state-machine (05), config (15), integrations/email (14), scope (02), design (06), risk/security/testing (07/08/09), deployment (10), test cases (12), status (13), PRD/glossary (01/00); version bumps + revision footers per doc 00 governance. Controller spot-checked 04/05/11 against as-built. |
 
