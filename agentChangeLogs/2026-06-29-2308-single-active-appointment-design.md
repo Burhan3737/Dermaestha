@@ -5,8 +5,8 @@
 **Skill(s) used:** code-review (workflow), superpowers:brainstorming (opted in via /brainstorming)
 **Ticket / issue:** None
 **Branch:** main
-**Commits / PR:** None yet (spec commit pending)
-**Last updated:** 2026-06-29-2308
+**Commits / PR:** Spec committed `0e6a12a`; implementation plan written but UNCOMMITTED (awaiting approval per updated CLAUDE.md no-commit rule)
+**Last updated:** 2026-06-29-2330
 **Tags:** #design #spec #bugfix
 
 ## Summary
@@ -21,6 +21,7 @@ ADR-43 removed timed slot-lock expiry, so a `pending` hold occupies a slot until
 | `docs/superpowers/specs/2026-06-29-single-active-appointment-design.md` | Created | Design spec for the single-active-appointment limit + pending-cancel enablement |
 | `agentChangeLogs/2026-06-29-2308-single-active-appointment-design.md` | Created | This session changelog |
 | `agentChangeLogs/index.md` | Modified | Added this session's index line |
+| `docs/superpowers/plans/2026-06-29-single-active-appointment.md` | Created | TDD implementation plan (3 tasks: server guard, Booking copy, pending-cancel) — uncommitted, awaiting approval |
 
 ## Dependencies / config / schema
 None. No schema change — the rule is a service-layer query over existing columns/states.
