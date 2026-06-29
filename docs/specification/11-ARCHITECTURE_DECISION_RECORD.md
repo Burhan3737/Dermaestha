@@ -4,7 +4,7 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.21                                                                                               |
+| Version          | 1.22                                                                                              |
 | Last updated     | 2026-06-28                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
@@ -57,6 +57,7 @@
 42. [ADR-41 — Doctor Today/History navigation is sidebar-only (route-derived view)](#adr-41--doctor-todayhistory-navigation-is-sidebar-only-route-derived-view)
 43. [ADR-42 — Doctor appointments page: in-page Today/History tabs (supersedes ADR-41)](#adr-42--doctor-appointments-page-in-page-todayhistory-tabs-supersedes-adr-41)
 44. [ADR-43 — Manual offline payment + 3-state appointment model (supersedes the PayFast/refund/no-show subsystems)](#adr-43--manual-offline-payment--3-state-appointment-model-supersedes-the-payfastrefundno-show-subsystems)
+45. [ADR-44 — Single-active-appointment limit (supersedes the No-Overlap rule, broadens the old Single-Lock)](#adr-44--single-active-appointment-limit-supersedes-the-no-overlap-rule-broadens-the-old-single-lock)
 
 ---
 
@@ -664,6 +665,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-44 — Single-active-appointment limit (supersedes the No-Overlap rule, broadens the old Single-Lock)
+
+**Date:** 2026-06-30
+
+**Status:** Accepted
+
+**Context:** The manual-payment pivot (ADR-43) removed the timed slot-lock auto-expiry — a `pending` hold occupies its slot until a human cancels/rejects it. `lockSlot` retained only a No-Overlap check (no two appointments at overlapping times); the pre-pivot Single-Lock guard (one live `slot_locked` hold per patient, which raised `ACTIVE_LOCK_EXISTS`) had been dropped in the pivot, leaving its `ACTIVE_LOCK_EXISTS` client wiring orphaned. With neither a per-patient cap nor an expiry, a single account could create unlimited never-expiring `pending` holds and squat a doctor's calendar — surfaced in a code review of the pivot. (docs/superpowers/specs/2026-06-29-single-active-appointment-design.md)
+
+**Decision:** Cap each patient at **one upcoming appointment**. `lockSlot` rejects a new booking when the patient already has an appointment in an active state (`pending` or `confirmed`) whose `slotEnd` is still in the future, throwing `ACTIVE_LOCK_EXISTS` (409). The boundary is `slotEnd > now`, evaluated in the query, so the patient is freed to book again the moment the current appointment ends — no background worker. The guard is a check-then-insert query in the service layer (reusing `ACTIVE_APPOINTMENT_STATES`), **replacing** the No-Overlap check rather than adding to it (the new rule strictly subsumes it); the rare concurrent-double-lock race is an accepted residual, as it was for No-Overlap. The rule is keyed on `patientUserId` and spans subjects — booking "for someone else" counts against the same cap. The patient self-unblocks by cancelling: the existing `cancel()` already accepts `pending`, now surfaced as a Cancel button on `pending` Upcoming rows, and the orphaned `ACTIVE_LOCK_EXISTS` client wiring is re-lit (block message + "Go to your appointments" link).
+
+**Consequences:** A single account holds at most one future slot, bounding the squat surface to one slot per account. The former **No-Overlap Rule is retired** (subsumed; doc 02 §F03.03, TC-F03-008) and the old **Single-Lock Rule is broadened** to include `confirmed` (not just locks). The usability trade-off: a patient cannot pre-book a follow-up while an upcoming appointment is still open — accepted for v1 (simplicity; revisit if it draws complaints). No schema change — the `uniq_active_slot` partial index still guarantees no-double-booking (#1), and this cap sits in the service layer above it. Supersedes the No-Overlap rule; layers a per-patient cap on top of the no-expiry hold model of ADR-23/ADR-43.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -690,3 +705,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-22 | Added ADR-41 (doctor Today/History navigation is sidebar-only; in-page tabs removed; active view derived from the route, single source of truth) | Doctor History sidebar-link desync bug fix; new architectural decision |
 | 2026-06-22 | Added ADR-42 (doctor appointments page = in-page Today/History tabs mirroring the patient page; History retained as the prescription entry point) and marked ADR-41 Superseded | Doctor appointments page redesign (in-page tabs); supersedes ADR-41 |
 | 2026-06-28 | Added ADR-43 (manual offline payment + 3-state appointment model); marked ADR-11/12/22/24/25/32/33 Superseded and ADR-15/23/27/39 Partially superseded | Manual-payment pivot — removes the PayFast gateway, refund subsystem, no-show lifecycle, Daily webhook, and `completed` state (as-built sync) |
+| 2026-06-30 | Added ADR-44 (single-active-appointment limit — one upcoming appointment per patient via `ACTIVE_LOCK_EXISTS`; replaces the No-Overlap rule, broadens the old Single-Lock, adds patient pending-cancel) | Single-active-appointment limit |

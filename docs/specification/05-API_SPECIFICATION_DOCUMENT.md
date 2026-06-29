@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.18                          |
+| Version          | 1.19                         |
 | Last updated     | 2026-06-28                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
@@ -86,7 +86,7 @@ Validation is Zod-first (`shared/schemas`), then the controller calls a service;
 | `401`  | Not authenticated                                            | `UNAUTHENTICATED`                                                     |
 | `403`  | Wrong role / not owner (DA6); or session must change password (DA3) | `FORBIDDEN`, `MUST_CHANGE_PASSWORD`                                                           |
 | `404`  | Not found _or_ not visible to caller (avoid existence leaks) | `NOT_FOUND`                                                           |
-| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `IMMUTABLE_FIELD`, `INVALID_STATE`, `BLOCK_HAS_BOOKINGS`, `OVERLAP`, `INVALID_TRANSITION`, `PMC_TAKEN`, `EMAIL_TAKEN` (P2002 on doctor create) |
+| `409`  | State/uniqueness conflict                                    | `SLOT_TAKEN`, `IMMUTABLE_FIELD`, `INVALID_STATE`, `BLOCK_HAS_BOOKINGS`, `ACTIVE_LOCK_EXISTS`, `INVALID_TRANSITION`, `PMC_TAKEN`, `EMAIL_TAKEN` (P2002 on doctor create) |
 | `422`  | Well-formed but semantically rejected                        | `BOOKING_TOO_SOON`, `SLOT_NOT_BOOKABLE`, `VIDEO_WINDOW_CLOSED` |
 | `429`  | Rate-limited / locked out                                    | `RATE_LIMITED`, `ACCOUNT_LOCKED`                                      |
 | `500`  | Unexpected; logged to error tracking                         | `INTERNAL` — a non-`AppError`/non-`ZodError` 500 also writes a fire-and-forget `system.unhandled_exception` audit row (F12.01 alert source; `targetRef` = route path, `reason` = message ≤ 500 chars) |
@@ -162,7 +162,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 | Method · Path                           | Role                 | Purpose                                                     | Notes                                                                  |
 | --------------------------------------- | -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `POST /api/appointments/lock`           | patient              | Create `pending` (locks the slot on click) + "who-for" (P3/P8) | snapshots `feeAtBooking` at lock (ADR-43); a concurrent 2nd lock fails via the partial unique index → 409 `SLOT_TAKEN` (#1); validation also returns 409 `OVERLAP` and 422 `SLOT_NOT_BOOKABLE` (past/lead-time). No 10-min auto-expiry — the slot frees only when a human cancels/rejects |
+| `POST /api/appointments/lock`           | patient              | Create `pending` (locks the slot on click) + "who-for" (P3/P8) | snapshots `feeAtBooking` at lock (ADR-43); a concurrent 2nd lock fails via the partial unique index → 409 `SLOT_TAKEN` (#1); validation also returns 409 `ACTIVE_LOCK_EXISTS` (the patient already has an upcoming appointment — single-active cap, ADR-44) and 422 `SLOT_NOT_BOOKABLE` (past/lead-time). No 10-min auto-expiry — the slot frees only when a human cancels/rejects |
 | `POST /api/appointments/:id/pay`        | patient              | Submit the offline bank-transfer reference (P3, ADR-43)     | body `{ reference }`; sets `paymentReference` + `paymentSubmittedAt`, stays `pending`, enqueues the admin alert + `payment_submitted_admin` email. **No gateway, no handoff URL** |
 | `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant; `?scope=history` returns past/cancelled rows newest-first; list rows (both roles) include `hasPrescription`. Patient Upcoming = `pending` ∪ `confirmed` with `slotEnd ≥ now`; Past = `confirmed` with `slotEnd < now` ∪ `cancelled` (time-based, no `completed` state) |
 | `GET /api/appointments/:id`             | patient/doctor/admin | Detail, ownership-checked                                   | 404 (not 403) when not visible; detail adds `subjectAge`, `subjectRelation`, `patientName`; for an owned **`pending`** appointment it also returns `paymentInstructions { amountDue, bankName, bankAccountName, bankAccountNumber, bankInstructions }` (amount + bank details from Settings, ADR-43) |
@@ -334,3 +334,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-15 | Flow-audit fixes: `POST /api/auth/login` body `role` clarified as accepted-but-ignored/non-authoritative (ISSUE-12); `GET /api/auth/me` anonymous → `200 null` not `401` (ISSUE-13); `GET /api/appointments/:id` detail adds `lockExpiresAt` for the P-07 terminal-state fix (ISSUE-3) | Three-role flow-audit fix session |
 | 2026-06-16 | GET /api/appointments active scope now also returns a live slot_locked hold (lockExpiresAt) | Pending-hold recovery feature (34f978d) |
 | 2026-06-28 | Manual-payment pivot (ADR-43): `/:id/pay` repurposed to submit a bank reference; `/:id` returns `paymentInstructions` for a pending appt; added admin `accept`/`reject`; removed PayFast/Daily/Resend webhooks, `verify-return`, `dispute`, and `record-refund`; rewrote the state-machine table to 3 states (`pending`/`confirmed`/`cancelled`); prescription gate → `confirmed` (no state change on issue); admin records/alerts/settings re-shaped (bank fields, `state=pending` review queue, `payment.submitted` alert); retired invariants #2/#7/#10; pruned obsolete 409/422 codes and the dev `/dev/worker/*` set to `notifications` only | Manual-payment pivot — API as-built sync |
+| 2026-06-30 | `/appointments/lock` validation now returns `ACTIVE_LOCK_EXISTS` (single-active-appointment cap) in place of `OVERLAP`; removed `OVERLAP` from and added `ACTIVE_LOCK_EXISTS` to the §3.2 `409` list (ADR-44) | Single-active-appointment limit |

@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.13                                                                                      |
+| Version          | 1.14                                                                                     |
 | Last updated     | 2026-06-28                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -183,7 +183,7 @@ Minimum tap target: ≥ 44 px tall. Time labels use tabular numerics.
 
 ### Active-lock guard (P-06)
 
-Submitting a booking while the patient already holds a live slot lock is rejected (`ACTIVE_LOCK_EXISTS`, doc 05) with the inline error "Finish your current booking first." Alongside the error, a **"Go to your pending booking"** link navigates to the appointments list (P-08), where the live hold surfaces as the payment-pending card (below).
+Submitting a booking while the patient already has an upcoming appointment — `pending` or `confirmed` (single-active cap, ADR-44) — is rejected (`ACTIVE_LOCK_EXISTS`, doc 05) with the inline error "Finish or cancel your current appointment before booking another." Alongside the error, a **"Go to your appointments"** link navigates to the appointments list (P-08), where the existing appointment surfaces — a `pending` hold as the payment-pending card (below, now carrying a **Cancel** action), a `confirmed` one with its Cancel control — so the patient can pay or cancel to free themselves to book again.
 
 ### Confirmation dialogs (modals)
 
@@ -643,3 +643,4 @@ The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`
 | 2026-06-23 | §7: documented the prescription document "paper" family (`.rx-paper`…) and the builder families (`.rx-builder-item`/`.rx-prev`/`.field--wide`/`textarea.input`), added `.rx-item__price` nowrap, and the `formatKarachiDate` formatter; §3: added the P-13/D-05 presentation note (document paper, initials signature, newest-first + "Earlier/Previously" dividers, Print) | Prescription view + builder redesign (ported mockup design into components.css) |
 | 2026-06-23 | §7 Select/picker: documented the D-05 medicine combobox (`.med-search` + leading magnifier) and its floating `.listbox` popover (`--shadow-overlay`) of `.option` rows (name/generic/price, hover/`--active` tint, separated `--freetext` fallback) | Medicine search combobox restyle (classes were referenced but never defined in components.css) |
 | 2026-06-28 | Synced the booking/payment surface to manual bank-transfer: P-07 is now the PaymentInstructions screen (bank details + amount + reference field; gateway redirect / return-state cards / polling removed); added admin Payment review (A-06, Accept/Reject) + Settings bank-detail fields; appointment badges reduced to the 3-state set (`pending`/`confirmed`/`cancelled`); cancellation modal stripped of refund math; removed refund/dispute/no-show/gateway UI references; trimmed §4 colour-use prose | Manual-payment pivot — as-built sync |
+| 2026-06-30 | §Active-lock guard (P-06): error copy → "Finish or cancel your current appointment before booking another." + link "Go to your appointments" (the blocker may now be a confirmed appointment); pending Upcoming rows gain a Cancel action (single-active cap, ADR-44) | Single-active-appointment limit |
