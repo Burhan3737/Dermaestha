@@ -211,7 +211,7 @@ describe('booking.lockSlot', () => {
     ]);
 
   beforeEach(() => {
-    prisma.appointment.findFirst.mockResolvedValue(null); // no overlap by default
+    prisma.appointment.findFirst.mockResolvedValue(null); // no active appointment by default
     prisma.doctor.findFirst.mockResolvedValue({ id: 'd1', fee: 250000 }); // active doctor
   });
 
@@ -237,12 +237,28 @@ describe('booking.lockSlot', () => {
     );
   });
 
-  it('rejects an overlapping appointment with OVERLAP (409)', async () => {
+  it('rejects a 2nd booking when an active upcoming appointment exists (ACTIVE_LOCK_EXISTS, 409)', async () => {
     bookable();
-    prisma.appointment.findFirst.mockResolvedValueOnce({ id: 'ov1' });
+    prisma.appointment.findFirst.mockResolvedValueOnce({ id: 'existing1' });
     await expect(
       lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true }),
-    ).rejects.toMatchObject({ code: 'OVERLAP', status: 409 });
+    ).rejects.toMatchObject({ code: 'ACTIVE_LOCK_EXISTS', status: 409 });
+    expect(prisma.appointment.create).not.toHaveBeenCalled();
+  });
+
+  it('guards on active states + still-upcoming slotEnd only', async () => {
+    bookable();
+    prisma.appointment.create.mockResolvedValue({ id: 'a1', state: 'pending', feeAtBooking: 250000 });
+    await lockSlot({ patientUserId: 'u1', doctorId: 'd1', slotStart, forSelf: true });
+    expect(prisma.appointment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          patientUserId: 'u1',
+          state: { in: ['pending', 'confirmed'] },
+          slotEnd: { gt: expect.any(Date) },
+        }),
+      }),
+    );
   });
 
   it('maps a unique-index collision (P2002) to SLOT_TAKEN (409)', async () => {
