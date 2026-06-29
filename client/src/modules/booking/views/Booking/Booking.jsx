@@ -83,7 +83,7 @@ export function Booking() {
         {error && <p className="error-text">{error}</p>}
         {lockBlocked && (
           <Link className="btn btn--secondary" to="/appointments">
-            Go to your pending booking
+            Go to your appointments
           </Link>
         )}
         <button
