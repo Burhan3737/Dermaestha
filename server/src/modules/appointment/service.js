@@ -154,7 +154,7 @@ export async function getForRole({ id, role, userId }) {
 
 /**
  * Create a `pending` hold for a patient (slot locked, awaiting manual payment). Validates the slot
- * is genuinely bookable, enforces No-Overlap, snapshots the fee, then inserts. With no auto-expiry,
+ * is genuinely bookable, enforces the single-active-appointment limit, snapshots the fee, then inserts. With no auto-expiry,
  * a unique-index collision is simply SLOT_TAKEN.
  * @param {{ patientUserId: string, doctorId: string, slotStart: string,
  *   forSelf: boolean, subject?: { name: string, age: number, relation: string } }} args
@@ -178,17 +178,23 @@ export async function lockSlot({ patientUserId, doctorId, slotStart, forSelf, su
     throw new AppError('SLOT_NOT_BOOKABLE', 'That slot is not available.', 422);
   }
 
-  // 2. No-Overlap: no active appointment overlapping [slotStart, slotEnd).
-  const overlap = await prisma.appointment.findFirst({
+  // 2. Single-active-appointment: a patient may hold at most ONE upcoming appointment
+  // (pending or confirmed). Strictly subsumes the old No-Overlap check.
+  const active = await prisma.appointment.findFirst({
     where: {
       patientUserId,
       state: { in: ACTIVE_APPOINTMENT_STATES },
-      slotStart: { lt: slotEnd },
-      slotEnd: { gt: slotStartDate },
+      slotEnd: { gt: new Date() },
     },
     select: { id: true },
   });
-  if (overlap) throw new AppError('OVERLAP', 'You already have an appointment at this time.', 409);
+  if (active) {
+    throw new AppError(
+      'ACTIVE_LOCK_EXISTS',
+      'Finish or cancel your current appointment before booking another.',
+      409,
+    );
+  }
 
   const data = {
     doctorId,

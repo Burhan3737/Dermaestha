@@ -26,8 +26,8 @@ export function Booking() {
       const apptId = await confirmBooking({ doctorId: id, slotStart, forSelf, subject });
       navigate(`/book/pay/${apptId}`);
     } catch (e) {
-      // An existing live hold blocks a new booking (Single-Lock). Point the patient to the pending
-      // booking in their appointments so they can complete it (instead of a dead-end message).
+      // The patient already has an upcoming appointment (single-active-appointment cap). Point them
+      // to their appointments so they can pay or cancel it (instead of a dead-end message).
       if (e.code === 'ACTIVE_LOCK_EXISTS') setLockBlocked(true);
       setError(e.message ?? 'Could not create the booking.');
       setBusy(false);
@@ -83,7 +83,7 @@ export function Booking() {
         {error && <p className="error-text">{error}</p>}
         {lockBlocked && (
           <Link className="btn btn--secondary" to="/appointments">
-            Go to your pending booking
+            Go to your appointments
           </Link>
         )}
         <button

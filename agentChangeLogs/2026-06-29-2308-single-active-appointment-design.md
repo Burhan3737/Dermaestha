@@ -1,12 +1,12 @@
 # 2026-06-29-2308 — single-active-appointment-design
 
-**Status:** Partial
+**Status:** Completed
 **Goal:** Review the post-tag payment/video changes for flow-breaking bugs, then brainstorm + spec a fix for the unbounded slot-squatting gap (limit a patient to one upcoming appointment).
 **Skill(s) used:** code-review (workflow), superpowers:brainstorming (opted in via /brainstorming)
 **Ticket / issue:** None
 **Branch:** main
-**Commits / PR:** Spec committed `0e6a12a`; implementation plan written but UNCOMMITTED (awaiting approval per updated CLAUDE.md no-commit rule)
-**Last updated:** 2026-06-29-2330
+**Commits / PR:** Branch `feat/single-active-appointment` off `main@03be977`. Spec `0e6a12a`, plan `03be977`; impl `a154903` (server guard), `958e32e` (Booking copy), `4504c2a` (pending-cancel). Not merged/pushed.
+**Last updated:** 2026-06-30-0030
 **Tags:** #design #spec #bugfix
 
 ## Summary
@@ -21,7 +21,20 @@ ADR-43 removed timed slot-lock expiry, so a `pending` hold occupies a slot until
 | `docs/superpowers/specs/2026-06-29-single-active-appointment-design.md` | Created | Design spec for the single-active-appointment limit + pending-cancel enablement |
 | `agentChangeLogs/2026-06-29-2308-single-active-appointment-design.md` | Created | This session changelog |
 | `agentChangeLogs/index.md` | Modified | Added this session's index line |
-| `docs/superpowers/plans/2026-06-29-single-active-appointment.md` | Created | TDD implementation plan (3 tasks: server guard, Booking copy, pending-cancel) — uncommitted, awaiting approval |
+| `docs/superpowers/plans/2026-06-29-single-active-appointment.md` | Created | TDD implementation plan (3 tasks: server guard, Booking copy, pending-cancel) |
+| `server/src/modules/appointment/service.js` | Modified | `lockSlot`: replaced No-Overlap check with single-active-appointment guard (`ACTIVE_LOCK_EXISTS`, 409, `slotEnd>now`); dropped `OVERLAP` (commit a154903) |
+| `server/test/unit/modules/appointment/service.test.js` | Modified | Replaced OVERLAP test with single-active + query-shape tests (a154903) |
+| `client/src/modules/booking/views/Booking/Booking.jsx` | Modified | Block-link copy → "Go to your appointments" (commit 958e32e) |
+| `client/test/unit/modules/booking/views/Booking/Booking.test.jsx` | Modified | Updated block-link test name/matcher (958e32e) |
+| `client/src/modules/appointment/views/Upcoming/Upcoming.jsx` | Modified | Cancel button on pending rows (reuses CancelModal/setCancelId) (commit 4504c2a) |
+| `client/test/unit/modules/appointment/views/Upcoming/Upcoming.test.jsx` | Modified | Added pending-cancel flow test (4504c2a) |
+| `client/src/modules/booking/views/Booking/Booking.jsx` | Modified | Refreshed stale `ACTIVE_LOCK_EXISTS` catch comment (commit fb5432c) |
+| `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md` | Modified | F03.03: Single-Lock+No-Overlap → Single-Active-Appointment Rule (ADR-44 doc-impact) |
+| `docs/specification/05-API_SPECIFICATION_DOCUMENT.md` | Modified | lock endpoint + 409 list: `OVERLAP`→`ACTIVE_LOCK_EXISTS` (ADR-44 doc-impact) |
+| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified | Active-lock guard copy/link + pending Cancel action (ADR-44 doc-impact) |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | Added ADR-44 (single-active-appointment limit) + index + footer |
+| `docs/specification/12-SCOPE_FEATURE_TEST_CASES_DOCUMENT.md` | Modified | TC-F03-007 broadened, TC-F03-008 retired, TC-F03-011 copy, +TC-F03-012 (ADR-44) |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | Footer note: single-active cap shipped (ADR-44) |
 
 ## Dependencies / config / schema
 None. No schema change — the rule is a service-layer query over existing columns/states.
@@ -40,13 +53,13 @@ None. No schema change — the rule is a service-layer query over existing colum
 - Migration `20260627000000_manual_payment_pivot` has a latent enum-mapping bug (refund notification types not remapped); verified harmless to the current dev DB (migration already applied cleanly) and to a fresh prod. Out of scope for this change; noted only.
 
 ## Verification
-Not verified (design only — no code changed). `npx prisma migrate status` → "Database schema is up to date!" (used to confirm the migration finding is not currently biting).
+Server suite 27/27 and full client suite 143/143 green (reported by implementers, per-task TDD RED/GREEN evidence in `.superpowers/sdd/task-*-report.md`). Per-task reviews: all 3 Approved. Final whole-branch review (opus, `03be977..4504c2a`): Ready to merge — Yes; no Critical/Important; `OVERLAP` confirmed removed repo-wide. `npx prisma migrate status` → "Database schema is up to date!" (pre-existing, no schema change here). **Live visual verification (Playwright, dev app on :5173/:3000):** registered a patient → booked Dr. Ayesha (pending) → 2nd booking with a *different* doctor (Dr. Bilal) was BLOCKED with "Finish or cancel your current appointment before booking another." + "Go to your appointments" link (no 2nd row created) → pending row showed the new Cancel button → cancelled (Upcoming emptied, slot freed) → re-booked successfully. All steps passed.
 
 ## Risk / rollback
 Design doc + changelog only; no runtime impact. Rollback = delete the two new docs and revert the index line.
 
 ## Open items / next session
-- User to review the committed spec (review gate).
-- On approval: invoke writing-plans to produce the implementation plan.
-- Spec doc-impact (apply at END, post-code, with approval): docs 02, 05, 11 (new ADR), 12, 13. Doc 04 not impacted.
-- `OVERLAP` cleanup sweep across client/tests/docs during implementation.
+- **Doc-impact:** APPLIED (commit 5f0e6c8) — docs 02/05/06/11(ADR-44)/12/13. Doc 04 not impacted.
+- **Cosmetic minors:** comment fix applied (fb5432c). Optional coverage test (pending row with `paymentReference` + Cancel) left as a nice-to-have.
+- **Branch:** merged no-ff into `main` and pushed (user-approved).
+- **Local test data left in dev DB:** patient `patient1@dermestha.dev`, one cancelled + one pending appointment (cleanup optional).

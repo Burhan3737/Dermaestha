@@ -72,18 +72,20 @@ describe('P-06 Booking', () => {
     expect(screen.getByLabelText(/patient name/i)).toBeTruthy();
   });
 
-  it('shows a "Go to your pending booking" link when an active lock blocks a new booking', async () => {
+  it('shows a "Go to your appointments" link when an active appointment blocks a new booking', async () => {
     api.post.mockRejectedValueOnce({
       code: 'ACTIVE_LOCK_EXISTS',
-      message: 'Finish your current booking first.',
+      message: 'Finish or cancel your current appointment before booking another.',
     });
     setup();
     await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: /confirm booking/i }));
     await waitFor(() =>
-      expect(screen.getByText('Finish your current booking first.')).toBeTruthy(),
+      expect(
+        screen.getByText('Finish or cancel your current appointment before booking another.'),
+      ).toBeTruthy(),
     );
-    const link = screen.getByRole('link', { name: /go to your pending booking/i });
+    const link = screen.getByRole('link', { name: /go to your appointments/i });
     expect(link.getAttribute('href')).toBe('/appointments');
   });
 });

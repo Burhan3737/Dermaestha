@@ -72,6 +72,13 @@ export function Upcoming() {
                           Awaiting confirmation
                         </span>
                       )}
+                      <button
+                        type="button"
+                        className="btn btn--danger-ghost btn--sm"
+                        onClick={() => setCancelId(a.id)}
+                      >
+                        Cancel
+                      </button>
                     </div>
                   </div>
                 </div>
