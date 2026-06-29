@@ -1,6 +1,6 @@
 # 2026-06-29-2308 — single-active-appointment-design
 
-**Status:** Partial
+**Status:** Completed
 **Goal:** Review the post-tag payment/video changes for flow-breaking bugs, then brainstorm + spec a fix for the unbounded slot-squatting gap (limit a patient to one upcoming appointment).
 **Skill(s) used:** code-review (workflow), superpowers:brainstorming (opted in via /brainstorming)
 **Ticket / issue:** None
@@ -53,12 +53,13 @@ None. No schema change — the rule is a service-layer query over existing colum
 - Migration `20260627000000_manual_payment_pivot` has a latent enum-mapping bug (refund notification types not remapped); verified harmless to the current dev DB (migration already applied cleanly) and to a fresh prod. Out of scope for this change; noted only.
 
 ## Verification
-Server suite 27/27 and full client suite 143/143 green (reported by implementers, per-task TDD RED/GREEN evidence in `.superpowers/sdd/task-*-report.md`). Per-task reviews: all 3 Approved. Final whole-branch review (opus, `03be977..4504c2a`): Ready to merge — Yes; no Critical/Important; `OVERLAP` confirmed removed repo-wide. `npx prisma migrate status` → "Database schema is up to date!" (pre-existing, no schema change here).
+Server suite 27/27 and full client suite 143/143 green (reported by implementers, per-task TDD RED/GREEN evidence in `.superpowers/sdd/task-*-report.md`). Per-task reviews: all 3 Approved. Final whole-branch review (opus, `03be977..4504c2a`): Ready to merge — Yes; no Critical/Important; `OVERLAP` confirmed removed repo-wide. `npx prisma migrate status` → "Database schema is up to date!" (pre-existing, no schema change here). **Live visual verification (Playwright, dev app on :5173/:3000):** registered a patient → booked Dr. Ayesha (pending) → 2nd booking with a *different* doctor (Dr. Bilal) was BLOCKED with "Finish or cancel your current appointment before booking another." + "Go to your appointments" link (no 2nd row created) → pending row showed the new Cancel button → cancelled (Upcoming emptied, slot freed) → re-booked successfully. All steps passed.
 
 ## Risk / rollback
 Design doc + changelog only; no runtime impact. Rollback = delete the two new docs and revert the index line.
 
 ## Open items / next session
-- **Doc-impact (apply with approval — code is committed):** docs 02, 05, 11 (new ADR), 12, 13. Doc 04 not impacted. `OVERLAP` removed from code; doc 05 still references it (covered by the 05 update).
-- **Two cosmetic minors (optional, pre-merge):** (1) `Booking.jsx:29-30` catch comment still says "Single-Lock"/"pending booking" — now stale (blocker can be confirmed); reword. (2) optional Upcoming test for a pending row with a submitted `paymentReference` + Cancel present.
-- **Branch not merged/pushed** — awaiting decision (finishing-a-development-branch).
+- **Doc-impact:** APPLIED (commit 5f0e6c8) — docs 02/05/06/11(ADR-44)/12/13. Doc 04 not impacted.
+- **Cosmetic minors:** comment fix applied (fb5432c). Optional coverage test (pending row with `paymentReference` + Cancel) left as a nice-to-have.
+- **Branch:** merged no-ff into `main` and pushed (user-approved).
+- **Local test data left in dev DB:** patient `patient1@dermestha.dev`, one cancelled + one pending appointment (cleanup optional).
