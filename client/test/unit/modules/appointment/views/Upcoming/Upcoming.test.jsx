@@ -113,4 +113,17 @@ describe('P-08 Upcoming', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancel appointment/i }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/appointments/a1/cancel', {}));
   });
+
+  it('lets the patient cancel a pending hold (Cancel button → modal → POST cancel)', async () => {
+    api.get.mockResolvedValue({
+      data: [confirmedRow({ id: 'p1', state: 'pending', paymentReference: null })],
+    });
+    api.post.mockResolvedValue({ state: 'cancelled' });
+    setup();
+    await waitFor(() => expect(screen.getByText('Dr A')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => expect(screen.getByText(/this cannot be undone/i)).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /cancel appointment/i }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/appointments/p1/cancel', {}));
+  });
 });
