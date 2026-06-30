@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.jsx';
 import { Button } from '../../../../shared/Button/Button.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
+import { ConfirmDialog } from '../../../../shared/ConfirmDialog/ConfirmDialog.jsx';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
 import { stateLabel, stateBadge } from '../../../appointment/stateLabel.js';
@@ -112,20 +113,15 @@ export function AdminRecordDetail() {
       )}
 
       {confirming && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal__body">
-              <p>Re-queue this failed email? The dispatch worker will retry it within a minute.</p>
-              {resendEmail.error && <Alert variant="danger">{resendEmail.error.message}</Alert>}
-            </div>
-            <div className="modal__actions">
-              <Button variant="ghost" onClick={() => { setConfirming(null); resendEmail.reset(); }}>Cancel</Button>
-              <Button isLoading={resendEmail.isPending} onClick={confirm}>
-                Resend email
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          confirmLabel="Resend email"
+          isLoading={resendEmail.isPending}
+          error={resendEmail.error?.message}
+          onConfirm={confirm}
+          onCancel={() => { setConfirming(null); resendEmail.reset(); }}
+        >
+          <p>Re-queue this failed email? The dispatch worker will retry it within a minute.</p>
+        </ConfirmDialog>
       )}
     </SidebarLayout>
   );

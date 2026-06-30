@@ -4,6 +4,7 @@ import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.j
 import { Button } from '../../../../shared/Button/Button.jsx';
 import { Field } from '../../../../shared/Field/Field.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
+import { ConfirmDialog } from '../../../../shared/ConfirmDialog/ConfirmDialog.jsx';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
 
@@ -112,21 +113,17 @@ export function AdminSettings() {
       </div>
 
       {confirming && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal__body">
-              <p>
-                Save these values? The lead time changes which slots patients can book from the next
-                request, and the bank details are shown to patients on the payment-instructions
-                screen.
-              </p>
-            </div>
-            <div className="modal__actions">
-              <Button variant="ghost" onClick={() => { setConfirming(false); saveSettings.reset(); }}>Cancel</Button>
-              <Button isLoading={saveSettings.isPending} onClick={save}>Confirm save</Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          confirmLabel="Confirm save"
+          isLoading={saveSettings.isPending}
+          onConfirm={save}
+          onCancel={() => { setConfirming(false); saveSettings.reset(); }}
+        >
+          <p>
+            Save these values? The lead time changes which slots patients can book from the next
+            request, and the bank details are shown to patients on the payment-instructions screen.
+          </p>
+        </ConfirmDialog>
       )}
     </SidebarLayout>
   );

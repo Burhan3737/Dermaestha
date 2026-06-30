@@ -12,6 +12,12 @@ describe('P-10 CancelModal (no refunds)', () => {
     expect(screen.queryByText(/Rs/)).toBeNull();
   });
 
+  it('matches the design-system modal: danger accent bar + padded body', () => {
+    const { container } = render(<CancelModal onConfirm={() => {}} onClose={() => {}} />);
+    expect(container.querySelector('.modal .modal__accent.modal__accent--danger')).toBeTruthy();
+    expect(container.querySelector('.modal .modal__body')).toBeTruthy();
+  });
+
   it('calls onConfirm when the confirm button is clicked', () => {
     const onConfirm = vi.fn();
     render(<CancelModal onConfirm={onConfirm} onClose={() => {}} />);

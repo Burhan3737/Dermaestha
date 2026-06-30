@@ -4,6 +4,7 @@ import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.j
 import { Button } from '../../../../shared/Button/Button.jsx';
 import { Field } from '../../../../shared/Field/Field.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
+import { ConfirmDialog } from '../../../../shared/ConfirmDialog/ConfirmDialog.jsx';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
 import { formatPkr } from '../../../../lib/format/format.js';
@@ -127,52 +128,41 @@ export function AdminDoctors() {
       )}
 
       {deactivating && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal__body">
-              <h2>Deactivate {deactivating.fullName}?</h2>
-              <p>
-                {deactivating.upcomingConfirmedCount} upcoming confirmed appointment(s) will remain on
-                their calendar and will be honoured — deactivation only removes the doctor from the
-                public listing and blocks new bookings. Login is not revoked.
-              </p>
-              {setDoctorActive.error && (
-                <Alert variant="danger">{setDoctorActive.error.message}</Alert>
-              )}
-            </div>
-            <div className="modal__actions">
-              <Button variant="ghost" onClick={() => setDeactivating(null)}>Cancel</Button>
-              <Button variant="danger" isLoading={setDoctorActive.isPending} onClick={confirmDeactivate}>
-                Deactivate doctor
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={`Deactivate ${deactivating.fullName}?`}
+          intent="danger"
+          confirmLabel="Deactivate doctor"
+          isLoading={setDoctorActive.isPending}
+          error={setDoctorActive.error?.message}
+          onConfirm={confirmDeactivate}
+          onCancel={() => setDeactivating(null)}
+        >
+          <p>
+            {deactivating.upcomingConfirmedCount} upcoming confirmed appointment(s) will remain on
+            their calendar and will be honoured — deactivation only removes the doctor from the
+            public listing and blocks new bookings. Login is not revoked.
+          </p>
+        </ConfirmDialog>
       )}
 
       {resetting && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal__body">
-              <h2>Reset password — {resetting.fullName}</h2>
-              <p>Share the new password out-of-band; the doctor must change it on next login.</p>
-              {resetDoctorPassword.error && (
-                <Alert variant="danger">{resetDoctorPassword.error.message}</Alert>
-              )}
-              <Field
-                label="New password"
-                id="reset-pw"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-            </div>
-            <div className="modal__actions">
-              <Button variant="ghost" onClick={() => { setResetting(null); setNewPassword(''); resetDoctorPassword.reset(); }}>Cancel</Button>
-              <Button isLoading={resetDoctorPassword.isPending} onClick={confirmReset}>Set password</Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={`Reset password — ${resetting.fullName}`}
+          confirmLabel="Set password"
+          isLoading={resetDoctorPassword.isPending}
+          error={resetDoctorPassword.error?.message}
+          onConfirm={confirmReset}
+          onCancel={() => { setResetting(null); setNewPassword(''); resetDoctorPassword.reset(); }}
+        >
+          <p>Share the new password out-of-band; the doctor must change it on next login.</p>
+          <Field
+            label="New password"
+            id="reset-pw"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </ConfirmDialog>
       )}
     </SidebarLayout>
   );

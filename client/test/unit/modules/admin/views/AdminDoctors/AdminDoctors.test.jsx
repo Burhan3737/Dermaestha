@@ -69,20 +69,25 @@ describe('AdminDoctors (A-01)', () => {
 
   it('deactivation goes through a warning modal that shows the upcoming-confirmed count (#9)', async () => {
     api.post.mockResolvedValue({ id: 'd1', isActive: false });
-    renderView();
+    const { container } = renderView();
     await screen.findByText('Dr Ayesha Khan');
     fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }));
     expect(api.post).not.toHaveBeenCalled(); // nothing happens before confirm
     expect(screen.getByText(/3 upcoming confirmed appointment/)).toBeTruthy();
+    // design: deactivation carries the danger-intent accent bar (doc 06 §190)
+    expect(container.querySelector('.modal .modal__accent--danger')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Deactivate doctor' }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/doctors/d1/deactivate'));
   });
 
   it('reset-password modal posts the admin-set password (DA5)', async () => {
     api.post.mockResolvedValue({ ok: true });
-    renderView();
+    const { container } = renderView();
     await screen.findByText('Dr Ayesha Khan');
     fireEvent.click(screen.getAllByRole('button', { name: 'Reset password' })[0]);
+    // design: a confirmation (non-destructive) carries the default spruce accent, not danger
+    expect(container.querySelector('.modal .modal__accent')).toBeTruthy();
+    expect(container.querySelector('.modal .modal__accent--danger')).toBeNull();
     fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'NewPass123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
     await waitFor(() =>

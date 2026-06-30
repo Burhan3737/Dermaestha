@@ -93,11 +93,14 @@ describe('AdminRecordDetail (A-04 detail)', () => {
 
   it('resend is offered ONLY on failed jobs and confirms before POSTing', async () => {
     api.post.mockResolvedValue({ id: 'n2', status: 'pending' });
-    renderView();
+    const { container } = renderView();
     await screen.findByText('appointment.confirmed');
     const resendButtons = screen.getAllByRole('button', { name: 'Resend' });
     expect(resendButtons).toHaveLength(1); // only the failed prescription_ready job
     fireEvent.click(resendButtons[0]);
+    // design: a confirmation carries the default spruce accent bar (doc 06 §190)
+    expect(container.querySelector('.modal .modal__accent')).toBeTruthy();
+    expect(container.querySelector('.modal .modal__accent--danger')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Resend email' })); // confirm modal
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/emails/n2/resend'));
   });

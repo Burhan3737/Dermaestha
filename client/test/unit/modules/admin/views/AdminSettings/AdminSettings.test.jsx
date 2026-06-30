@@ -52,12 +52,15 @@ describe('AdminSettings (A-05)', () => {
 
   it('save confirms, then PUTs the lead time + bank details', async () => {
     api.put.mockResolvedValue({ id: 1 });
-    renderView();
+    const { container } = renderView();
     const lead = await screen.findByLabelText('Minimum booking lead time (minutes)');
     fireEvent.change(lead, { target: { value: '30' } });
     fireEvent.change(screen.getByLabelText('Account number'), { target: { value: '999' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
     expect(api.put).not.toHaveBeenCalled(); // confirm gate first
+    // design: a confirmation carries the default spruce accent bar (doc 06 §190)
+    expect(container.querySelector('.modal .modal__accent')).toBeTruthy();
+    expect(container.querySelector('.modal .modal__accent--danger')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm save' }));
     await waitFor(() =>
       expect(api.put).toHaveBeenCalledWith('/admin/settings', {
