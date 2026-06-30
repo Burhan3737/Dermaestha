@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.14                                                                                     |
-| Last updated     | 2026-06-28                                                                                |
+| Version          | 1.15                                                                                     |
+| Last updated     | 2026-06-30                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -524,6 +524,7 @@ Radius `var(--r-sm)` (3 px), no dot, `var(--fs-label)` (11 px), Archivo 700, `4 
 - Accent bar (`.modal__accent`): 4 px height, default spruce (`var(--color-primary)`). `.modal__accent--danger` overrides to `var(--color-danger)`.
 - Body padding: `var(--sp-5)` (20 px).
 - Actions: right-aligned, gap `var(--sp-2)`, margin-top `var(--sp-4)`.
+- Confirmation dialogs render via the shared `ConfirmDialog` component (`client/src/shared/ConfirmDialog`), which owns this chrome: backdrop, intent-colored accent bar (`intent="danger"` → `--danger`; default → spruce), padded body, optional `.h3` title, body `children`, an error `Alert`, and right-aligned ghost "cancel" + filled `btn--sm` "confirm". All six confirm-gated dialogs (P-10, D-06, A-01 deactivate & reset-password, A-04 resend, A-05 settings save) use it.
 - ARIA: every modal renders `role="dialog"` and `aria-modal="true"` on the backdrop. **No focus trap is implemented** — a deliberate house-wide v1 gap, consistent with the no-WCAG-target assumption recorded in doc 07.
 
 ### Inline alert (`.alert`)
@@ -644,3 +645,4 @@ The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`
 | 2026-06-23 | §7 Select/picker: documented the D-05 medicine combobox (`.med-search` + leading magnifier) and its floating `.listbox` popover (`--shadow-overlay`) of `.option` rows (name/generic/price, hover/`--active` tint, separated `--freetext` fallback) | Medicine search combobox restyle (classes were referenced but never defined in components.css) |
 | 2026-06-28 | Synced the booking/payment surface to manual bank-transfer: P-07 is now the PaymentInstructions screen (bank details + amount + reference field; gateway redirect / return-state cards / polling removed); added admin Payment review (A-06, Accept/Reject) + Settings bank-detail fields; appointment badges reduced to the 3-state set (`pending`/`confirmed`/`cancelled`); cancellation modal stripped of refund math; removed refund/dispute/no-show/gateway UI references; trimmed §4 colour-use prose | Manual-payment pivot — as-built sync |
 | 2026-06-30 | §Active-lock guard (P-06): error copy → "Finish or cancel your current appointment before booking another." + link "Go to your appointments" (the blocker may now be a confirmed appointment); pending Upcoming rows gain a Cancel action (single-active cap, ADR-44) | Single-active-appointment limit |
+| 2026-06-30 | §7 Modal: documented the shared `ConfirmDialog` building block — all six confirm-gated dialogs (P-10, D-06, A-01 deactivate/reset, A-04 resend, A-05 save) now render through it (intent-colored accent bar + padded body + ghost/filled `btn--sm` actions); fixes the prior gap where cancel/admin dialogs omitted the accent bar | Shared ConfirmDialog refactor |
