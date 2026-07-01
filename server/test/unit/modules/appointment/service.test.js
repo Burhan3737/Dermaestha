@@ -115,13 +115,13 @@ describe('appointment.listForRole (patient)', () => {
 });
 
 describe('appointment.listForRole (doctor)', () => {
-  it("default scope is today's confirmed appointments and rows include patientName", async () => {
+  it('default (upcoming) scope = pending OR confirmed-not-yet-ended, filtered by doctorId, asc', async () => {
     prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
     prisma.appointment.findMany.mockResolvedValue([
       {
         id: 'a1',
-        slotStart: new Date(),
-        slotEnd: new Date(),
+        slotStart: new Date('2099-01-04T13:00:00Z'),
+        slotEnd: new Date('2099-01-04T13:30:00Z'),
         state: 'confirmed',
         forSelf: false,
         subjectName: 'Child',
@@ -131,9 +131,44 @@ describe('appointment.listForRole (doctor)', () => {
     ]);
     const rows = await listForRole({ role: 'doctor', userId: 'docUser' });
     expect(rows[0].patientName).toBe('Parent P');
-    const where = prisma.appointment.findMany.mock.calls[0][0].where;
-    expect(where.state).toBe('confirmed');
-    expect(where.slotStart.lt.getTime() - where.slotStart.gte.getTime()).toBe(24 * 3600 * 1000);
+    const arg = prisma.appointment.findMany.mock.calls[0][0];
+    expect(arg.where.doctorId).toBe('d1');
+    expect(arg.where.OR[0]).toEqual({ state: 'pending' });
+    expect(arg.where.OR[1].state).toBe('confirmed');
+    expect(arg.where.OR[1].slotEnd.gte).toBeInstanceOf(Date);
+    expect(arg.where.slotStart).toBeUndefined(); // no calendar-day window any more
+    expect(arg.orderBy).toEqual({ slotStart: 'asc' });
+  });
+
+  it('a confirmed appointment that already ended is NOT in the default scope (it belongs to Past)', async () => {
+    // Regression for the reported bug: the default doctor scope must be the time-based upcoming
+    // filter, so an ended-today confirmed row is excluded by slotEnd >= now (asserted on the where).
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    prisma.appointment.findMany.mockResolvedValue([]);
+    await listForRole({ role: 'doctor', userId: 'docUser' });
+    const arg = prisma.appointment.findMany.mock.calls[0][0];
+    const cutoff = arg.where.OR[1].slotEnd.gte.getTime();
+    expect(cutoff).toBeLessThanOrEqual(Date.now());
+    expect(Date.now() - cutoff).toBeLessThan(5000); // "now" captured at call time
+  });
+
+  it('history scope = confirmed-and-ended OR cancelled, filtered by doctorId, desc', async () => {
+    prisma.doctor.findUnique.mockResolvedValue({ id: 'd1' });
+    prisma.appointment.findMany.mockResolvedValue([]);
+    await listForRole({ role: 'doctor', userId: 'docUser', scope: 'history' });
+    const arg = prisma.appointment.findMany.mock.calls[0][0];
+    expect(arg.where.doctorId).toBe('d1');
+    expect(arg.where.OR[0].state).toBe('confirmed');
+    expect(arg.where.OR[0].slotEnd.lt).toBeInstanceOf(Date);
+    expect(arg.where.OR[1]).toEqual({ state: 'cancelled' });
+    expect(arg.orderBy).toEqual({ slotStart: 'desc' });
+  });
+
+  it('returns [] when the user is not a doctor', async () => {
+    prisma.doctor.findUnique.mockResolvedValue(null);
+    const rows = await listForRole({ role: 'doctor', userId: 'nope' });
+    expect(rows).toEqual([]);
+    expect(prisma.appointment.findMany).not.toHaveBeenCalled();
   });
 });
 

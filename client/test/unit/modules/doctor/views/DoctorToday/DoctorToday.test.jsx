@@ -38,19 +38,42 @@ function setup(route = '/doctor') {
 beforeEach(() => vi.clearAllMocks());
 
 describe('D-02 DoctorToday', () => {
-  it('renders Today/History in-page tabs as route links, marking the active one', async () => {
+  it('renders Upcoming/Past in-page tabs as route links, marking the active one', async () => {
     api.get.mockResolvedValue({ data: [] });
     setup('/doctor');
-    await waitFor(() => expect(screen.getByRole('heading', { name: /today/i })).toBeTruthy());
-    const todayTab = screen.getByRole('link', { name: /^today$/i });
-    const historyTab = screen.getByRole('link', { name: /^history$/i });
-    expect(todayTab.getAttribute('href')).toBe('/doctor');
-    expect(historyTab.getAttribute('href')).toBe('/doctor/history');
-    expect(todayTab.className).toContain('tab--active');
-    expect(historyTab.className).not.toContain('tab--active');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /upcoming/i })).toBeTruthy());
+    const upcomingTab = screen.getByRole('link', { name: /^upcoming$/i });
+    const pastTab = screen.getByRole('link', { name: /^past$/i });
+    expect(upcomingTab.getAttribute('href')).toBe('/doctor');
+    expect(pastTab.getAttribute('href')).toBe('/doctor/history');
+    expect(upcomingTab.className).toContain('tab--active');
+    expect(pastTab.className).not.toContain('tab--active');
   });
 
-  it('lists today appointments with the patient name', async () => {
+  it('renders a pending row as inert: badge + note, no Join/Cancel', async () => {
+    const soon = new Date(Date.now() + 3 * 3600 * 1000).toISOString();
+    api.get.mockResolvedValue({
+      data: [
+        {
+          id: 'p1',
+          slotStart: soon,
+          slotEnd: new Date(Date.now() + 3 * 3600 * 1000 + 18e5).toISOString(),
+          state: 'pending',
+          forSelf: true,
+          subjectName: null,
+          patientName: 'Pending P',
+        },
+      ],
+    });
+    setup('/doctor');
+    await waitFor(() => expect(screen.getByText('Pending P')).toBeTruthy());
+    expect(screen.getByText('Payment pending')).toBeTruthy();
+    expect(screen.getByText(/awaiting payment confirmation/i)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /join call/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^cancel$/i })).toBeNull();
+  });
+
+  it('lists upcoming appointments with the patient name', async () => {
     const noon = karachiNoonMs();
     api.get.mockResolvedValue({
       data: [
@@ -144,7 +167,7 @@ describe('D-02 DoctorToday', () => {
     setup('/doctor/history');
     await waitFor(() => expect(screen.getByText('Past P')).toBeTruthy());
     expect(api.get).toHaveBeenCalledWith('/appointments?scope=history');
-    expect(screen.getByRole('link', { name: /^history$/i }).className).toContain('tab--active');
+    expect(screen.getByRole('link', { name: /^past$/i }).className).toContain('tab--active');
   });
 
   it('history: confirmed past row gets Write prescription + Awaiting badge after 12h', async () => {

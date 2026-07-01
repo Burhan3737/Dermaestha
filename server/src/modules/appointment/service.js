@@ -3,7 +3,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { prisma } from '../../lib/prisma/prisma.js';
 import { AppError } from '../../http/AppError.js';
 import { logger } from '../../lib/logger/logger.js';
-import { KARACHI, karachiWallTimeToUtc } from '../../lib/tz/tz.js';
+import { KARACHI } from '../../lib/tz/tz.js';
 import { SLOT_GRANULARITY_MIN, ACTIVE_APPOINTMENT_STATES } from '../../config/constants.js';
 import { generateSlots } from '../doctor/service.js';
 import * as notification from '../notification/service.js';
@@ -64,21 +64,11 @@ export async function listForRole({ role, userId, scope = 'active' }) {
   }
   const doctor = await prisma.doctor.findUnique({ where: { userId }, select: { id: true } });
   if (!doctor) return [];
-  // F05.02: the default doctor view is TODAY's appointments (Karachi day); history is the
-  // time-based Past split (confirmed-and-ended OR cancelled), consistent with the patient view.
-  const todayYMD = formatInTimeZone(now, KARACHI, 'yyyy-MM-dd');
-  const dayStart = karachiWallTimeToUtc(todayYMD, '00:00');
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-  const where =
-    scope === 'history'
-      ? { doctorId: doctor.id, ...pastWhere(now) }
-      : {
-          doctorId: doctor.id,
-          state: 'confirmed',
-          slotStart: { gte: dayStart, lt: dayEnd },
-        };
+  // F05.02: the doctor view is the same time-based Upcoming/Past split as the patient (ADR — new).
+  // Upcoming = pending OR confirmed-not-yet-ended; Past = confirmed-and-ended OR cancelled.
+  const stateWhere = scope === 'history' ? pastWhere(now) : upcomingWhere(now);
   const rows = await prisma.appointment.findMany({
-    where,
+    where: { doctorId: doctor.id, ...stateWhere },
     orderBy: { slotStart: scope === 'history' ? 'desc' : 'asc' },
     include: { patient: { select: { fullName: true } }, _count: { select: { prescriptions: true } } },
   });

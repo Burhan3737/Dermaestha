@@ -1,16 +1,16 @@
 # 2026-07-02-0026 — doctor-appointments-upcoming-past-design
 
-**Status:** Partial
-**Goal:** Brainstorm + write the design to switch the doctor appointment view from a calendar-day "Today/History" split to the patient's time-based "Upcoming/Past" split, fixing the ended-today-but-still-cancellable bug.
-**Skill(s) used:** superpowers:brainstorming (opted in via /superpowers:brainstorming)
+**Status:** Partial (implemented + verified; UNCOMMITTED — awaiting user review, then commit + spec updates)
+**Goal:** Brainstorm + spec + implement the switch of the doctor appointment view from a calendar-day "Today/History" split to the patient's time-based "Upcoming/Past" split, fixing the ended-today-but-still-cancellable bug.
+**Skill(s) used:** superpowers:brainstorming → writing-plans → subagent-driven-development (opted in)
 **Ticket / issue:** None
 **Branch:** main
-**Commits / PR:** None
+**Commits / PR:** 4f39a82 (design doc only). Code changes UNCOMMITTED (held for user review).
 **Last updated:** 2026-07-02-0026
-**Tags:** #bugfix #design
+**Tags:** #bugfix #design #frontend #backend
 
 ## Summary
-The doctor view splits the default tab by Karachi calendar day, so a `confirmed` appointment that started earlier today and has already ended stays under "Today" and remains cancellable (and is duplicated under "History"). Designed the fix: give the doctor the patient's exact time-based Upcoming/Past split, so ended appointments move to Past (read-only). This also lets both roles share the same `upcomingWhere`/`pastWhere` fragments. Design doc written; no code yet.
+The doctor view splits the default tab by Karachi calendar day, so a `confirmed` appointment that started earlier today and has already ended stays under "Today" and remains cancellable (and is duplicated under "History"). Fix: give the doctor the patient's exact time-based Upcoming/Past split, so ended appointments move to Past (read-only). Both roles now share the same `upcomingWhere`/`pastWhere` fragments (role separation kept via ownership filter + include); `pending` rows become visible-but-inert for doctors. Designed, spec'd, planned, and implemented subagent-driven (2 tasks, per-task review + clean final whole-branch review). Server 30/30 + client 152 tests green; lint no new errors. Code not yet committed.
 
 ## Context / why
 User reported doctor appointments "seem a bit off": patient has Upcoming/Past (correct), doctor has Today/Past, and an appointment whose time has passed today still shows under Today with a working Cancel button. Root cause confirmed in `server/src/modules/appointment/service.js:69-79` (day-window `where`) + `DoctorToday.jsx:25,53` (client day-filter + confirmed-row Cancel button).
@@ -18,9 +18,14 @@ User reported doctor appointments "seem a bit off": patient has Upcoming/Past (c
 ## Files changed
 | File | Action | What & why |
 |---|---|---|
-| `docs/superpowers/specs/2026-07-02-doctor-appointments-upcoming-past-design.md` | Created | The approved design (problem, semantics, role-separation, changes, tests, spec doc-impact). |
-| `agentChangeLogs/2026-07-02-0026-doctor-appointments-upcoming-past-design.md` | Created | This session log. |
-| `agentChangeLogs/index.md` | Modified | Added this session's index line. |
+| `docs/superpowers/specs/2026-07-02-doctor-appointments-upcoming-past-design.md` | Created (committed 4f39a82) | The approved design (problem, semantics, role-separation, changes, tests, spec doc-impact). |
+| `docs/superpowers/plans/2026-07-02-doctor-appointments-upcoming-past.md` | Created (UNCOMMITTED) | TDD implementation plan (2 tasks) + review-phase verification scenarios. |
+| `server/src/modules/appointment/service.js` | Modified (UNCOMMITTED) | Doctor branch of `listForRole` now reuses the shared `upcomingWhere`/`pastWhere` fragments instead of the Karachi calendar-day window; deleted `todayYMD`/`dayStart`/`dayEnd` + the day ternary; removed the orphaned `karachiWallTimeToUtc` import. |
+| `server/test/unit/modules/appointment/service.test.js` | Modified (UNCOMMITTED) | Rewrote the doctor `listForRole` describe block for the time-based split: upcoming/history `where` shape + the ended-confirmed regression + not-a-doctor `[]`. |
+| `client/src/modules/doctor/views/DoctorToday/DoctorToday.jsx` | Modified (UNCOMMITTED) | Removed client-side `karachiDay` filter; relabeled tabs Today→Upcoming/History→Past (routes unchanged); show full `formatKarachi` date+time on every row (dropped time-only column + `formatKarachiTime` import); added inert `pending` row branch (badge + "Awaiting payment confirmation", no actions). |
+| `client/test/unit/modules/doctor/views/DoctorToday/DoctorToday.test.jsx` | Modified (UNCOMMITTED) | Updated tab/heading assertions to Upcoming/Past; added the inert-pending-row test; retitled the upcoming-list test. |
+| `agentChangeLogs/2026-07-02-0026-doctor-appointments-upcoming-past-design.md` | Created (committed 4f39a82) | This session log. |
+| `agentChangeLogs/index.md` | Modified (committed 4f39a82) | Added this session's index line. |
 
 ## Dependencies / config / schema
 None.
@@ -34,14 +39,19 @@ None.
 ## Notable findings
 - The ended-today appointment currently appears in BOTH Today and History (duplication), and only the Today instance is wrongly actionable.
 - Sidebar nav is already just "Appointments" → `/doctor` (`SidebarLayout.jsx:7`), so no sidebar change is needed — only the in-page tabs.
-- `date-fns-tz`/`tz` imports in the appointment service must stay (still used by `lockSlot`), so deleting the doctor day-branch requires no import cleanup.
+- **Correction to the design's import note:** `karachiWallTimeToUtc` was in fact used ONLY by the deleted day-window block (not `lockSlot`, which uses `formatInTimeZone` + `KARACHI`). The Task 1 review caught this; the now-orphaned import was removed (CLAUDE.md surgical-change rule). `formatInTimeZone`/`KARACHI` remain and are still used by `lockSlot`.
+- Server workspace has no `test` npm script — focused server runs use `npx vitest run <path>`.
 
 ## Verification
-Not verified (design only; no code changes yet).
+- Server: `npx vitest run server/test/unit/modules/appointment/service.test.js` → 30/30 pass; `npx eslint server/src/modules/appointment/service.js` → clean.
+- Client: DoctorToday suite 9/9 pass; full client suite 152 pass; `npm run lint` → same 14 pre-existing errors as clean `main` (verified via stash/pop), none new.
+- Per-task reviews: Task 1 clean after the import fix; Task 2 Approved/spec-compliant.
+- Final whole-branch review (opus): CLEAN — "Ready for user review: YES"; no Critical/Important; 2 Minors (no action).
 
 ## Risk / rollback
-Design document only — no runtime impact. Revert = delete the spec file + revert the index line.
+Behavior change (bugfix) but low blast radius — 4 files, no schema/route/sidebar change. `pending` appointments newly visible to doctors (inert). Revert = `git checkout -- <the 4 code files>` (currently uncommitted).
 
 ## Open items / next session
-- User to review the written spec, then proceed to superpowers:writing-plans for the implementation plan.
-- Spec doc-impact tracked in the design §6 (docs 02/06/11-new-ADR/13); to be applied at the END, after code is committed and with explicit approval.
+- **Commits are HELD** — awaiting user review before committing the 4 code files.
+- Optional Minor (final-review triage): add a "no Write prescription" absence assertion to the client pending-row test (belt-and-suspenders; leak is structurally unreachable).
+- Spec doc-impact tracked in the design §6 (docs 02 F05.02 / 06 D-02 / 11 new-ADR / 13); to be applied at the END, after code is committed and with explicit approval.
