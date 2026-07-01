@@ -4,7 +4,7 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.16                                                                                     |
+| Version          | 1.17                                                                                     |
 | Last updated     | 2026-07-01                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
@@ -609,7 +609,7 @@ Centered, `padding: var(--sp-12) var(--sp-4)`, `var(--color-text-muted)`. Icon: 
 
 ### In-page tabs (`.tabs`)
 
-The shared dashboard toggle behind the patient Upcoming/Past (P-08/P-09) and doctor Today/History (D-02) views. Container (`.tabs`): flex row, `gap: var(--sp-1)`, 1 px bottom border (`var(--border-1)`), `margin-bottom: var(--sp-5)`. Tab (`.tab`): Archivo 700, `var(--fs-body-sm)`, `10px var(--sp-4)` padding, 2 px transparent bottom border, `var(--color-text-muted)` text; hover → `var(--color-text-strong)`. Active (`.tab--active`): `var(--color-primary)` text + 2 px spruce bottom border. The tabs are route `<Link>`s, so the active tab is derived from the URL (ADR-42).
+The shared dashboard toggle behind the patient Upcoming/Past (P-08/P-09), doctor Today/History (D-02), and admin A-04 Records/Audit log views. Container (`.tabs`): flex row, `gap: var(--sp-1)`, 1 px bottom border (`var(--border-1)`), `margin-bottom: var(--sp-5)`. Tab (`.tab`): Archivo 700, `var(--fs-body-sm)`, `10px var(--sp-4)` padding, 2 px transparent bottom border, `var(--color-text-muted)` text; hover → `var(--color-text-strong)`. Active (`.tab--active`): `var(--color-primary)` text + 2 px spruce bottom border. The tabs are route `<Link>`s, so the active tab is derived from the URL (ADR-42); A-04's Audit log tab lives at `/admin/records/audit` (Records at `/admin/records`).
 
 ### Appointment row card (`.appt-row`) — signature component
 
@@ -647,3 +647,4 @@ The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`
 | 2026-06-30 | §Active-lock guard (P-06): error copy → "Finish or cancel your current appointment before booking another." + link "Go to your appointments" (the blocker may now be a confirmed appointment); pending Upcoming rows gain a Cancel action (single-active cap, ADR-44) | Single-active-appointment limit |
 | 2026-06-30 | §7 Modal: documented the shared `ConfirmDialog` building block — all six confirm-gated dialogs (P-10, D-06, A-01 deactivate/reset, A-04 resend, A-05 save) now render through it (intent-colored accent bar + padded body + ghost/filled `btn--sm` actions); fixes the prior gap where cancel/admin dialogs omitted the accent bar | Shared ConfirmDialog refactor |
 | 2026-07-01 | §Confirmation dialogs: extended the confirm-gated list to include admin doctor reactivate (A-01), medicine deactivate/reactivate (A-02), and payment accept/reject (A-06) — the payment decisions are gated because each emails the patient and is irreversible | Confirm-gate consequential admin actions |
+| 2026-07-01 | §7 In-page tabs: A-04 Records/Audit log now uses the shared route-`<Link>` tab control (was the lone `<button>`+state deviation); noted its Audit tab URL `/admin/records/audit` (Records at `/admin/records`) (ADR-42) | Admin Records & audit tab consistency fix |
