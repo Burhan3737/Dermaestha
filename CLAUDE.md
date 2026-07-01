@@ -33,6 +33,7 @@
 
 ### Actions — require approval, STOP and ask first
 
+- Do NOT `git commit`. Stop, clearly tell the user that the changes are ready for review, and wait for their approval before creating any commit.
 - Do NOT `git push`. Stop, clearly tell the user, and wait for their approval.
 - Do NOT perform any deployment action. Stop, clearly tell the user, and wait for their approval.
 - Do NOT create a new branch. Stop, clearly tell the user, and wait for their approval.
