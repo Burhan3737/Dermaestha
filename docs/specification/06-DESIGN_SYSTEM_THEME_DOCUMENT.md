@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.15                                                                                     |
-| Last updated     | 2026-06-30                                                                                |
+| Version          | 1.16                                                                                     |
+| Last updated     | 2026-07-01                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -189,7 +189,7 @@ Submitting a booking while the patient already has an upcoming appointment — `
 
 Centered on a dimmed backdrop (`rgba(15,33,24,.45)`). A 4 px accent bar at the top is colored by intent: spruce for confirmations, danger red for cancellations and deactivation. Actions are right-aligned: ghost "cancel" + filled "confirm". Never left-aligned in a content column.
 
-Confirm-gated actions include: cancellations (P-10), doctor cancel (D-06), admin deactivation (A-01), and the **A-05 platform-settings save** — gated because it alters the bank-transfer payment details shown to patients on the payment-instructions screen (P-07) and the minimum booking lead.
+Confirm-gated actions include: cancellations (P-10), doctor cancel (D-06), admin doctor deactivate **and reactivate** (A-01), admin medicine deactivate **and reactivate** (A-02), admin payment **accept and reject** (A-06), and the **A-05 platform-settings save** — gated because it alters the bank-transfer payment details shown to patients on the payment-instructions screen (P-07) and the minimum booking lead. The A-06 payment decisions are gated because each emails the patient and is irreversible (`cancelled` is terminal; a `confirmed` appointment cannot be un-confirmed).
 
 ### Payment instructions (P-07)
 
@@ -646,3 +646,4 @@ The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`
 | 2026-06-28 | Synced the booking/payment surface to manual bank-transfer: P-07 is now the PaymentInstructions screen (bank details + amount + reference field; gateway redirect / return-state cards / polling removed); added admin Payment review (A-06, Accept/Reject) + Settings bank-detail fields; appointment badges reduced to the 3-state set (`pending`/`confirmed`/`cancelled`); cancellation modal stripped of refund math; removed refund/dispute/no-show/gateway UI references; trimmed §4 colour-use prose | Manual-payment pivot — as-built sync |
 | 2026-06-30 | §Active-lock guard (P-06): error copy → "Finish or cancel your current appointment before booking another." + link "Go to your appointments" (the blocker may now be a confirmed appointment); pending Upcoming rows gain a Cancel action (single-active cap, ADR-44) | Single-active-appointment limit |
 | 2026-06-30 | §7 Modal: documented the shared `ConfirmDialog` building block — all six confirm-gated dialogs (P-10, D-06, A-01 deactivate/reset, A-04 resend, A-05 save) now render through it (intent-colored accent bar + padded body + ghost/filled `btn--sm` actions); fixes the prior gap where cancel/admin dialogs omitted the accent bar | Shared ConfirmDialog refactor |
+| 2026-07-01 | §Confirmation dialogs: extended the confirm-gated list to include admin doctor reactivate (A-01), medicine deactivate/reactivate (A-02), and payment accept/reject (A-06) — the payment decisions are gated because each emails the patient and is irreversible | Confirm-gate consequential admin actions |
