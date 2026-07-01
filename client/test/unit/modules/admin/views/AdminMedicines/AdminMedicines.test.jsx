@@ -59,9 +59,13 @@ describe('AdminMedicines (A-02)', () => {
 
   it('deactivate button PATCHes isActive=false', async () => {
     api.patch.mockResolvedValue({ id: 'm1', isActive: false });
-    renderView();
+    const { container } = renderView();
     await screen.findByText('Adapalene Gel');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Deactivate' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Deactivate' })[0]); // opens confirm
+    // deactivation is destructive → danger accent
+    expect(container.querySelector('.modal .modal__accent--danger')).toBeTruthy();
+    expect(api.patch).not.toHaveBeenCalled(); // gated until confirm
+    fireEvent.click(screen.getByRole('button', { name: 'Deactivate medicine' }));
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith('/admin/medicines/m1', { isActive: false }),
     );

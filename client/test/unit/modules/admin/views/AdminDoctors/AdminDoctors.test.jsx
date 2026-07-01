@@ -99,9 +99,14 @@ describe('AdminDoctors (A-01)', () => {
 
   it('activate posts reactivate for an inactive doctor', async () => {
     api.post.mockResolvedValue({ id: 'd2', isActive: true });
-    renderView();
+    const { container } = renderView();
     await screen.findByText('Dr Pending');
-    fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' })); // opens confirm
+    // reactivation is a (non-destructive) confirmation → spruce accent, not danger
+    expect(container.querySelector('.modal .modal__accent')).toBeTruthy();
+    expect(container.querySelector('.modal .modal__accent--danger')).toBeNull();
+    expect(api.post).not.toHaveBeenCalled(); // gated until confirm
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivate doctor' }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/doctors/d2/reactivate'));
   });
 

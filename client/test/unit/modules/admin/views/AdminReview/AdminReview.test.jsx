@@ -54,9 +54,14 @@ describe('AdminReview (A-06)', () => {
       .mockResolvedValueOnce({ data: [PENDING_ROW] })
       .mockResolvedValueOnce({ data: [] });
     api.post.mockResolvedValue({ state: 'confirmed' });
-    renderView();
+    const { container } = renderView();
     await screen.findByText('Parent P');
-    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' })); // opens confirm
+    // accept is a (non-destructive) confirmation → spruce accent, not danger
+    expect(container.querySelector('.modal .modal__accent')).toBeTruthy();
+    expect(container.querySelector('.modal .modal__accent--danger')).toBeNull();
+    expect(api.post).not.toHaveBeenCalled(); // gated until confirm
+    fireEvent.click(screen.getByRole('button', { name: 'Accept payment' }));
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/admin/appointments/a1/accept'),
     );
@@ -66,9 +71,13 @@ describe('AdminReview (A-06)', () => {
   it('Reject posts to the reject endpoint', async () => {
     api.get.mockResolvedValue({ data: [PENDING_ROW] });
     api.post.mockResolvedValue({ state: 'cancelled' });
-    renderView();
+    const { container } = renderView();
     await screen.findByText('Parent P');
-    fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' })); // opens confirm
+    // reject is destructive (terminal) → danger accent
+    expect(container.querySelector('.modal .modal__accent--danger')).toBeTruthy();
+    expect(api.post).not.toHaveBeenCalled(); // gated until confirm
+    fireEvent.click(screen.getByRole('button', { name: 'Reject payment' }));
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith('/admin/appointments/a1/reject'),
     );

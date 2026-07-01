@@ -19,6 +19,7 @@ function statusBadge(d) {
 export function AdminDoctors() {
   const { doctors, setDoctorActive, resetDoctorPassword, createDoctor, updateDoctor, uploadDoctorPhoto, saveDoctorBlocks } = useAdmin({ doctors: true });
   const [deactivating, setDeactivating] = useState(null); // doctor row or null
+  const [reactivating, setReactivating] = useState(null); // doctor row or null
   const [resetting, setResetting] = useState(null); // doctor row or null
   const [newPassword, setNewPassword] = useState('');
   const [editing, setEditing] = useState(null); // null | 'add' | doctor row
@@ -61,6 +62,12 @@ export function AdminDoctors() {
       { onSuccess: () => setDeactivating(null) },
     );
 
+  const confirmReactivate = () =>
+    setDoctorActive.mutate(
+      { id: reactivating.id, isActive: true },
+      { onSuccess: () => setReactivating(null) },
+    );
+
   const confirmReset = () =>
     resetDoctorPassword.mutate(
       { id: resetting.id, newPassword },
@@ -99,7 +106,7 @@ export function AdminDoctors() {
                     {d.isActive ? (
                       <Button variant="danger" onClick={() => setDeactivating(d)}>Deactivate</Button>
                     ) : (
-                      <Button variant="secondary" isLoading={setDoctorActive.isPending} onClick={() => setDoctorActive.mutate({ id: d.id, isActive: true })}>
+                      <Button variant="secondary" onClick={() => setReactivating(d)}>
                         Activate
                       </Button>
                     )}{' '}
@@ -141,6 +148,22 @@ export function AdminDoctors() {
             {deactivating.upcomingConfirmedCount} upcoming confirmed appointment(s) will remain on
             their calendar and will be honoured — deactivation only removes the doctor from the
             public listing and blocks new bookings. Login is not revoked.
+          </p>
+        </ConfirmDialog>
+      )}
+
+      {reactivating && (
+        <ConfirmDialog
+          title={`Reactivate ${reactivating.fullName}?`}
+          confirmLabel="Reactivate doctor"
+          isLoading={setDoctorActive.isPending}
+          error={setDoctorActive.error?.message}
+          onConfirm={confirmReactivate}
+          onCancel={() => { setReactivating(null); setDoctorActive.reset(); }}
+        >
+          <p>
+            The doctor returns to the public listing and can take new bookings again. Login is
+            unchanged.
           </p>
         </ConfirmDialog>
       )}

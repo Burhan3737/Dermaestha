@@ -4,6 +4,7 @@ import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.j
 import { Button } from '../../../../shared/Button/Button.jsx';
 import { Field } from '../../../../shared/Field/Field.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
+import { ConfirmDialog } from '../../../../shared/ConfirmDialog/ConfirmDialog.jsx';
 import { ADMIN_LINKS } from '../../admin.routes.jsx';
 import { useAdmin } from '../../useAdmin.js';
 import { formatPkr } from '../../../../lib/format/format.js';
@@ -17,6 +18,7 @@ export function AdminMedicines() {
   const EMPTY = { name: '', genericName: '', dosageForms: '', unitPrice: '' };
   const [form, setForm] = useState(EMPTY);
   const [editing, setEditing] = useState(null); // medicine row being edited, or null (add mode)
+  const [confirming, setConfirming] = useState(null); // { med, activate } | null
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const startEdit = (m) => {
@@ -91,14 +93,14 @@ export function AdminMedicines() {
                     {m.isActive ? (
                       <Button
                         variant="danger"
-                        onClick={() => updateMedicine.mutate({ id: m.id, isActive: false })}
+                        onClick={() => setConfirming({ med: m, activate: false })}
                       >
                         Deactivate
                       </Button>
                     ) : (
                       <Button
                         variant="secondary"
-                        onClick={() => updateMedicine.mutate({ id: m.id, isActive: true })}
+                        onClick={() => setConfirming({ med: m, activate: true })}
                       >
                         Reactivate
                       </Button>
@@ -131,6 +133,33 @@ export function AdminMedicines() {
           </div>
         </form>
       </div>
+
+      {confirming && (
+        <ConfirmDialog
+          title={
+            confirming.activate
+              ? `Reactivate ${confirming.med.name}?`
+              : `Deactivate ${confirming.med.name}?`
+          }
+          intent={confirming.activate ? 'default' : 'danger'}
+          confirmLabel={confirming.activate ? 'Reactivate medicine' : 'Deactivate medicine'}
+          isLoading={updateMedicine.isPending}
+          error={updateMedicine.error?.message}
+          onConfirm={() =>
+            updateMedicine.mutate(
+              { id: confirming.med.id, isActive: confirming.activate },
+              { onSuccess: () => setConfirming(null) },
+            )
+          }
+          onCancel={() => { setConfirming(null); updateMedicine.reset(); }}
+        >
+          <p className="body-sm muted">
+            {confirming.activate
+              ? 'Doctors will be able to prescribe this medicine again.'
+              : 'This removes the medicine from the prescribable catalogue. Existing prescriptions keep their own price snapshot.'}
+          </p>
+        </ConfirmDialog>
+      )}
     </SidebarLayout>
   );
 }
