@@ -31,6 +31,7 @@ export const adminRoutes = (session) => [
   { path: '/admin/medicines', element: guard(session, <AdminMedicines />) },
   { path: '/admin/review', element: guard(session, <AdminReview />) },
   { path: '/admin/records', element: guard(session, <AdminRecords />) },
+  { path: '/admin/records/audit', element: guard(session, <AdminRecords />) },
   { path: '/admin/records/:id', element: guard(session, <AdminRecordDetail />) },
   { path: '/admin/alerts', element: guard(session, <AdminAlerts />) },
   { path: '/admin/settings', element: guard(session, <AdminSettings />) },

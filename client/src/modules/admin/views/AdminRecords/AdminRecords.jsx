@@ -1,6 +1,6 @@
 // @ts-check
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { SidebarLayout } from '../../../../layouts/SidebarLayout/SidebarLayout.jsx';
 import { Button } from '../../../../shared/Button/Button.jsx';
 import { Field } from '../../../../shared/Field/Field.jsx';
@@ -16,7 +16,10 @@ const pkr = (paisa) => (paisa == null ? '—' : formatPkr(paisa));
 const EMPTY_FILTERS = { patient: '', doctorName: '', appointmentId: '', paymentRef: '', from: '', to: '' };
 
 export function AdminRecords() {
-  const [tab, setTab] = useState('records');
+  // In-page Records/Audit tabs are route links, so the active tab is derived from the URL and can
+  // never drift out of sync with it (doc 06 §7, ADR-42 — mirrors the patient/doctor tab pattern).
+  const { pathname } = useLocation();
+  const tab = pathname.endsWith('/audit') ? 'audit' : 'records';
   const [draft, setDraft] = useState(EMPTY_FILTERS);
   const [applied, setApplied] = useState({ page: 1 });
   const [auditApplied, setAuditApplied] = useState({ page: 1 });
@@ -37,18 +40,18 @@ export function AdminRecords() {
     <SidebarLayout links={ADMIN_LINKS}>
       <h1>Records &amp; audit log</h1>
 
-      <div className="tabs">
-        <button type="button" className={`tab${tab === 'records' ? ' tab--active' : ''}`} onClick={() => setTab('records')}>
+      <div className="tabs" role="tablist">
+        <Link className={`tab${tab === 'records' ? ' tab--active' : ''}`} to="/admin/records">
           Records
-        </button>
-        <button type="button" className={`tab${tab === 'audit' ? ' tab--active' : ''}`} onClick={() => setTab('audit')}>
+        </Link>
+        <Link className={`tab${tab === 'audit' ? ' tab--active' : ''}`} to="/admin/records/audit">
           Audit log
-        </button>
+        </Link>
       </div>
 
       {tab === 'records' && (
         <div className="section-card">
-          <form className="filters" onSubmit={search}>
+          <form className="filters" style={{ alignItems: 'flex-end' }} onSubmit={search}>
             <Field label="Patient email / phone" id="f-patient" value={draft.patient} onChange={set('patient')} />
             <Field label="Doctor name" id="f-doctor" value={draft.doctorName} onChange={set('doctorName')} />
             <Field label="Appointment ID" id="f-appt" value={draft.appointmentId} onChange={set('appointmentId')} />

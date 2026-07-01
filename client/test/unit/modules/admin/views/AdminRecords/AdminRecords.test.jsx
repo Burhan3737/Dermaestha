@@ -90,7 +90,7 @@ describe('AdminRecords (A-04)', () => {
   it('audit tab lists audit entries from /admin/audit', async () => {
     renderView();
     await screen.findByText('Parent P');
-    fireEvent.click(screen.getByRole('button', { name: 'Audit log' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Audit log' }));
     expect(await screen.findByText('appointment.confirmed')).toBeTruthy();
   });
 });
