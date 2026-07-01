@@ -1,11 +1,11 @@
 # 2026-07-02-0026 — doctor-appointments-upcoming-past-design
 
-**Status:** Partial (implemented + verified; UNCOMMITTED — awaiting user review, then commit + spec updates)
+**Status:** Completed (implemented, verified, committed + pushed; spec updates applied)
 **Goal:** Brainstorm + spec + implement the switch of the doctor appointment view from a calendar-day "Today/History" split to the patient's time-based "Upcoming/Past" split, fixing the ended-today-but-still-cancellable bug.
 **Skill(s) used:** superpowers:brainstorming → writing-plans → subagent-driven-development (opted in)
 **Ticket / issue:** None
 **Branch:** main
-**Commits / PR:** 4f39a82 (design doc only). Code changes UNCOMMITTED (held for user review).
+**Commits / PR:** 4f39a82 (design) · 9eff65a (code fix + plan + changelog) · spec-updates commit (docs 00-index-adjacent set). Pushed to origin/main.
 **Last updated:** 2026-07-02-0026
 **Tags:** #bugfix #design #frontend #backend
 
@@ -24,8 +24,15 @@ User reported doctor appointments "seem a bit off": patient has Upcoming/Past (c
 | `server/test/unit/modules/appointment/service.test.js` | Modified (UNCOMMITTED) | Rewrote the doctor `listForRole` describe block for the time-based split: upcoming/history `where` shape + the ended-confirmed regression + not-a-doctor `[]`. |
 | `client/src/modules/doctor/views/DoctorToday/DoctorToday.jsx` | Modified (UNCOMMITTED) | Removed client-side `karachiDay` filter; relabeled tabs Today→Upcoming/History→Past (routes unchanged); show full `formatKarachi` date+time on every row (dropped time-only column + `formatKarachiTime` import); added inert `pending` row branch (badge + "Awaiting payment confirmation", no actions). |
 | `client/test/unit/modules/doctor/views/DoctorToday/DoctorToday.test.jsx` | Modified (UNCOMMITTED) | Updated tab/heading assertions to Upcoming/Past; added the inert-pending-row test; retitled the upcoming-list test. |
-| `agentChangeLogs/2026-07-02-0026-doctor-appointments-upcoming-past-design.md` | Created (committed 4f39a82) | This session log. |
+| `agentChangeLogs/2026-07-02-0026-doctor-appointments-upcoming-past-design.md` | Created 4f39a82 / updated | This session log. |
 | `agentChangeLogs/index.md` | Modified (committed 4f39a82) | Added this session's index line. |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified (spec update) | Added ADR-45 (doctor time-based Upcoming/Past); marked ADR-42 partially superseded; v1.23. |
+| `docs/specification/02-SCOPE_FEATURE_DOCUMENT.md` | Modified (spec update) | Rewrote F05.02 to the time-based Upcoming/Past split + inert pending rows; v1.11. |
+| `docs/specification/05-API_SPECIFICATION_DOCUMENT.md` | Modified (spec update) | `GET /api/appointments` doctor scope = same time-based split as patient; §6.1 D2 row relabeled; v1.20. |
+| `docs/specification/06-DESIGN_SYSTEM_THEME_DOCUMENT.md` | Modified (spec update) | D-02 relabeled Upcoming/Past (diagram + inventory); appt-row `.appt-time` column removed note; doctor inert-pending-row note; v1.18. |
+| `docs/specification/12-SCOPE_FEATURE_TEST_CASES_DOCUMENT.md` | Modified (spec update) | Rewrote TC-F05-016 to the Upcoming/Past split rule; added TC-F05-020 (inert pending); v1.12. |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified (spec update) | §6 D-02 line → time-based Upcoming/Past + inert pending; v1.28. |
+| `docs/specification/01-PRD_DOCUMENT.md` | Modified (spec update) | Core-features wording "today's" → "upcoming" appointments; v1.2. |
 
 ## Dependencies / config / schema
 None.
@@ -52,6 +59,6 @@ None.
 Behavior change (bugfix) but low blast radius — 4 files, no schema/route/sidebar change. `pending` appointments newly visible to doctors (inert). Revert = `git checkout -- <the 4 code files>` (currently uncommitted).
 
 ## Open items / next session
-- **Commits are HELD** — awaiting user review before committing the 4 code files.
 - Optional Minor (final-review triage): add a "no Write prescription" absence assertion to the client pending-row test (belt-and-suspenders; leak is structurally unreachable).
-- Spec doc-impact tracked in the design §6 (docs 02 F05.02 / 06 D-02 / 11 new-ADR / 13); to be applied at the END, after code is committed and with explicit approval.
+- DONE: code committed (9eff65a) + pushed; spec updates applied across 7 docs (01/02/05/06/11/12/13) after approval and committed/pushed.
+- Root `npm test` surfaces pre-existing integration failures (shared dev DB not seeded for the integration suite; `discovery` expects ≥2 doctors) — proven identical with the change stashed, i.e. unrelated to this work. Not addressed here.

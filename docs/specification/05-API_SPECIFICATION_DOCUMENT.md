@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.19                         |
-| Last updated     | 2026-06-28                    |
+| Version          | 1.20                         |
+| Last updated     | 2026-07-02                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -164,7 +164,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 | --------------------------------------- | -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `POST /api/appointments/lock`           | patient              | Create `pending` (locks the slot on click) + "who-for" (P3/P8) | snapshots `feeAtBooking` at lock (ADR-43); a concurrent 2nd lock fails via the partial unique index → 409 `SLOT_TAKEN` (#1); validation also returns 409 `ACTIVE_LOCK_EXISTS` (the patient already has an upcoming appointment — single-active cap, ADR-44) and 422 `SLOT_NOT_BOOKABLE` (past/lead-time). No 10-min auto-expiry — the slot frees only when a human cancels/rejects |
 | `POST /api/appointments/:id/pay`        | patient              | Submit the offline bank-transfer reference (P3, ADR-43)     | body `{ reference }`; sets `paymentReference` + `paymentSubmittedAt`, stays `pending`, enqueues the admin alert + `payment_submitted_admin` email. **No gateway, no handoff URL** |
-| `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 today+history)                | patient sees own; doctor sees assigned; never cross-tenant; `?scope=history` returns past/cancelled rows newest-first; list rows (both roles) include `hasPrescription`. Patient Upcoming = `pending` ∪ `confirmed` with `slotEnd ≥ now`; Past = `confirmed` with `slotEnd < now` ∪ `cancelled` (time-based, no `completed` state) |
+| `GET /api/appointments`                 | patient/doctor       | Role-scoped list (P9 own / D2 upcoming+past)                | patient sees own; doctor sees assigned; never cross-tenant; `?scope=history` returns past/cancelled rows newest-first; list rows (both roles) include `hasPrescription`. **Both roles** use the same time-based split (ADR-45): Upcoming = `pending` ∪ `confirmed` with `slotEnd ≥ now` (asc); Past = `confirmed` with `slotEnd < now` ∪ `cancelled` (desc). No `completed` state |
 | `GET /api/appointments/:id`             | patient/doctor/admin | Detail, ownership-checked                                   | 404 (not 403) when not visible; detail adds `subjectAge`, `subjectRelation`, `patientName`; for an owned **`pending`** appointment it also returns `paymentInstructions { amountDue, bankName, bankAccountName, bankAccountNumber, bankInstructions }` (amount + bank details from Settings, ADR-43) |
 | `POST /api/appointments/:id/cancel`     | patient/doctor       | Cancel (P6/D5) → `→ cancelled` from `pending`/`confirmed`   | body `{ reason? }`; frees the slot; enqueues a `cancellation` email. **No refund** — money handled offline (ADR-43) |
 | `GET /api/appointments/:id/video-token` | patient/doctor       | Time-bound Daily token (P5/D3)                              | **`confirmed`-only** (non-confirmed → 404); issued within slot-start−10m … slot-end+5m; Daily free tier (room + token, no join recording) |
@@ -277,7 +277,7 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | P8 book for someone           | `appointments/lock` (`forSelf`+subject fields)                               |
 | P9 list own appts             | `GET /api/appointments` (patient scope)                                      |
 | D1 availability               | `PUT /api/availability`, `GET .../availability`                              |
-| D2 today + history            | `GET /api/appointments` (doctor scope)                                       |
+| D2 upcoming + past            | `GET /api/appointments` (doctor scope)                                       |
 | D3 join call                  | `appointments/:id/video-token`                                               |
 | D4 build Rx                   | `POST .../prescriptions`, `GET /api/medicines`                               |
 | D5 cancel                     | `appointments/:id/cancel` (doctor → `cancelled`)                            |
@@ -335,3 +335,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-16 | GET /api/appointments active scope now also returns a live slot_locked hold (lockExpiresAt) | Pending-hold recovery feature (34f978d) |
 | 2026-06-28 | Manual-payment pivot (ADR-43): `/:id/pay` repurposed to submit a bank reference; `/:id` returns `paymentInstructions` for a pending appt; added admin `accept`/`reject`; removed PayFast/Daily/Resend webhooks, `verify-return`, `dispute`, and `record-refund`; rewrote the state-machine table to 3 states (`pending`/`confirmed`/`cancelled`); prescription gate → `confirmed` (no state change on issue); admin records/alerts/settings re-shaped (bank fields, `state=pending` review queue, `payment.submitted` alert); retired invariants #2/#7/#10; pruned obsolete 409/422 codes and the dev `/dev/worker/*` set to `notifications` only | Manual-payment pivot — API as-built sync |
 | 2026-06-30 | `/appointments/lock` validation now returns `ACTIVE_LOCK_EXISTS` (single-active-appointment cap) in place of `OVERLAP`; removed `OVERLAP` from and added `ACTIVE_LOCK_EXISTS` to the §3.2 `409` list (ADR-44) | Single-active-appointment limit |
+| 2026-07-02 | `GET /api/appointments` doctor scope now uses the same time-based Upcoming/Past split as the patient (was D2 calendar-day "today"); §6.1 D2 row relabeled upcoming+past (ADR-45) | Doctor Upcoming/Past bugfix |

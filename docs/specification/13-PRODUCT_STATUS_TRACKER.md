@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Document ID      | `13-PRODUCT_STATUS_TRACKER`                                                                                                                           |
 | Status           | Canonical                                                                                                                                             |
-| Version          | 1.27                                                                                                                                                  |
-| Last updated     | 2026-06-28                                                                                                                                            |
+| Version          | 1.28                                                                                                                                                  |
+| Last updated     | 2026-07-02                                                                                                                                            |
 | Sources absorbed | `server/src + client/src inspection; agentChangeLogs/2026-05-31-1700-m0-foundation-scaffold.md; ARCHITECTURE.md §5b; docs/specification/02; PRD §5.1` |
 | Related docs     | 02, 03, 05                                                                                                                                            |
 
@@ -253,7 +253,7 @@ This section is the v1 build backlog (baseline 2026-06-01), reconciled as each s
 - [x] Analytics: server `POST /api/analytics/events` route (public, rate-limited 60/min/IP, closed-catalog validated) + `analytics.record` best-effort writer + server-side `booking_confirmed` emit — Slice H · S6; client KPI #3 seam (`track.js`, `video_join_attempt`/`video_join_success`) — Slice H · S3 (ADR-34); KPI #1 (`landing_view`/`booking_started`) — Slice H · S4. Full funnel now lands
 - [x] Audit log query API (admin-only): `GET /api/admin/audit` — Slice G (with `GET /api/admin/records` + `/records/:id`)
 - [x] Patient views: P-07 payment return ✓, P-08 upcoming (with "Join Call") ✓ (Slice C), P-09 past appointments ✓ (Slice F); P-11 pre-call get-ready room ✓, P-12 patient video room ✓ (Slice H · S3)
-- [x] Doctor views: D-03 availability grid ✓ (Slice B); D-02 today's-appointments base view ✓ (Today/History, 10-min Join gate, write-Rx, awaiting badge, cancel modal); D-04 doctor video room ✓ (Slice H · S3)
+- [x] Doctor views: D-03 availability grid ✓ (Slice B); D-02 appointments view ✓ (time-based Upcoming/Past, 10-min Join gate, write-Rx, awaiting badge, cancel modal, inert pending rows; ADR-45); D-04 doctor video room ✓ (Slice H · S3)
 
 ### M3 — Prescriptions
 
@@ -319,3 +319,4 @@ This section is the v1 build backlog (baseline 2026-06-01), reconciled as each s
 | 2026-06-22 | §6 doctor-views: D-02 Today/History reinstated as in-page tabs (route-driven); sidebar simplified to Appointments · Availability (ADR-42, supersedes ADR-41) | Doctor appointments page redesign (in-page tabs) (v1.25) |
 | 2026-06-28 | Manual-payment pivot (ADR-43): Payment module → manual offline bank transfer + admin accept/reject; Refund module + Payment adapter + Reconciliation/Refund-retry/Appointment-evaluation workers → Removed; Video adapter → room+token only (Daily webhook removed); Appointment state machine → 3-state (`pending`/`confirmed`/`cancelled`); Notification triggers re-listed (7 templates, refund/apology removed); Settings fallback-fee → bank-transfer details; F04/F05/F06/F07/F08 feature rows, §2 M1–M4 snapshots, §5 M2 roadmap, and §6 backlog synced; `notification-dispatch` noted as the sole cron | Manual-payment pivot — as-built sync (v1.26) |
 | 2026-06-30 | F03 booking: added the single-active-appointment cap (at most one upcoming `pending`/`confirmed` per patient; `lockSlot` → `ACTIVE_LOCK_EXISTS`, replaces the No-Overlap check) + patient Cancel on `pending` Upcoming rows; server + client unit tests added (ADR-44) | Single-active-appointment limit (v1.27) |
+| 2026-07-02 | §6 doctor-views: D-02 default view switched from calendar-day "Today/History" to the time-based Upcoming/Past split (mirrors the patient); pending rows now visible but inert; server + client unit tests updated (ADR-45) | Doctor Upcoming/Past bugfix (v1.28) |

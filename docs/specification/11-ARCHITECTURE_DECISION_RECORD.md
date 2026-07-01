@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.22                                                                                              |
-| Last updated     | 2026-06-28                                                                                         |
+| Version          | 1.23                                                                                              |
+| Last updated     | 2026-07-02                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -58,6 +58,7 @@
 43. [ADR-42 — Doctor appointments page: in-page Today/History tabs (supersedes ADR-41)](#adr-42--doctor-appointments-page-in-page-todayhistory-tabs-supersedes-adr-41)
 44. [ADR-43 — Manual offline payment + 3-state appointment model (supersedes the PayFast/refund/no-show subsystems)](#adr-43--manual-offline-payment--3-state-appointment-model-supersedes-the-payfastrefundno-show-subsystems)
 45. [ADR-44 — Single-active-appointment limit (supersedes the No-Overlap rule, broadens the old Single-Lock)](#adr-44--single-active-appointment-limit-supersedes-the-no-overlap-rule-broadens-the-old-single-lock)
+46. [ADR-45 — Doctor appointments use the patient's time-based Upcoming/Past split (supersedes ADR-42's Today/History semantics)](#adr-45--doctor-appointments-use-the-patients-time-based-upcomingpast-split-supersedes-adr-42s-todayhistory-semantics)
 
 ---
 
@@ -632,7 +633,7 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 **Date:** 2026-06-22
 
-**Status:** Accepted
+**Status:** Partially superseded by ADR-45 (2026-07-02) — the in-page route-link tabs mechanism (and ADR-41's route-derived active-tab fix) is kept; the **Today/History semantics** are replaced by the patient's time-based **Upcoming/Past** split.
 
 **Context:** ADR-41 made the doctor Today/History navigation sidebar-only (in-page tabs removed). On reviewing the patient appointments page — which presents Upcoming/Past as in-page route-driven `<Link>` tabs on a single page (`/appointments`, `/appointments/history`) — the doctor surface was changed to mirror that pattern for cross-role consistency rather than stay tab-less. A proposal to drop the History view entirely was rejected: completed appointments are terminal and only appear under the doctor's `scope=history` query (`server/src/modules/appointment/service.js`), and "Write prescription" renders only on `completed`/`prescription_issued` rows — so History is the sole entry point to the F08.02 prescription-writing flow (and the edge-case #26 12h reminder). Removing it would break prescriptions.
 
@@ -679,6 +680,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-45 — Doctor appointments use the patient's time-based Upcoming/Past split (supersedes ADR-42's Today/History semantics)
+
+**Date:** 2026-07-02
+
+**Status:** Accepted
+
+**Context:** The doctor D-02 default view scoped appointments by the current Asia/Karachi calendar day (`state='confirmed'` AND `slotStart` within `[today 00:00, 24:00)`), while the patient views (F05.01/F08.01) split time-based on `slotEnd` vs now. Two consequences: (1) a `confirmed` appointment that started earlier today but had already ended (`slotEnd < now`) stayed under "Today" and still rendered a Cancel button — while also appearing under History (`slotEnd < now`), i.e. duplicated and wrongly actionable; (2) `pending` bookings were invisible to the doctor (the day query filtered to `confirmed` only), so the doctor had no signal that a slot was booked-but-unpaid. The two roles were needlessly inconsistent. (docs/superpowers/specs/2026-07-02-doctor-appointments-upcoming-past-design.md)
+
+**Decision:** The doctor view adopts the **same time-based split as the patient**, reusing the shared `upcomingWhere(now)`/`pastWhere(now)` fragments in `modules/appointment/service.js`: Upcoming = `pending` ∪ (`confirmed` with `slotEnd ≥ now`), sorted `slotStart` asc; Past (`scope=history`) = (`confirmed` with `slotEnd < now`) ∪ `cancelled`, sorted desc. Role separation is preserved — the doctor query filters by `doctorId` and includes the patient name; the patient query filters by `patientUserId` and includes doctor detail. `pending` appointments become visible to the doctor but **inert**: the D-02 pending row shows the "Payment pending" badge + an "Awaiting payment confirmation" note and no Join Call / Write-prescription / Cancel affordance (those stay `confirmed`-only). ADR-42's in-page route-link tabs are kept; only the labels change (Today→Upcoming, History→Past) and the client-side calendar-day filter is removed. Routes `/doctor` and `/doctor/history` are unchanged.
+
+**Consequences:** The reported bug is structurally impossible — an ended `confirmed` row is Past (read-only) for both roles, never Upcoming. The doctor's Upcoming is now multi-day, so each row shows the full `Asia/Karachi` date+time (the fixed `.appt-time` time-only column is dropped in favour of the patient-style date+time sub-line). Doctors gain visibility of their own unpaid `pending` holds without any action on them. **Partially supersedes ADR-42** (the tabs mechanism and ADR-41's route-derived active-tab fix are retained; only the Today/History semantics are replaced). Retires TC-F05-016's "Doctor Today-Scope Rule" (rewritten to the time-based rule; new TC-F05-020 covers the inert pending row). No schema, route, or dependency change; server unit 30/30 + client 152/152 green. Updates doc 02 §F05.02, doc 05, doc 06 (§D-02 + appt-row leading element + a pending-row note), doc 12, and doc 13 §6.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -706,3 +721,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-22 | Added ADR-42 (doctor appointments page = in-page Today/History tabs mirroring the patient page; History retained as the prescription entry point) and marked ADR-41 Superseded | Doctor appointments page redesign (in-page tabs); supersedes ADR-41 |
 | 2026-06-28 | Added ADR-43 (manual offline payment + 3-state appointment model); marked ADR-11/12/22/24/25/32/33 Superseded and ADR-15/23/27/39 Partially superseded | Manual-payment pivot — removes the PayFast gateway, refund subsystem, no-show lifecycle, Daily webhook, and `completed` state (as-built sync) |
 | 2026-06-30 | Added ADR-44 (single-active-appointment limit — one upcoming appointment per patient via `ACTIVE_LOCK_EXISTS`; replaces the No-Overlap rule, broadens the old Single-Lock, adds patient pending-cancel) | Single-active-appointment limit |
+| 2026-07-02 | Added ADR-45 (doctor appointments use the patient's time-based Upcoming/Past split; pending visible-but-inert; tabs relabeled) and marked ADR-42 Partially superseded | Doctor Upcoming/Past bugfix (ended-today row shown as cancellable) |

@@ -4,8 +4,8 @@
 | ---------------- | ---------------------------------------- |
 | Document ID      | `01-PRD_DOCUMENT`                        |
 | Status           | Canonical                                |
-| Version          | 1.1                                      |
-| Last updated     | 2026-06-28                               |
+| Version          | 1.2                                      |
+| Last updated     | 2026-07-02                               |
 | Sources absorbed | `docs/product/PRD.md §1, §2.1, §2.3, §5` |
 | Related docs     | 02, 07                                   |
 
@@ -70,7 +70,7 @@ The downloadable prescription is itemised with admin-configured medicine prices 
 - **Book for someone else** — "Who is this for?" field captures actual patient name, age, and relation; prescription PDF auto-issued in the actual patient's name
 - **View upcoming appointments** — dashboard section listing confirmed appointments with Join Call and Cancel affordances
 - **Doctor availability** — doctor sets recurring weekly availability grid; slots auto-generated in 30-minute increments
-- **Doctor today's appointments & prescription builder** — doctor dashboard shows today's schedule with Join Call links; prescription builder with medicine catalogue search, running total, and read-only patient identification header
+- **Doctor upcoming appointments & prescription builder** — doctor dashboard shows the upcoming schedule (with a Past tab) and Join Call links; prescription builder with medicine catalogue search, running total, and read-only patient identification header
 - **Admin doctor onboarding** — add, edit, deactivate, and reactivate doctors; initial password set by admin
 - **Admin medicine catalogue** — add, edit (including unit price in PKR), and deactivate medicines used in the prescription builder
 - **Admin system-health alerts** — alert feed for submitted payment references awaiting review, email failures, overdue prescriptions, and unhandled exceptions
@@ -158,3 +158,4 @@ The complete risk register (all risks with likelihood, impact, and mitigation de
 | ---------- | ---------------- | -------------------------------------------------- |
 | 2026-06-01 | Initial creation | Faithful re-presentation of PRD.md §1/§2.1/§2.3/§5 |
 | 2026-06-28 | Reframed payment to the manual offline bank-transfer model (admin-verified, no gateway/hosted-checkout/webhooks/refunds) and the appointment lifecycle to the 3-state `pending → confirmed` / `cancelled` model: §2 note; objective 3; core features (book & pay, cancel, upcoming, admin alerts/records/settings, new admin payment-review); §5 email triggers + payment row; KPIs #4 (offline confirmation rate) and #7 (refunds deferred); M2 deliverable; risk #1 (KYC no longer applicable) | Manual-payment pivot — as-built sync |
+| 2026-07-02 | Core features: doctor dashboard reworded "today's appointments" → "upcoming appointments" (with a Past tab), matching the time-based Upcoming/Past split now used for both roles (ADR-45) | Doctor Upcoming/Past bugfix |

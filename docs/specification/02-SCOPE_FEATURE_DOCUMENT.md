@@ -4,8 +4,8 @@
 | ---------------- | --------------------------------------------- |
 | Document ID      | `02-SCOPE_FEATURE_DOCUMENT`                   |
 | Status           | Canonical                                     |
-| Version          | 1.10                                          |
-| Last updated     | 2026-06-28                                    |
+| Version          | 1.11                                          |
+| Last updated     | 2026-07-02                                    |
 | Sources absorbed | `docs/product/PRD.md §2.2, §3.3–§3.6, §4, §6` |
 | Related docs     | 01, 04, 05, 08, 12, 13                        |
 
@@ -134,9 +134,10 @@ One-line: the confirmed appointment progresses through the §4.3 state machine; 
   - Row columns: **doctor name + photo**, **slot date/time** in `Asia/Karachi`, **"for: [actual patient]"** line if booked-for-someone-else (P8), **consultation fee**, a **"Join Call" button** (F05.03, on `confirmed` rows only), and a **"Cancel" link** (F06) on `pending` and `confirmed` rows. A `pending` row also surfaces the **"Complete payment"** action (F03.03 / F04.01).
   - Once the slot end has passed, a `confirmed` appointment moves out of "Upcoming" into the "Past appointments" view (F08.01).
   - **Empty-State Rule**: shows "No upcoming appointments — Browse doctors" linking to the public doctor listing (F02).
-- **F05.02 - Doctor today view (D2)**
-  - Doctor dashboard default view shows today's appointments sorted by slot time; past appointments are shown under an in-page "History" tab on the same D-02 page (route `/doctor/history`), beside the "Today" tab — mirroring the patient Upcoming/Past page (ADR-42).
-  - Row columns: **slot time**, **patient name** (and **"for: [actual patient]"** if booked-for-someone-else), **reason/notes if any**, **"Join Call" button**.
+- **F05.02 - Doctor Upcoming/Past view (D2)**
+  - Time-based, mirroring F05.01: **Upcoming** (default) lists every `pending` appointment plus every `confirmed` appointment whose slot end is still in the future (`slotEnd ≥ now`), sorted by slot time ascending; **Past** (in-page "Past" tab, route `/doctor/history`) lists every `confirmed` appointment whose slot has ended (`slotEnd < now`) plus every `cancelled` appointment, newest-first (mirrors F08.01). The two in-page route-link tabs sit beside each other on the same D-02 page (ADR-42 mechanism retained; the former "Today/History" day-based semantics are replaced per ADR-45).
+  - Row columns: **slot date/time** in `Asia/Karachi`, **patient name** (and **"for: [actual patient]"** if booked-for-someone-else), a **status badge**, and — on `confirmed` rows — a **"Join Call" button** (F05.03) + **"Write prescription"** (F08.02) + **"Cancel"** (F06).
+  - **Pending rows are inert for the doctor**: a `pending` appointment is shown (so the doctor sees the slot is booked) with the "Payment pending" badge + an "Awaiting payment confirmation" note and **no** Join Call, Write-prescription, or Cancel action — those await admin payment confirmation (F04.02).
 - **F05.03 - Video consultation (P5, D3)**
   - **Join-Activation Rule**: the "Join Call" button activates 10 minutes before slot start (matching P5, D2, and P9). It opens the video room in the current browser tab — no app install.
   - Tested on Chrome (Android 10+) and Safari (iOS 14+) over 3G; doctor side tested on desktop Chrome/Firefox/Safari and Android Chrome.
@@ -551,3 +552,4 @@ confirmed / paid ─► cancelled   (card → refund initiated; cod → closed)
 | 2026-06-22 | F05.02: doctor past appointments are an in-page "History" tab on D-02 (mirrors patient Upcoming/Past; ADR-42, supersedes ADR-41) | Doctor appointments page redesign (in-page tabs) |
 | 2026-06-28 | F04 → manual offline bank transfer + admin accept/reject (paymentInstructions, `/pay {reference}`, F04.03 reconciliation retired); F05 → 3-state model (no in_progress/completed/no-show), F05.04 evaluation worker removed, video-token confirmed-only on Daily free tier; F06 renamed Cancellation, all refund/window/`doctor_cancelled` rules retired; F07 trigger set re-listed (payment_submitted_admin/booking_confirmation/payment_not_received/cancellation + reminders; refund/apology removed); F08 prescription gate `completed`→`confirmed` (issuing does not change state); F12/F13 gateway/refund/PayFast sources retired; F14.02 fallback-fee → bank-transfer fields; §3 state machine + §4 edge handlings synced | Manual-payment pivot — as-built sync |
 | 2026-06-30 | F03.03: replaced the Single-Lock + No-Overlap Rules with one Single-Active-Appointment Rule — at most one upcoming appointment (`pending`/`confirmed`) per patient (`ACTIVE_LOCK_EXISTS`, 409); Recoverable-Hold note adds patient self-cancel of a pending hold (ADR-44) | Single-active-appointment limit |
+| 2026-07-02 | F05.02: doctor view is now the same time-based Upcoming/Past split as F05.01 (was calendar-day "Today"); pending rows shown but inert (badge + note, no actions); tabs relabeled Upcoming/Past, routes unchanged (ADR-45) | Doctor Upcoming/Past bugfix (ended-today row shown as cancellable) |

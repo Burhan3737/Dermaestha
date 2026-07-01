@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------------------------------------------------------------------- |
 | Document ID      | `06-DESIGN_SYSTEM_THEME_DOCUMENT`                                                         |
 | Status           | Canonical                                                                                 |
-| Version          | 1.17                                                                                     |
-| Last updated     | 2026-07-01                                                                                |
+| Version          | 1.18                                                                                     |
+| Last updated     | 2026-07-02                                                                                |
 | Sources absorbed | `docs/design/DESIGN.md; mockups/assets/css/tokens.css; mockups/assets/css/components.css` |
 | Related docs     | 02, 03                                                                                    |
 
@@ -65,7 +65,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  D02["D-02<br/>Today's appointments"]
+  D02["D-02<br/>Appointments (Upcoming/Past)"]
   D04["D-04<br/>Video consultation"]
   D05["D-05<br/>Prescription builder"]
   D02 --> D04 --> D05
@@ -131,7 +131,7 @@ Doctors — Medicines — Payment review — Records & audit — System health �
 | P-12      | Video consultation                       | Patient                  | P5           |
 | P-13      | Prescription view + PDF                  | Patient                  | P7, §3.5     |
 | D-01      | Forced first-login password change       | Doctor                   | DA3          |
-| D-02      | Today's appointments + History           | Doctor                   | D2           |
+| D-02      | Appointments — Upcoming + Past           | Doctor                   | D2           |
 | D-03      | Weekly availability grid                 | Doctor                   | D1           |
 | D-04      | Video consultation (doctor)              | Doctor                   | D3           |
 | D-05      | Prescription builder                     | Doctor                   | D4           |
@@ -200,6 +200,8 @@ There is **no payment-gateway redirect, hosted-checkout handoff/return page, or 
 ### Payment-pending card (P-08)
 
 A `pending` appointment renders in the patient Upcoming list with the **"Payment pending"** status badge (`badge--warning`) and a primary action linking to the P-07 payment-instructions screen (`/book/pay/:id`): **"Enter payment reference"** before a reference is submitted, or **"View payment details"** afterwards — in which case a muted **"Awaiting confirmation"** note sits beside it. As-built per ADR-43 there is no hold-expiry countdown or "Complete payment" hosted-checkout resume.
+
+On the **doctor** side (D-02 Upcoming), a `pending` appointment is shown but **inert**: the same **"Payment pending"** badge with a muted **"Awaiting payment confirmation"** note and **no** action buttons (Join Call, Write prescription, and Cancel are `confirmed`-only, ADR-45).
 
 ### Not-found & cross-tenant states
 
@@ -615,10 +617,10 @@ The shared dashboard toggle behind the patient Upcoming/Past (P-08/P-09), doctor
 
 The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`.appt-list`): vertical flex, `gap: var(--sp-3)`. Each row is a `.card` + `.appt-row`: flex, `align-items: flex-start`, `gap: var(--sp-4)`, `var(--sp-4) var(--sp-5)` padding.
 
-- **Leading element** — a fixed 76 px tabular time column (`.appt-time`, doctor Today) **or** a `.avatar--lg` doctor avatar (`.appt-avatar`, patient; photo when present, initials fallback).
+- **Leading element** — a `.avatar--lg` doctor avatar (`.appt-avatar`, patient P-08/P-09; photo when present, initials fallback). The doctor D-02 rows have no leading element: the former fixed 76 px tabular time column (`.appt-time`) was removed when D-02 moved to the multi-day Upcoming/Past view — the slot date+time now renders as an `.appt-sub` line inside the meta, matching the patient (ADR-45).
 - **Meta** (`.appt-meta`, `flex: 1`): a head row (`.appt-head`, `justify-content: space-between`) with the name (`.appt-name`, Archivo 700, `var(--color-text-strong)`) + muted sub-lines (`.appt-sub`, `var(--fs-body-sm)`: specialization / "for: …" and tabular time · fee) on the left, and the status `.badge` on the right; below it an actions row (`.appt-actions`: flex-wrap, `gap: var(--sp-2)`, `margin-top: var(--sp-3)`) of `.btn--sm` controls.
 - `.appt-row--active` tints a joinable row (`var(--color-primary-tint)` fill + `var(--color-primary-border)`).
-- Below 640 px the row wraps and the time column spans full width.
+- Below 640 px the row wraps.
 
 ### Card utility (`.card`)
 
@@ -648,3 +650,4 @@ The patient (P-08/P-09) and doctor (D-02) appointment list item. List wrapper (`
 | 2026-06-30 | §7 Modal: documented the shared `ConfirmDialog` building block — all six confirm-gated dialogs (P-10, D-06, A-01 deactivate/reset, A-04 resend, A-05 save) now render through it (intent-colored accent bar + padded body + ghost/filled `btn--sm` actions); fixes the prior gap where cancel/admin dialogs omitted the accent bar | Shared ConfirmDialog refactor |
 | 2026-07-01 | §Confirmation dialogs: extended the confirm-gated list to include admin doctor reactivate (A-01), medicine deactivate/reactivate (A-02), and payment accept/reject (A-06) — the payment decisions are gated because each emails the patient and is irreversible | Confirm-gate consequential admin actions |
 | 2026-07-01 | §7 In-page tabs: A-04 Records/Audit log now uses the shared route-`<Link>` tab control (was the lone `<button>`+state deviation); noted its Audit tab URL `/admin/records/audit` (Records at `/admin/records`) (ADR-42) | Admin Records & audit tab consistency fix |
+| 2026-07-02 | D-02 relabeled Today's appointments → Upcoming/Past (§2 diagram + inventory); appt-row leading element note: doctor `.appt-time` column removed (date+time now an `.appt-sub` line, matching the patient); added the doctor inert-pending-row note beside the P-08 payment-pending card (ADR-45) | Doctor Upcoming/Past bugfix |

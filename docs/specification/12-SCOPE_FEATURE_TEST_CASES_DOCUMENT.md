@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.11                                  |
-| Last updated     | 2026-06-28                             |
+| Version          | 1.12                                  |
+| Last updated     | 2026-07-02                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -147,10 +147,11 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F05-013 | **Retired (ADR-43).** §3 No-show resolution — patient absent (doctor joined) | `CA` in `in_progress`; doctor joined, patient absent at slot+15m | 1. Doctor joins; patient never joins. 2. Let the no-show grace window elapse. | Appointment → `patient_no_show`; no refund; the doctor-joined record ensures doctor-absence precedence does not fire (ADR-12). | High     |
 | TC-F05-014 | **Retired (ADR-43).** §5 Evaluation worker: `in_progress→completed` at slot-end+5m | `CA` in `in_progress`; both parties have joined | 1. Let slot-end+5m arrive. 2. The evaluation worker ticks. | Appointment transitions to `completed`; no appointment remains in `in_progress` past slot-end+5m (hard guarantee per ADR-25). | Critical |
 | TC-F05-015 | **Retired (ADR-43).** §3 Zero-join-data at cutoff → non-penalizing terminal + admin alert | `CA` in `in_progress`; no join-event data recorded when slot-end+5m arrives | 1. Let slot-end+5m arrive with `doctorJoinedAt` and `patientJoinedAt` both null. | Appointment resolves to `doctor_no_show` (non-penalizing, doctor-absence-precedence for missing data per ADR-12); an `evaluation_data_gap` admin alert is raised; the appointment does NOT remain in `in_progress`. | Critical |
-| TC-F05-016 | F05.02 Doctor Today-Scope Rule (G3) | Doctor `D` has appointments today and on future days | 1. `D` opens the default appointments view. | The default doctor scope returns only `confirmed` appointments within the current `Asia/Karachi` day; future-day and past appointments are excluded; history remains a separate scope. | High |
+| TC-F05-016 | F05.02 Doctor Upcoming/Past Split Rule (ADR-45; supersedes the retired Today-Scope Rule) | Doctor `D` has a `pending`, a future `confirmed`, an ended `confirmed` (slot earlier today, `slotEnd < now`), and a `cancelled` appointment | 1. `D` opens the default (Upcoming) view. 2. `D` opens the Past tab. | Upcoming shows the `pending` and the future `confirmed` (slot-time asc) and **excludes** the ended `confirmed` even though its slot was earlier today; the ended `confirmed` and the `cancelled` appear under Past (newest-first). Same time-based split as the patient (F05.01). | High |
 | TC-F05-017 | F05.03 Role-aware waiting copy | `CA`; both parties eligible to join | 1. `D` joins the video room before `P`. 2. Separately, `P` joins before `D`. | When the doctor joins first, the waiting screen reads "Waiting for the patient to join…" (NOT "Doctor will be with you shortly"); when the patient joins first, the waiting screen reads "Doctor will be with you shortly". | High |
 | TC-F05-018 | F05.01 Appointment-Status Badge Rule | `P` has appointments in each state (`pending`, `confirmed`, `cancelled`) | 1. `P` opens the appointments view. | Each appointment shows the correct status badge — `pending` = "Payment pending", `confirmed` = "Confirmed", `cancelled` = "Cancelled"; only these three states exist (no completed/in_progress/no-show). | High |
 | TC-F05-019 | F05.01 Upcoming/Past Split Rule | `P` has a future `confirmed` appointment and a past appointment | 1. `P` opens the appointments view. | Appointments are split into "Upcoming" and "Past" by slot time (not by state); future-dated rows appear under Upcoming, past-dated rows under Past. | Medium |
+| TC-F05-020 | F05.02 Doctor pending-row is inert (ADR-45) | Doctor `D` has a `pending` appointment on an upcoming slot | 1. `D` opens the Upcoming view. | The `pending` row shows the "Payment pending" badge + an "Awaiting payment confirmation" note and **no** Join Call, Write-prescription, or Cancel action (those render on `confirmed` rows only). | Medium |
 
 ### F06 — Cancellation & refund
 
@@ -369,3 +370,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-21 | Added TC-F05-017 — role-aware video waiting copy (doctor-first "Waiting for the patient to join…" vs patient-first "Doctor will be with you shortly") | Role-aware video waiting-screen copy |
 | 2026-06-28 | Retired (ADR-43) the PayFast gateway/checkout/webhook, refund, no-show, reconciliation, completion-worker, and removed-state cases (TC-F04-001/002/003/004/005/007/008/009, TC-F05-006/007/008/009/011/012/013/014/015, TC-F06-001…007, TC-F08-001/008/010/012, TC-F12-003, TC-F14-002, TC-SEC-008/012); added the manual-payment / admin-review / 3-state / prescribe-on-confirmed cases (TC-F04-010…013, TC-F05-018/019, TC-F06-008, TC-F08-016); re-pointed surviving state references to the 3-state model | Manual-payment pivot — as-built sync |
 | 2026-06-30 | Broadened TC-F03-007 to the Single-Active-Appointment Rule (`pending`/`confirmed`, `ACTIVE_LOCK_EXISTS`); retired TC-F03-008 (No-Overlap, subsumed); refreshed TC-F03-011 copy/labels; added TC-F03-012 (patient cancels a pending hold) (ADR-44) | Single-active-appointment limit |
+| 2026-07-02 | Rewrote TC-F05-016 from the retired Doctor Today-Scope Rule to the time-based Doctor Upcoming/Past Split Rule (ended-today `confirmed` excluded from Upcoming); added TC-F05-020 (doctor pending row inert) (ADR-45) | Doctor Upcoming/Past bugfix |
