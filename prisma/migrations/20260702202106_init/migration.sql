@@ -5,16 +5,16 @@ CREATE TYPE "Role" AS ENUM ('patient', 'doctor', 'admin');
 CREATE TYPE "DoctorStatus" AS ENUM ('pending', 'active');
 
 -- CreateEnum
-CREATE TYPE "AppointmentState" AS ENUM ('slot_locked', 'confirmed', 'in_progress', 'completed', 'prescription_issued', 'cancelled_refunded', 'cancelled_no_refund', 'doctor_cancelled', 'patient_no_show', 'doctor_no_show');
-
--- CreateEnum
-CREATE TYPE "PaymentStatus" AS ENUM ('pending', 'success', 'failed');
-
--- CreateEnum
-CREATE TYPE "RefundStatus" AS ENUM ('initiated', 'retrying', 'settled', 'failed');
+CREATE TYPE "AppointmentState" AS ENUM ('pending', 'confirmed', 'cancelled');
 
 -- CreateEnum
 CREATE TYPE "AuditActorType" AS ENUM ('patient', 'doctor', 'admin', 'system');
+
+-- CreateEnum
+CREATE TYPE "NotificationType" AS ENUM ('booking_confirmation', 'reminder_24h', 'reminder_1h', 'prescription_ready', 'payment_submitted_admin', 'payment_not_received', 'cancellation');
+
+-- CreateEnum
+CREATE TYPE "NotificationStatus" AS ENUM ('pending', 'sent', 'failed', 'suppressed');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -26,6 +26,8 @@ CREATE TABLE "users" (
     "full_name" TEXT NOT NULL,
     "tos_accepted_at" TIMESTAMPTZ(6),
     "must_change_password" BOOLEAN NOT NULL DEFAULT false,
+    "reset_token_hash" TEXT,
+    "reset_token_expires_at" TIMESTAMPTZ(6),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
@@ -67,14 +69,14 @@ CREATE TABLE "appointments" (
     "patient_user_id" TEXT NOT NULL,
     "slot_start" TIMESTAMPTZ(6) NOT NULL,
     "slot_end" TIMESTAMPTZ(6) NOT NULL,
-    "state" "AppointmentState" NOT NULL DEFAULT 'slot_locked',
+    "state" "AppointmentState" NOT NULL DEFAULT 'pending',
     "fee_at_booking" INTEGER,
+    "payment_reference" TEXT,
+    "payment_submitted_at" TIMESTAMPTZ(6),
     "for_self" BOOLEAN NOT NULL DEFAULT true,
     "subject_name" TEXT,
     "subject_age" INTEGER,
     "subject_relation" TEXT,
-    "disputed" BOOLEAN NOT NULL DEFAULT false,
-    "lock_expires_at" TIMESTAMPTZ(6),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
@@ -82,22 +84,23 @@ CREATE TABLE "appointments" (
 );
 
 -- CreateTable
-CREATE TABLE "payments" (
+CREATE TABLE "notification_jobs" (
     "id" TEXT NOT NULL,
+    "type" "NotificationType" NOT NULL,
     "appointment_id" TEXT NOT NULL,
-    "patient_user_id" TEXT NOT NULL,
-    "slot_start" TIMESTAMPTZ(6) NOT NULL,
-    "provider_ref" TEXT,
-    "status" "PaymentStatus" NOT NULL DEFAULT 'pending',
-    "amount" INTEGER NOT NULL,
-    "gateway_fee" INTEGER,
-    "refund_idempotency_key" TEXT,
-    "refund_ref" TEXT,
-    "refund_status" "RefundStatus",
+    "recipient_email" TEXT NOT NULL,
+    "vars" JSONB,
+    "scheduled_for" TIMESTAMPTZ(6) NOT NULL,
+    "dedupe_key" TEXT NOT NULL DEFAULT '',
+    "status" "NotificationStatus" NOT NULL DEFAULT 'pending',
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "next_attempt_at" TIMESTAMPTZ(6),
+    "last_error" TEXT,
+    "sent_at" TIMESTAMPTZ(6),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
-    CONSTRAINT "payments_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "notification_jobs_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -169,8 +172,10 @@ CREATE TABLE "analytics_events" (
 CREATE TABLE "settings" (
     "id" INTEGER NOT NULL DEFAULT 1,
     "min_booking_lead_minutes" INTEGER NOT NULL DEFAULT 60,
-    "fallback_fee_pct_bps" INTEGER NOT NULL DEFAULT 0,
-    "fallback_fee_fixed" INTEGER NOT NULL DEFAULT 0,
+    "bank_name" TEXT,
+    "bank_account_name" TEXT,
+    "bank_account_number" TEXT,
+    "bank_instructions" TEXT,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
     CONSTRAINT "settings_pkey" PRIMARY KEY ("id")
@@ -201,19 +206,19 @@ CREATE INDEX "availability_blocks_doctor_id_idx" ON "availability_blocks"("docto
 CREATE INDEX "appointments_doctor_id_slot_start_idx" ON "appointments"("doctor_id", "slot_start");
 
 -- CreateIndex
+CREATE INDEX "appointments_slot_start_idx" ON "appointments"("slot_start");
+
+-- CreateIndex
 CREATE INDEX "appointments_patient_user_id_idx" ON "appointments"("patient_user_id");
 
 -- CreateIndex
 CREATE INDEX "appointments_state_idx" ON "appointments"("state");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "payments_refund_idempotency_key_key" ON "payments"("refund_idempotency_key");
+CREATE INDEX "notification_jobs_status_scheduled_for_idx" ON "notification_jobs"("status", "scheduled_for");
 
 -- CreateIndex
-CREATE INDEX "payments_appointment_id_idx" ON "payments"("appointment_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "payments_patient_user_id_slot_start_key" ON "payments"("patient_user_id", "slot_start");
+CREATE UNIQUE INDEX "notification_jobs_appointment_id_type_dedupe_key_key" ON "notification_jobs"("appointment_id", "type", "dedupe_key");
 
 -- CreateIndex
 CREATE INDEX "prescriptions_appointment_id_idx" ON "prescriptions"("appointment_id");
@@ -229,6 +234,9 @@ CREATE INDEX "audit_log_actor_type_idx" ON "audit_log"("actor_type");
 
 -- CreateIndex
 CREATE INDEX "audit_log_at_idx" ON "audit_log"("at");
+
+-- CreateIndex
+CREATE INDEX "audit_log_target_ref_idx" ON "audit_log"("target_ref");
 
 -- CreateIndex
 CREATE INDEX "analytics_events_type_idx" ON "analytics_events"("type");
@@ -252,15 +260,17 @@ ALTER TABLE "appointments" ADD CONSTRAINT "appointments_doctor_id_fkey" FOREIGN 
 ALTER TABLE "appointments" ADD CONSTRAINT "appointments_patient_user_id_fkey" FOREIGN KEY ("patient_user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "payments" ADD CONSTRAINT "payments_appointment_id_fkey" FOREIGN KEY ("appointment_id") REFERENCES "appointments"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "notification_jobs" ADD CONSTRAINT "notification_jobs_appointment_id_fkey" FOREIGN KEY ("appointment_id") REFERENCES "appointments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
+-- AddForeignKeynpx prisma migrate reset --force --skip-seed
 ALTER TABLE "prescriptions" ADD CONSTRAINT "prescriptions_appointment_id_fkey" FOREIGN KEY ("appointment_id") REFERENCES "appointments"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "prescription_items" ADD CONSTRAINT "prescription_items_prescription_id_fkey" FOREIGN KEY ("prescription_id") REFERENCES "prescriptions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- NO-DOUBLE-BOOKING partial index (PRD §3.3 #1) — cannot be expressed in Prisma DSL (no WHERE on @@unique)
+-- NO-DOUBLE-BOOKING partial index (PRD §3.3 #1) — cannot be expressed in Prisma DSL (no WHERE on @@unique).
+-- Hand-appended per docs/specification/04-DATABASE_DOCUMENT.md §4b. Releasing/terminal state (cancelled)
+-- is excluded so a freed slot is immediately rebookable. A second insert for a held slot then fails at
+-- WRITE time, not validation time.
 CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
-  WHERE state IN ('slot_locked','confirmed','in_progress','completed',
-                  'prescription_issued','cancelled_no_refund');
+  WHERE state IN ('pending', 'confirmed');
