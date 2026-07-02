@@ -1,8 +1,22 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { DoctorForm } from '#src/modules/admin/components/DoctorForm/DoctorForm.jsx';
 
 describe('DoctorForm (A-01)', () => {
+  // jsdom lacks URL.createObjectURL; the photo preview effect relies on it (house pattern).
+  beforeEach(() => {
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:preview'),
+      revokeObjectURL: vi.fn(),
+    });
+  });
+  // Unmount (runs the preview effect's revokeObjectURL cleanup) while URL is still stubbed,
+  // then remove the stub.
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
   it('add mode collects all F10.01 fields incl. initial password, submits PKR fee as paisa', () => {
     const onSubmit = vi.fn();
     render(<DoctorForm mode="add" onSubmit={onSubmit} onCancel={() => {}} />);
@@ -72,6 +86,24 @@ describe('DoctorForm (A-01)', () => {
     expect(screen.queryByLabelText('Email')).toBeNull();
     expect(screen.queryByLabelText('Initial password')).toBeNull();
     expect(screen.getByText(/never affect existing appointments/)).toBeTruthy();
+  });
+
+  it('edit mode shows the existing photo, and previews a newly selected file', () => {
+    render(
+      <DoctorForm
+        mode="edit"
+        initial={{ fullName: 'Dr A', phone: '0300', specialization: 'Acne', fee: 250000, bio: 'b', photoUrl: '/uploads/doctors/abc.jpg' }}
+        onSubmit={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    // Existing photo is shown on open.
+    const img = screen.getByAltText('Profile photo preview');
+    expect(img.getAttribute('src')).toBe('/uploads/doctors/abc.jpg');
+    // Selecting a new file swaps the preview to the object URL.
+    const photo = new File(['x'], 'new.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText(/profile photo/i), { target: { files: [photo] } });
+    expect(screen.getByAltText('Profile photo preview').getAttribute('src')).toBe('blob:preview');
   });
 
   it('weekly template editor adds a block row into the submitted payload', () => {

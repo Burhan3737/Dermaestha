@@ -5,5 +5,5 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   // Dev-only: proxy API calls to the Express server. In prod the SPA is served same-origin.
-  server: { proxy: { '/api': 'http://localhost:3000', '/dev': 'http://localhost:3000' } },
+  server: { proxy: { '/api': 'http://localhost:3000', '/dev': 'http://localhost:3000', '/uploads': 'http://localhost:3000' } },
 })

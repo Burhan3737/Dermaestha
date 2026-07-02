@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -57,6 +57,17 @@ function renderView() {
 beforeEach(() => {
   vi.clearAllMocks();
   api.get.mockResolvedValue(DOCTORS);
+  // jsdom lacks URL.createObjectURL; the DoctorForm photo-preview effect relies on it.
+  vi.stubGlobal('URL', {
+    createObjectURL: vi.fn(() => 'blob:preview'),
+    revokeObjectURL: vi.fn(),
+  });
+});
+
+// Unmount (runs the preview effect's revokeObjectURL cleanup) while URL is still stubbed.
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe('AdminDoctors (A-01)', () => {

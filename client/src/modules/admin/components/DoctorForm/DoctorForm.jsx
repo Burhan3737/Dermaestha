@@ -1,5 +1,5 @@
 // @ts-check
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../../../../shared/Button/Button.jsx';
 import { Field } from '../../../../shared/Field/Field.jsx';
 import { Alert } from '../../../../shared/Alert/Alert.jsx';
@@ -26,7 +26,22 @@ export function DoctorForm({ mode, initial = {}, isSaving = false, error = null,
   const [blocks, setBlocks] = useState(initial.blocks ?? []);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoError, setPhotoError] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // Preview the newly selected file; fall back to the existing photo (edit mode). The object
+  // URL is revoked on change/unmount so repeated selections don't leak blobs.
+  useEffect(() => {
+    if (!photoFile) {
+      setPreviewUrl(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
+
+  const shownPhoto = previewUrl ?? initial.photoUrl ?? null;
 
   const submit = (e) => {
     e.preventDefault();
@@ -87,6 +102,13 @@ export function DoctorForm({ mode, initial = {}, isSaving = false, error = null,
         />
       )}
 
+      {shownPhoto && (
+        <img
+          src={shownPhoto}
+          alt="Profile photo preview"
+          style={{ display: 'block', width: 96, height: 96, objectFit: 'cover', borderRadius: 8, marginBottom: 'var(--sp-2)' }}
+        />
+      )}
       <Field
         label={`Profile photo (JPEG/PNG/WebP, max 2MB)${mode === 'add' ? ' — required' : ''}`}
         id="df-photo"
