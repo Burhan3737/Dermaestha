@@ -20,6 +20,10 @@ User asked whether migrations are still needed given the DB is already in its fi
 |---|---|---|
 | `prisma/migrations/` (9 old dirs) | Deleted | Superseded by the single consolidated baseline (`migration_lock.toml` kept) |
 | `prisma/migrations/20260702202106_init/migration.sql` | Created | Fresh baseline generated from final schema (13 tables, all indexes) + hand-appended `uniq_active_slot` partial index (`WHERE state IN ('pending','confirmed')`) |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | Added ADR-46 (migration consolidation) + footer row; v1.23→1.24 |
+| `docs/specification/04-DATABASE_DOCUMENT.md` | Modified | §4b caveat names the baseline as the index's home (ADR-46) + footer row; v1.10→1.11 |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | "Prisma schema + migrations" row re-pointed to the consolidated baseline + footer row; v1.28→1.29 |
+| `README.md` | Modified | Migration caveat: re-pointed to `20260702202106_init` + fixed a doubly-stale index SQL block (old 6-state list → `pending`/`confirmed`) |
 
 ## Dependencies / config / schema
 DB schema unchanged (identical to pre-squash). Local dev DB wiped twice (`migrate reset --force --skip-seed`, run by the user) and rebuilt from the single baseline. Seeded prod-style with admin only via `npm run bootstrap:admin` (`admin@dermestha.dev` / `ChangeMe123!` — placeholder, rotate). No package/env changes.
@@ -46,17 +50,11 @@ DB schema unchanged (identical to pre-squash). Local dev DB wiped twice (`migrat
 Local-only blast radius. Revert = `git checkout prisma/migrations` to restore the 9 original migration dirs, then `npx prisma migrate reset --force`. No shared/prod DB affected (app not deployed).
 
 ## Open items / next session
-Doc-impact consolidated list (present for approval; apply only after code committed). Only DOCS reference the old migration filenames — no code does. `agentChangeLogs/*` and `docs/superpowers/plans/*` are historical and left untouched.
-
-Stale current-state pointers to now-deleted migration files → repoint to `20260702202106_init`:
-- doc 04 §406 (`manual_payment_pivot`), §540/§549/§556 (`slice_h_s6_indexes` provenance)
-- doc 07 §93, §127 (`slice_h_s6_indexes`)
-- doc 11 §162 (ADR-31: `prisma/migrations/20260531163617_init/migration.sql`)
-- doc 13 §105, §180 (`20260531163617_init` + `slice_h_s6_indexes`)
-- README.md §162 (`20260531163617_init/migration.sql`)
-
-Governance:
-- Recommend new ADR-46 (doc 11) recording the pre-launch migration consolidation (per change-impact matrix: new decision → 11, then affected docs).
-- doc 04 revision footer (§617–625): leave historical rows; ADD one new footer row for the squash rather than rewriting history.
+Doc-impact: APPLIED (committed separately after the code commit, per change protocol).
+- Added ADR-46 (doc 11) as the canonical record; bumped versions + footers on docs 04/11/13.
+- Fixed current-state locators: doc 13 "Prisma schema + migrations" row, README migration caveat (+ its stale SQL), doc 04 §4b caveat.
+- INTENTIONALLY PRESERVED as development history (covered by ADR-46, not rewritten): the provenance prose naming old migrations in doc 04 (§240/§246/§406/§469/§530/§540/§549/§556), doc 07 (§93/§127), doc 11 (§439/§495), doc 13 (§180), and all revision-footer rows. Rewriting these to the baseline name would falsify which change introduced what.
+- Onboarding files (`onboarding/*`) + doc 10 + doc 15: NO change needed — they use generic commands (`migrate deploy`, `db:seed`, `bootstrap-admin`) and process descriptions, no old migration filenames.
+- `agentChangeLogs/*`, `docs/superpowers/plans/*`: historical, left untouched.
 
 Separate follow-up task (NOT this session): retire `seed.js` — move server integration test fixtures (`server/test/integration/prescription.test.js` depends on `dr.ayesha@dermestha.dev`) onto another seed, then update README + onboarding/* + doc 10 §4.1 + doc 13.

@@ -159,12 +159,11 @@ No database required. Expected: **2 tests, 1 file** (RoleRoute guards).
 
 ## Migration caveat (IMPORTANT)
 
-The no-double-booking guarantee (PRD §3.3 #1) is enforced by a **partial unique index** (`uniq_active_slot`) that Prisma's schema DSL cannot express (Prisma has no `WHERE` clause on `@@unique`). This index lives as hand-appended SQL at the bottom of `prisma/migrations/20260531163617_init/migration.sql`:
+The no-double-booking guarantee (PRD §3.3 #1) is enforced by a **partial unique index** (`uniq_active_slot`) that Prisma's schema DSL cannot express (Prisma has no `WHERE` clause on `@@unique`). This index lives as hand-appended SQL at the bottom of the single consolidated baseline `prisma/migrations/20260702202106_init/migration.sql`:
 
 ```sql
 CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
-  WHERE state IN ('slot_locked','confirmed','in_progress','completed',
-                  'prescription_issued','cancelled_no_refund');
+  WHERE state IN ('pending', 'confirmed');
 ```
 
 `prisma migrate deploy` applies it automatically from the file. However, **if you ever recreate the init migration from scratch** (e.g. `prisma migrate dev --create-only` on an empty DB), Prisma will regenerate the SQL without this block and you must re-append it manually. See `docs/engineering/CONFIG.md §7.2` for the full spec.

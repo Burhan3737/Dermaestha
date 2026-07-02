@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.23                                                                                              |
-| Last updated     | 2026-07-02                                                                                         |
+| Version          | 1.24                                                                                              |
+| Last updated     | 2026-07-03                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -694,6 +694,20 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-46 — Consolidate pre-launch migrations into a single baseline
+
+**Date:** 2026-07-03
+
+**Status:** Accepted
+
+**Context:** Pre-deployment, the schema is final and `prisma/migrations/` held nine incremental migrations accumulated across Slices A–H — several of which hand-edited and rebuilt the `uniq_active_slot` partial index as the state machine evolved. With no deployed database to preserve, that incremental history is maintenance noise (nine files to read, multiple partial-index rebuilds) with no operational value. (agentChangeLogs/2026-07-03-0111-consolidate-prisma-migrations.md)
+
+**Decision:** Collapse the nine migrations into a single baseline `20260702202106_init`, generated from `schema.prisma` against an empty dev DB, with the no-double-booking `uniq_active_slot` partial index (invariant #1, doc 04 §4b) hand-appended to its SQL — the index cannot be expressed in the Prisma DSL and is not reproduced by a schema regeneration. Migrations are **retained, not abandoned**: production still deploys via `prisma migrate deploy`, and the partial index lives only in migration SQL, so a `db push`-only workflow would silently omit it on a fresh database. Applied on the local dev DB only (the app is not yet deployed).
+
+**Consequences:** `prisma/migrations/` now holds one baseline that reproduces the complete, correct schema — partial index included — from empty; verified via `migrate status` (clean, single `_prisma_migrations` row) and a direct check that `uniq_active_slot` exists. The nine former migration names (`20260531163617_init`, `20260602221542_add_reset_token_columns`, `20260604141222_add_video_join_columns`, `20260610231617_slice_e_notification_outbox`, `20260612003907_slice_f_outbox_dedupe_key`, `20260613181905_slice_h_refund_manual_required`, `20260613213051_slice_h_s6_indexes`, `20260627000000_manual_payment_pivot`, `20260628000000_drop_completed_state`) no longer exist on disk. References to them elsewhere in this suite (docs 04, 07, 11, 13) are **preserved as development history** — the DDL they introduced now lives in the single baseline. Repeating this consolidation is safe only while the app remains undeployed; once a shared/prod DB exists the baseline must be treated as immutable and further changes made as new forward migrations.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -722,3 +736,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-28 | Added ADR-43 (manual offline payment + 3-state appointment model); marked ADR-11/12/22/24/25/32/33 Superseded and ADR-15/23/27/39 Partially superseded | Manual-payment pivot — removes the PayFast gateway, refund subsystem, no-show lifecycle, Daily webhook, and `completed` state (as-built sync) |
 | 2026-06-30 | Added ADR-44 (single-active-appointment limit — one upcoming appointment per patient via `ACTIVE_LOCK_EXISTS`; replaces the No-Overlap rule, broadens the old Single-Lock, adds patient pending-cancel) | Single-active-appointment limit |
 | 2026-07-02 | Added ADR-45 (doctor appointments use the patient's time-based Upcoming/Past split; pending visible-but-inert; tabs relabeled) and marked ADR-42 Partially superseded | Doctor Upcoming/Past bugfix (ended-today row shown as cancellable) |
+| 2026-07-03 | Added ADR-46 (consolidate the nine pre-launch migrations into a single baseline `20260702202106_init`; `uniq_active_slot` re-appended; migrations retained for prod `migrate deploy`) | Pre-launch migration consolidation |
