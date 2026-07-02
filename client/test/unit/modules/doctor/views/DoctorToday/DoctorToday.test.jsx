@@ -71,6 +71,7 @@ describe('D-02 DoctorToday', () => {
     expect(screen.getByText(/awaiting payment confirmation/i)).toBeTruthy();
     expect(screen.queryByRole('link', { name: /join call/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /^cancel$/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /write prescription/i })).toBeNull();
   });
 
   it('lists upcoming appointments with the patient name', async () => {
