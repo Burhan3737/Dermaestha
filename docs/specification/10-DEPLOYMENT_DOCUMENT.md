@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | 10-DEPLOYMENT_DOCUMENT                                                                                  |
 | Status           | Canonical                                                                                               |
-| Version          | 1.8                                                                                                     |
-| Last updated     | 2026-06-28                                                                                              |
+| Version          | 1.9                                                                                                     |
+| Last updated     | 2026-07-04                                                                                              |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §13, §14; Dockerfile; docker-compose.yml; .env.example; package.json` |
 | Related docs     | 03, 08, 15                                                                                              |
 
@@ -75,6 +75,8 @@ Hosted on **Railway** in the **Mumbai or Singapore region** (closest to Karachi 
 
 Full env-var reference: **doc 15 (15-CONFIGURATION_REFERENCE_DOCUMENT)**.
 
+**Free-tier alternative (non-canonical).** The same Docker image also runs on a free stack for demos/evaluation — a Render web service (app) plus a Neon managed Postgres (`DATABASE_URL`), with Daily.co and email on their own free tiers. Portable by construction (doc 03 §6), it needs no code change. Per-scenario operator commands and the free-tier caveats live in the `deployment/README.md` runbook. Railway remains the canonical production target.
+
 ---
 
 ## 3. Pre-deployment checklist
@@ -98,7 +100,7 @@ Complete every item before triggering a production deploy.
 - [ ] **Environment variables set** — all required vars from doc 15 are configured in Railway's environment dashboard; no var is left empty for production.
 - [ ] **Secrets rotated per environment** — `SESSION_SECRET`, `DAILY_API_KEY`, `RESEND_API_KEY`, `SENTRY_DSN`.
 - [ ] **Bank-transfer settings populated** — the admin `settings` row carries the live `bankName` / `bankAccountName` / `bankAccountNumber` / `bankInstructions` shown to patients on a pending booking; verify they are set before taking real bookings (payment is offline, admin-verified — ADR-43).
-- [ ] **Dev provider switch OFF** — `EMAIL_PROVIDER` is unset or `stub` (NOT `console`) so the dev email stub is never used in production (doc 08; doc 15).
+- [ ] **Real email configured** — production delivery requires `RESEND_API_KEY` set **and** `EMAIL_PROVIDER` not `console`. `pickProvider()` (`server/src/integrations/email/index.js`) only special-cases `console`; any other value — including `stub` or unset — falls back to the console logger **when `RESEND_API_KEY` is absent**, so a missing key means no real emails are sent despite a non-`console` provider (doc 08; doc 15).
 - [ ] **Dev video switch OFF** — `VIDEO_PROVIDER` is unset or `stub` (NOT `mock`) so the dev mock video provider is never used in production. (The only dev route, `POST /dev/worker/notifications`, is mounted solely when `NODE_ENV=development`.) (ADR-24; doc 08; doc 15.)
 - [ ] **Uploads directory configured** — `UPLOADS_DIR` is set (default `./uploads`) and the path is writable and backed by persistent storage (a Railway volume), otherwise doctor profile photos are lost on every redeploy. See doc 15 §8 (File Storage).
 - [ ] **Settings singleton — automatic.** The `settings` row (`id = 1`) is bootstrapped **automatically at server boot** by `ensureSettings()` (`server/src/index.js`), which idempotently upserts `id = 1` (schema defaults fill the row). No manual `INSERT`, seed step, or first-deploy action is required; `GET`/`PUT /api/admin/settings` work on a fresh DB. (Slice H · S6, resolving the prior known gap.)
@@ -175,6 +177,8 @@ npm run build:client          # produces client/dist/
    # Via Railway's shell or a one-off service command
    npx prisma migrate deploy
    ```
+
+   > **First-boot ordering — migrate before the app boots.** The app queries the DB at startup: `ensureSettings()` upserts `settings(id=1)` *before* `listen()` (`server/src/index.js`), so against an un-migrated database the process crashes before it can serve. Railway's one-off command runs in a separate instance of the image, independent of the (crash-looping) main service, so running `migrate deploy` this way recovers it. On a host with no independent release/one-off phase (e.g. Render free, whose shell needs a live instance), run `prisma migrate deploy` against the managed database from an operator machine **before the first deploy**. This affects only a fresh/empty DB — the schema then persists across redeploys.
 
 7. Verify the `uniq_active_slot` partial index is present (see checklist §3).
 
@@ -322,3 +326,4 @@ A formal version scheme and Git tagging convention have not been established. At
 | 2026-06-14 | Added a Node-version-floor note under the Dockerfile build steps: `@daily-co/daily-js@0.91.0` (video UI) requires Node ≥22.14.0; `node:22-slim` satisfies it but must not be pinned below that (doc 07 open-q 11) | Slice H · S3 (video consultation UI; ADR-34) |
 | 2026-06-14 | Settings singleton (id=1) is now bootstrapped automatically at boot via `ensureSettings()` — replaced the manual-insert first-deploy checklist item + adjusted the local-dev seed note (§3, §4.1); renamed `ERROR_TRACKING_DSN` → `SENTRY_DSN` (secrets checklist §3 + error-tracking paragraph §8, now naming Sentry + PII scrub; ADR-36) | Slice H · S6 (launch foundation + hardening) |
 | 2026-06-28 | Removed all PayFast/payment-gateway and refund deploy facts: dropped the `PAYFAST_MODE` env row + staging note (§2), the `PAYFAST_*` secret + PayFast-KYC checklist items + `PAYMENT_PROVIDER`/`/dev/checkout` switch (§3), the PayFast webhook-reachability check (§7), and the Webhook-mismatch + Refund-exhaustion alert rows (§8); booking-validation + worker-liveness now reflect the manual book→pending→reference→admin-accept flow and the single `notification-dispatch` worker; added a bank-transfer-settings checklist item; corrected the `uniq_active_slot` hand-append SQL to the as-built `WHERE state IN ('pending', 'confirmed')` (ADR-43) | Manual-payment pivot — as-built sync |
+| 2026-07-04 | §2 added a non-canonical free-tier host alternative (Render app + Neon Postgres) pointing to the `deployment/README.md` runbook; §3 reworded the email pre-deploy check to the accurate condition (`RESEND_API_KEY` set + `EMAIL_PROVIDER` ≠ `console`; unset/`stub` without a key silently falls back to the console logger); §4.2 added a first-boot ordering caveat (`ensureSettings()` queries the DB before `listen()` → migrate before first boot on hosts without an independent release/one-off phase) | Free-tier deployment runbook — doc-10 alignment |

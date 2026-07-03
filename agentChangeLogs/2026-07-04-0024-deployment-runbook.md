@@ -21,6 +21,7 @@ User is evaluating a genuinely-free deployment and asked, across the session, ho
 | `deployment/README.md` | Created | Concise free-tier deployment runbook (Render + Neon), all five scenarios + rollback + caveats |
 | `agentChangeLogs/2026-07-04-0024-deployment-runbook.md` | Created | This session changelog |
 | `agentChangeLogs/index.md` | Modified | Added the session index line |
+| `docs/specification/10-DEPLOYMENT_DOCUMENT.md` | Modified | Spec doc-impact applied (user-approved): §2 free-tier host alternative, §3 email pre-deploy wording fix, §4.2 first-boot migrate caveat; v1.8→1.9 + footer row |
 
 ## Dependencies / config / schema
 None. No code, dependencies, schema, or env changes — documentation only.
@@ -44,4 +45,5 @@ Not verified at runtime — documentation only, no executable change. Env-var li
 Negligible — additive documentation. Revert by deleting `deployment/` and this changelog, and removing the index line.
 
 ## Open items / next session
-- Optional doc-10 improvements to consider (tracked, not applied): (1) the Render+Neon free path as an alternative to Railway; (2) the "empty-DB first-boot crash on hosts without a release phase" caveat; (3) the `EMAIL_PROVIDER` `stub`/`console` checklist wording. These touch a canonical spec (doc 10) and require the doc-impact approval flow.
+- The three tracked doc-10 improvements were **applied this session with user approval** (doc 10 v1.8→1.9): (1) §2 Render+Neon free-tier alternative; (2) §4.2 first-boot migrate-before-boot caveat; (3) §3 email pre-deploy wording fix. No further doc-impact outstanding.
+- Pre-existing, unrelated working-tree change left untouched: `agentChangeLogs/2026-07-03-0111-consolidate-prisma-migrations.md` (prior session's skill-file line) — flagged to the user, not committed here.
