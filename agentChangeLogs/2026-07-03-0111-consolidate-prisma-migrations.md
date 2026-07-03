@@ -24,6 +24,7 @@ User asked whether migrations are still needed given the DB is already in its fi
 | `docs/specification/04-DATABASE_DOCUMENT.md` | Modified | §4b caveat names the baseline as the index's home (ADR-46) + footer row; v1.10→1.11 |
 | `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | "Prisma schema + migrations" row re-pointed to the consolidated baseline + footer row; v1.28→1.29 |
 | `README.md` | Modified | Migration caveat: re-pointed to `20260702202106_init` + fixed a doubly-stale index SQL block (old 6-state list → `pending`/`confirmed`) |
+| `.claude/skills/dermestha-migration-reset/SKILL.md` | Created | Project-local skill capturing the full-consolidation procedure (re-runnable for future schema changes); authored via superpowers:writing-skills (RED baseline + GREEN verify subagents) |
 
 ## Dependencies / config / schema
 DB schema unchanged (identical to pre-squash). Local dev DB wiped twice (`migrate reset --force --skip-seed`, run by the user) and rebuilt from the single baseline. Seeded prod-style with admin only via `npm run bootstrap:admin` (`admin@dermestha.dev` / `ChangeMe123!` — placeholder, rotate). No package/env changes.
