@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------- |
 | Document ID      | `12-SCOPE_FEATURE_TEST_CASES_DOCUMENT` |
 | Status           | Canonical                              |
-| Version          | 1.12                                  |
-| Last updated     | 2026-07-02                             |
+| Version          | 1.13                                  |
+| Last updated     | 2026-07-05                             |
 | Sources absorbed | `docs/specification/02, 08, 09`        |
 | Related docs     | 02, 08, 09                             |
 
@@ -265,6 +265,9 @@ Cases are grouped by feature. Each case lists all six fields. IDs are sequential
 | TC-F15-002 | F15.03 Forced first-login change (DA3)          | `D` just created by admin (`mustChangePassword=true`) | 1. `D` logs in for the first time. 2. Attempt to reach the doctor panel.                   | `D` is blocked from non-auth routes until the password is changed; on successful change the flag clears and the panel is reachable. | Critical |
 | TC-F15-003 | F15.06 Single-Middleware Rule (role boundary)   | `P` logged in                                         | 1. `P` requests an `/api/admin/*` route.                                                   | The request is rejected by the single `requireRole` middleware (out-of-role); the server is the enforcement boundary.               | Critical |
 | TC-F15-004 | F15.05 Doctor recovery is admin-mediated (DA5)  | `D` exists                                            | 1. Look for a self-service reset for `D`. 2. `A` resets `D`'s password from the edit page. | No self-service doctor reset exists; after admin reset `mustChangePassword` is set to true.                                         | High     |
+| TC-F15-005 | Superadmin admitted on admin routes (ADR-47, allow) | `SA` (superadmin) account exists (bootstrap/seed) | 1. Log in as `SA`. 2. Land on the dashboard. 3. Open the admin panel and each admin-gated route/tab. | `SA` routes to `/admin`; every `admin`-gated and admin-shared route admits `SA` (explicit per-route dual-listing); all **6 admin tabs** render; admin behavior is unchanged. | Critical |
+| TC-F15-006 | Superadmin scope boundary (ADR-47, deny) | `SA` (superadmin) and `P` (patient) accounts exist | 1. `SA` requests a patient- or doctor-only route (one not shared with admin). 2. `P` requests an `/api/admin/*` route / `/admin`. | `SA` is rejected by `requireRole` on routes that admit only patient/doctor (`superadmin` is admitted nowhere new beyond `admin`); `P` is blocked from `/admin` and admin routes (`403 FORBIDDEN`). | Critical |
+| TC-F15-007 | Superadmin audited as admin (ADR-47, coercion) | `SA` (superadmin) exists; `A` can query the audit log | 1. `SA` logs in (and/or performs an admin action). 2. `A` queries the audit log for that event. | The audit entry records `actor_type='admin'` (superadmin→admin coercion); `AuditActorType` has no `superadmin` value, so `SA` is not a distinct audit actor. | High     |
 
 ### F16 — Legal content (ToS / Privacy)
 
@@ -371,3 +374,4 @@ The Medicine Ordering Module (doc 02 §5, PRD §6) is **not part of the v1 build
 | 2026-06-28 | Retired (ADR-43) the PayFast gateway/checkout/webhook, refund, no-show, reconciliation, completion-worker, and removed-state cases (TC-F04-001/002/003/004/005/007/008/009, TC-F05-006/007/008/009/011/012/013/014/015, TC-F06-001…007, TC-F08-001/008/010/012, TC-F12-003, TC-F14-002, TC-SEC-008/012); added the manual-payment / admin-review / 3-state / prescribe-on-confirmed cases (TC-F04-010…013, TC-F05-018/019, TC-F06-008, TC-F08-016); re-pointed surviving state references to the 3-state model | Manual-payment pivot — as-built sync |
 | 2026-06-30 | Broadened TC-F03-007 to the Single-Active-Appointment Rule (`pending`/`confirmed`, `ACTIVE_LOCK_EXISTS`); retired TC-F03-008 (No-Overlap, subsumed); refreshed TC-F03-011 copy/labels; added TC-F03-012 (patient cancels a pending hold) (ADR-44) | Single-active-appointment limit |
 | 2026-07-02 | Rewrote TC-F05-016 from the retired Doctor Today-Scope Rule to the time-based Doctor Upcoming/Past Split Rule (ended-today `confirmed` excluded from Upcoming); added TC-F05-020 (doctor pending row inert) (ADR-45) | Doctor Upcoming/Past bugfix |
+| 2026-07-05 | Added TC-F15-005 (superadmin admitted on admin routes → `/admin` + all 6 admin tabs, allow), TC-F15-006 (superadmin scope boundary + patient blocked from `/admin`, deny), TC-F15-007 (superadmin login/action audited as `actor_type='admin'` by coercion) (ADR-47) | superadmin role |

@@ -3,8 +3,8 @@
 | Document ID      | 15-CONFIGURATION_REFERENCE_DOCUMENT          |
 | ---------------- | -------------------------------------------- |
 | Status           | Canonical                                    |
-| Version          | 1.11                                         |
-| Last updated     | 2026-06-28                                   |
+| Version          | 1.12                                         |
+| Last updated     | 2026-07-05                                   |
 | Sources absorbed | `docs/engineering/CONFIG.md`; `.env.example` |
 | Related docs     | 03, 04, 08, 10, 14                           |
 
@@ -174,6 +174,17 @@ Source: `.env.example`. Copy to `.env` for local dev; set real values in Railway
 | ---------------- | ------------------------------ | ---------------------------------------- |
 | `SESSION_SECRET` | Express-session signing secret | _(must be set — rotate per environment)_ |
 
+### Admin Bootstrap (DA4)
+
+One-off account creation via `prisma/scripts/bootstrap-admin.js`, run once on first deploy (rotate the passwords immediately after). The script creates **both** an `admin` and a `superadmin` account (each idempotent). All four variables are **bootstrap-only** — required when the script runs, never read at runtime, and with no default. There is no admin/superadmin self-signup and no in-app user-management UI (ADR-47).
+
+| Variable              | Purpose                                                            | Example / Default              |
+| --------------------- | ----------------------------------------------------------------- | ------------------------------ |
+| `ADMIN_EMAIL`         | Email for the bootstrap `admin` account                           | _(bootstrap-only; no default)_ |
+| `ADMIN_PASSWORD`      | Initial password for the bootstrap `admin` account                | _(bootstrap-only; no default)_ |
+| `SUPERADMIN_EMAIL`    | Email for the bootstrap `superadmin` account (DA4; ADR-47)        | _(bootstrap-only; no default)_ |
+| `SUPERADMIN_PASSWORD` | Initial password for the bootstrap `superadmin` account (ADR-47)  | _(bootstrap-only; no default)_ |
+
 ### Payment (offline — no gateway)
 
 Payment is offline bank transfer verified manually by the admin (ADR-43). **There is no payment gateway and no `PAYFAST_*` / `PAYMENT_PROVIDER` configuration.** Bank-transfer details shown to the patient are runtime-editable admin Settings (`bankName`, `bankAccountName`, `bankAccountNumber`, `bankInstructions`; A6), not env vars.
@@ -278,3 +289,4 @@ Source: root `package.json` (`scripts` + `devDependencies`). Run from the projec
 | 2026-06-14 | Renamed the Error-Tracking env var `ERROR_TRACKING_DSN` → `SENTRY_DSN` (string, optional; DSN-gated Sentry + PII scrub; ADR-36); flipped §7 #4 Dual-Zod "known inconsistency" → resolved (single zod@3 via `shared` workspace + root `overrides.zod`; duck-typing removed; ADR-37) | Slice H · S6 (launch foundation + hardening) |
 | 2026-06-14 | Added §9 Build & Test Scripts — recorded `npm run test:e2e` (`playwright test`) + noted `@playwright/test` as a cross-cutting root devDependency (like `vitest`); ADR-38 | Slice H · S7 (E2E QA + launch gate) |
 | 2026-06-28 | Manual-payment pivot (ADR-43): removed all `PAYFAST_*`/`PAYMENT_PROVIDER`/`REFUND_*`/`RECONCILIATION_*`/`NO_SHOW_GRACE_MIN`/`SLOT_LOCK_TTL_MIN`/`DAILY_WEBHOOK_SECRET` config; §3 worker cadence → single `notification-dispatch` job; §4 refund-retry section retired; §6 fallback-fee model → bank-transfer settings; Daily → free tier (no webhook); pay rate-limit re-scoped to the bank-reference submit endpoint; missing-Rx alert keyed on `confirmed` | Manual-payment pivot — config as-built sync |
+| 2026-07-05 | Added §8 "Admin Bootstrap (DA4)" subsection with the bootstrap-only env vars `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` (ADR-47); also documented the previously-undocumented `ADMIN_EMAIL` / `ADMIN_PASSWORD` they are modeled on, since `bootstrap-admin.js` requires all four (no runtime default) | superadmin role |

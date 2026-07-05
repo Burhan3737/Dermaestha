@@ -4,8 +4,8 @@
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | Document ID      | 11-ARCHITECTURE_DECISION_RECORD                                                                    |
 | Status           | Canonical                                                                                          |
-| Version          | 1.24                                                                                              |
-| Last updated     | 2026-07-03                                                                                         |
+| Version          | 1.25                                                                                              |
+| Last updated     | 2026-07-05                                                                                         |
 | Sources absorbed | `docs/engineering/ARCHITECTURE.md §3/§5/§8/§10/§12/§15; agentChangeLogs/; docs/superpowers/specs/` |
 | Related docs     | 03, 04, 05, 14                                                                                     |
 
@@ -59,6 +59,8 @@
 44. [ADR-43 — Manual offline payment + 3-state appointment model (supersedes the PayFast/refund/no-show subsystems)](#adr-43--manual-offline-payment--3-state-appointment-model-supersedes-the-payfastrefundno-show-subsystems)
 45. [ADR-44 — Single-active-appointment limit (supersedes the No-Overlap rule, broadens the old Single-Lock)](#adr-44--single-active-appointment-limit-supersedes-the-no-overlap-rule-broadens-the-old-single-lock)
 46. [ADR-45 — Doctor appointments use the patient's time-based Upcoming/Past split (supersedes ADR-42's Today/History semantics)](#adr-45--doctor-appointments-use-the-patients-time-based-upcomingpast-split-supersedes-adr-42s-todayhistory-semantics)
+47. [ADR-46 — Consolidate pre-launch migrations into a single baseline](#adr-46--consolidate-pre-launch-migrations-into-a-single-baseline)
+48. [ADR-47 — Superadmin role: explicit per-route dual-listing (no central role hierarchy)](#adr-47--superadmin-role-explicit-per-route-dual-listing-no-central-role-hierarchy)
 
 ---
 
@@ -708,6 +710,24 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 
 ---
 
+## ADR-47 — Superadmin role: explicit per-route dual-listing (no central role hierarchy)
+
+**Date:** 2026-07-05
+
+**Status:** Accepted
+
+**Context:** Dermestha needed an elevated internal-staff role above `admin`. The near-term requirement is only "an account that can do everything admin can," but a foreseeable future cycle will want to **restrict some admin capabilities** (i.e. keep certain routes for `superadmin` only while narrowing `admin`). The existing authorization model is a single variadic `requireRole(...)` middleware with **no central role hierarchy** — each route names the exact roles it admits (doc 05 §1; doc 08 §3.1).
+
+**Decision:** Add a fourth `Role` enum value `superadmin` (doc 04 §2a) and admit it via **explicit per-route dual-listing** rather than by teaching `requireRole` a hierarchy in which `admin` routes auto-admit `superadmin`. `superadmin` was added alongside `admin` at **23 `requireRole(...)` call sites across 6 files** (admin 9, doctor 8, medicine 3, appointment 1, prescription 1, auth 1); the middleware itself is unchanged (already variadic). Four **in-body** `admin` checks also admit `superadmin`: appointment & prescription service visibility (so a superadmin sees the record, not a 404) and the doctor & medicine controller `includeInactive` gates (so a superadmin is not 403'd). `superadmin` is admitted **wherever `admin` is, and nowhere else new** — never on patient- or doctor-only routes. Explicit dual-listing was chosen **over** a central hierarchy precisely so that `admin` can be restricted per-route later by simply removing `admin` from a route's role list without touching `superadmin`.
+
+Audit: the `AuditActorType` enum is left **unchanged** (`patient`/`doctor`/`admin`/`system`). A `superadmin`'s actions are recorded as **`actor_type='admin'` by deliberate coercion** — auth login/reset/change coerce `superadmin`→`admin`, and admin-action writes already hardcode `'admin'`. A role-accurate alternative (adding `superadmin` to `AuditActorType`) was **considered and deferred**.
+
+Client: `RoleRoute` accepts a role string or an array; admin routes are guarded per-route with `['admin','superadmin']` (each route declares its own roles, mirroring the server's easy-future-segregation posture); the Login/SignUp dashboard map routes `superadmin` → `/admin`. Account creation: `prisma/scripts/bootstrap-admin.js` now creates **both** an admin and a superadmin, each idempotent, from `ADMIN_EMAIL`/`ADMIN_PASSWORD` and `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` (doc 15 §8); `seed-baseline.js` adds a `baseline.superadmin@dermestha.test` dev account. There is no admin/superadmin self-signup and no in-app user-management UI (DA4 posture unchanged). The migration baseline was regenerated to `20260705115543_init` (ADR-46 single-baseline lineage; the hand-added `uniq_active_slot` partial index re-appended, doc 04 §4b).
+
+**Consequences:** This cycle `superadmin` is a **functional clone of `admin`** (superadmin ⊇ admin) with a separate identity, so a later cycle can segregate the two per-route with no middleware change. The deferred audit-actor decision means superadmin actions are **indistinguishable from admin in the audit log** until `AuditActorType` gains a `superadmin` value. Verified: 256 server/shared + 156 client tests green; the E2E pass confirms a superadmin logs in → `/admin`, sees all 6 admin tabs, admin behavior is unchanged, and a patient is blocked from `/admin`. Updates docs 04, 05, 08, 12, 13, 15.
+
+---
+
 ## Revision footer
 
 | Date       | Change           | Why                                                           |
@@ -737,3 +757,4 @@ Prisma's DSL cannot express a `WHERE` clause on a `UNIQUE` index, so this index 
 | 2026-06-30 | Added ADR-44 (single-active-appointment limit — one upcoming appointment per patient via `ACTIVE_LOCK_EXISTS`; replaces the No-Overlap rule, broadens the old Single-Lock, adds patient pending-cancel) | Single-active-appointment limit |
 | 2026-07-02 | Added ADR-45 (doctor appointments use the patient's time-based Upcoming/Past split; pending visible-but-inert; tabs relabeled) and marked ADR-42 Partially superseded | Doctor Upcoming/Past bugfix (ended-today row shown as cancellable) |
 | 2026-07-03 | Added ADR-46 (consolidate the nine pre-launch migrations into a single baseline `20260702202106_init`; `uniq_active_slot` re-appended; migrations retained for prod `migrate deploy`) | Pre-launch migration consolidation |
+| 2026-07-05 | Added ADR-47 (superadmin role via explicit per-route dual-listing at 23 `requireRole` sites + 4 in-body admin checks; no central hierarchy chosen so admin can be restricted per-route later; audit `actorType` coerced superadmin→admin, role-accurate alternative deferred; baseline regenerated to `20260705115543_init` under ADR-46 lineage); backfilled the missing ADR-46 index entry | superadmin role |

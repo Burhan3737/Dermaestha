@@ -5,7 +5,7 @@
 **Skill(s) used:** superpowers:brainstorming (opted in)
 **Ticket / issue:** None
 **Branch:** main (no code changes; design doc only)
-**Commits / PR:** None (awaiting user review; no commit per CLAUDE.md)
+**Commits / PR:** `f2084dd` on main (superadmin feature committed 2026-07-05, user-approved; not pushed)
 **Last updated:** 2026-07-05-1712
 **Tags:** #feature #design
 
@@ -48,6 +48,13 @@ User asked to add a `superadmin` role, same as `admin` for now but positioned to
 | `server/test/unit/scripts/bootstrap-admin.test.js` | Created | `ensureRoleUser` idempotency tests. |
 | `client/test/unit/lib/RoleRoute/RoleRoute.test.jsx` | Modified | +3 (array match/mismatch, string back-compat). |
 | `server/test/integration/superadmin.test.js` | Created | Task 4/5/6 integration assertions (created in Stage A; run in Stage C). |
+| `docs/specification/04-DATABASE_DOCUMENT.md` | Modified | Role enum → 4 values (+superadmin); §4b baseline pointer → `20260705115543_init`; footer, v1.12. |
+| `docs/specification/05-API_SPECIFICATION_DOCUMENT.md` | Modified | §1 RBAC + §4 role legend: superadmin admitted on all admin/admin-shared routes (explicit dual-listing); footer, v1.21. |
+| `docs/specification/08-SECURITY_COMPLIANCE_DOCUMENT.md` | Modified | §1 scoping + §3.1 role table & admission note + §3.4 audit-coercion note; footer, v1.12. |
+| `docs/specification/11-ARCHITECTURE_DECISION_RECORD.md` | Modified | New ADR-47 (explicit dual-listing, no hierarchy, audit coercion + deferred alternative); backfilled missing ADR-46 index entry; footer, v1.25. |
+| `docs/specification/12-SCOPE_FEATURE_TEST_CASES_DOCUMENT.md` | Modified | TC-F15-005/006/007 (superadmin allow / deny / audit-coercion); footer, v1.13. |
+| `docs/specification/13-PRODUCT_STATUS_TRACKER.md` | Modified | Migrations row → new baseline; F15 row records superadmin; footer, v1.30. |
+| `docs/specification/15-CONFIGURATION_REFERENCE_DOCUMENT.md` | Modified | §8 Admin Bootstrap subsection: `SUPERADMIN_EMAIL`/`PASSWORD` (+ documented `ADMIN_EMAIL`/`PASSWORD`); footer, v1.12. |
 
 ## Dependencies / config / schema
 - Schema: `superadmin` added to `enum Role` (Stage A edit); DB migration applied in Stage B (baseline regenerate via `dermestha-migration-reset`). `enum AuditActorType` intentionally unchanged.
@@ -79,8 +86,9 @@ Implementation verified — all green (2026-07-05):
 - Schema change (Role enum) is additive; no data migration. `AuditActorType` unchanged.
 
 ## Open items / next session
-- USER to review the working tree and decide on commit (no commit made this session).
-- Spec-suite doc-impact (04/05/08/11/12/13/15) tracked + presented; apply ONLY after code is committed + explicit approval (CLAUDE.md change protocol).
+- Feature committed as `f2084dd` (user-approved). Not pushed.
+- Audit role-accuracy follow-up: user reviewed the fix approach (add `superadmin` to `AuditActorType` + drop coercion + thread real role into the 12 hardcoded `actorType:'admin'` writes) and chose to KEEP the coercion — a superadmin's actions stay `actor_type='admin'`. No actorType change made ("lets keep it this way").
+- Spec-suite doc-impact APPLIED (2026-07-05, user-approved, after the code commit): 7 docs — 04 v1.12, 05 v1.21, 08 v1.12, 11 v1.25 (ADR-47), 12 v1.13 (TC-F15-005..007), 13 v1.30, 15 v1.12. Controller verified every edit against the diff (surgical, next-free IDs, cross-refs valid). Spec-doc edits are UNCOMMITTED pending the user's commit decision.
 - A background server (this session) is running on :3000 with the changes live.
 - Out of scope / next cycle: restrict `admin` by moving specific routes/tabs to `superadmin`-only.
 - Spec doc-impact (04/05/08/11/12/13/15) tracked; apply only at END after code committed + approval.

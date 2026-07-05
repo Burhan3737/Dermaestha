@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------- |
 | Document ID      | 04-DATABASE_DOCUMENT                                          |
 | Status           | Canonical                                                     |
-| Version          | 1.11                                                          |
-| Last updated     | 2026-07-03                                                    |
+| Version          | 1.12                                                          |
+| Last updated     | 2026-07-05                                                    |
 | Sources absorbed | `prisma/schema.prisma`; `docs/engineering/ARCHITECTURE.md §5` |
 | Related docs     | 02, 03, 05, 08, 15                                            |
 
@@ -48,6 +48,7 @@ enum Role {
   patient
   doctor
   admin
+  superadmin
 }
 
 enum DoctorStatus {
@@ -529,7 +530,7 @@ CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
 
 **Active states covered:** `pending`, `confirmed` (the two non-terminal states in the 3-state model, ADR-43; migration `20260628000000_drop_completed_state` rebuilt the index with this list). **Releasing / terminal state excluded:** `cancelled`. When an appointment is cancelled, its `(doctor_id, slot_start)` pair is no longer covered by the index, so the slot becomes rebookable. A second insert for a currently-held slot fails at write time (a unique violation), not at application-level validation time — this is intentional.
 
-**Migration caveat:** This index must be re-appended by hand whenever the baseline migration is regenerated from `schema.prisma`, or the `appointments` table is otherwise recreated via a destructive migration. As of the pre-launch migration consolidation (ADR-46) the index lives at the bottom of the single baseline `20260702202106_init/migration.sql`. See the `prisma/schema.prisma` header (this §4b is the canonical caveat).
+**Migration caveat:** This index must be re-appended by hand whenever the baseline migration is regenerated from `schema.prisma`, or the `appointments` table is otherwise recreated via a destructive migration. As of the pre-launch migration consolidation (ADR-46) the index lives at the bottom of the single baseline `20260705115543_init/migration.sql`. See the `prisma/schema.prisma` header (this §4b is the canonical caveat).
 
 ### 4c. Query indexes (non-unique)
 
@@ -624,3 +625,4 @@ The feature IDs below are the canonical IDs defined in `docs/specification/02-SC
 | 2026-06-14 | Documented the no-cascade release policy (§2f): `Payment.appointment` / `Prescription.appointment` are `ON DELETE RESTRICT` (no schema change) and the failed/abandoned-payment paths force-expire the lock rather than delete (ADR-39); corrected the now-stale §2n `onDelete: Cascade` rationale (the `payment.failed`/edge-#6a paths no longer delete — the cascade now backstops the lazy-reclaim delete) | Slice H · S7 (E2E QA + launch gate; ADR-39) |
 | 2026-06-28 | Manual-payment pivot (ADR-43): `AppointmentState` → 3 values (`pending`/`confirmed`/`cancelled`); dropped `PaymentStatus`/`RefundStatus` enums and the `Payment` model (§2f); `NotificationType` → `payment_submitted_admin`/`payment_not_received`/`cancellation` (was refund/apology types); added `Appointment.paymentReference`/`paymentSubmittedAt`, dropped `disputed`/`lockExpiresAt`/`doctorJoinedAt`/`patientJoinedAt`, `feeAtBooking` now snapshot at booking; `Settings` gained the four bank fields, dropped `fallbackFee*`; `uniq_active_slot` now `WHERE state IN ('pending','confirmed')`; pruned payment FKs/indexes/scope rows; migrations `20260627000000_manual_payment_pivot` + `20260628000000_drop_completed_state` | Manual-payment pivot — schema as-built sync |
 | 2026-07-03 | Consolidated the nine pre-launch migrations into a single baseline `20260702202106_init` (ADR-46) and named it as the current home of the `uniq_active_slot` index (§4b). The migration names in earlier rows/prose above are retained as development history — their DDL now lives in the baseline | Pre-launch migration consolidation (ADR-46) |
+| 2026-07-05 | `Role` enum → 4 values (added `superadmin`, §2a); repointed the §4b current-baseline pointer to the regenerated single baseline `20260705115543_init` (replaces `20260702202106_init`; `uniq_active_slot` re-appended, ADR-46 lineage; the 2026-07-03 footer name is kept as history). `AuditActorType` unchanged (superadmin actions audited as `admin` by coercion — see ADR-47) | superadmin role |

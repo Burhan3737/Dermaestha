@@ -4,8 +4,8 @@
 | ---------------- | ------------------------------------------------------------------------------------------------------- |
 | Document ID      | `08-SECURITY_COMPLIANCE_DOCUMENT`                                                                       |
 | Status           | Canonical                                                                                               |
-| Version          | 1.11                                                                                                    |
-| Last updated     | 2026-06-28                                                                                              |
+| Version          | 1.12                                                                                                    |
+| Last updated     | 2026-07-05                                                                                              |
 | Sources absorbed | `docs/product/PRD.md §3.6; docs/engineering/ARCHITECTURE.md §7, §11; docs/engineering/CONFIG.md §2, §5` |
 | Related docs     | 02, 05, 12, 15                                                                                          |
 
@@ -39,6 +39,7 @@ Scoping rules by role (PRD §3.6):
 - **Patient** — can read only their own appointments, profile, and prescriptions.
 - **Doctor** — can read and act on only the appointments assigned to them; their own profile and availability. Doctor schedule and contact information is accessible only to that doctor and admin.
 - **Admin** — can read any appointment, patient, doctor, or audit-log record via A5; admin-only routes (`/api/admin/*`) are unreachable by patient or doctor sessions.
+- **Superadmin** — this cycle a functional clone of `admin`: admitted on every `admin`-gated and admin-shared route via explicit per-route dual-listing, and nowhere else new (not on patient- or doctor-only routes). Audited as `actor_type='admin'` by coercion (§3.4; ADR-47).
 
 **Existence leak prevention.** Routes that act on resources a caller does not own return `404` rather than `403` to avoid confirming resource existence (PRD §3.6 authorization rules; ARCH §11).
 
@@ -197,16 +198,19 @@ The database is a **Railway-managed PostgreSQL** instance. Railway handles autom
 
 ### 3.1 RBAC model
 
-The platform uses role-based access control (RBAC) with three user-facing roles and one system actor:
+The platform uses role-based access control (RBAC) with four user-facing roles and one system actor:
 
-| Role      | Description                                                                                                                                           |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `patient` | Registered patients; self-managed accounts                                                                                                            |
-| `doctor`  | Dermatologists onboarded by admin; credentials managed by admin                                                                                       |
-| `admin`   | Internal Dermestha staff; single bootstrap account (DA4)                                                                                              |
-| `system`  | The in-process notification-dispatch worker (the single remaining cron job; reconciliation and appointment-evaluation workers were removed in the manual-payment pivot — ADR-43); no session, identified in audit entries by actor type |
+| Role         | Description                                                                                                                                           |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `patient`    | Registered patients; self-managed accounts                                                                                                            |
+| `doctor`     | Dermatologists onboarded by admin; credentials managed by admin                                                                                       |
+| `admin`      | Internal Dermestha staff; bootstrap account (DA4)                                                                                                     |
+| `superadmin` | Internal Dermestha staff, elevated; bootstrap account (DA4). This cycle a **functional clone of `admin`** — admitted wherever `admin` is and nowhere else new (ADR-47). Distinct role kept so `admin` can be restricted per-route in a future cycle |
+| `system`     | The in-process notification-dispatch worker (the single remaining cron job; reconciliation and appointment-evaluation workers were removed in the manual-payment pivot — ADR-43); no session, identified in audit entries by actor type |
 
-Roles are stored on the `users.role` enum column. A single `requireRole(...)` middleware reads the session's role and rejects any request outside the allowed roles for the route. This is the **exclusive route-level authorization mechanism** and is never enforced only on the frontend. Supplemental **parameter-level** authorization may additionally be performed in a handler body where the protected surface is a specific query param rather than the route itself — for example, the admin-only `includeInactive` flag on the otherwise-shared doctor/medicine list routes gates the param with an in-handler `req.session.role !== 'admin'` check (PRD DA6; ARCH §7; ARCH §11).
+Roles are stored on the `users.role` enum column. A single `requireRole(...)` middleware reads the session's role and rejects any request outside the allowed roles for the route. This is the **exclusive route-level authorization mechanism** and is never enforced only on the frontend. Supplemental **parameter-level** authorization may additionally be performed in a handler body where the protected surface is a specific query param rather than the route itself — for example, the admin-only `includeInactive` flag on the otherwise-shared doctor/medicine list routes gates the param with an in-handler role check (PRD DA6; ARCH §7; ARCH §11).
+
+**`superadmin` admission (ADR-47).** There is **no central role hierarchy** in `requireRole`; `superadmin` is admitted by **explicit per-route dual-listing** — every `admin`-gated `requireRole(...)` names both `admin` and `superadmin`, and the four in-body `admin` checks (doctor & medicine `includeInactive` gates; appointment & prescription service visibility) admit it too. This makes `superadmin` ⊇ `admin` this cycle without granting any patient- or doctor-only route. A `superadmin`'s actions are recorded in the audit log as **`actor_type='admin'`** by deliberate coercion (auth login/reset/change coerce `superadmin`→`admin`; admin-action writes already hardcode `admin`); the `AuditActorType` enum is unchanged (`patient`/`doctor`/`admin`/`system`), so `superadmin` is not a distinct audit actor. A role-accurate alternative (adding `superadmin` to `AuditActorType`) was considered and deferred (ADR-47).
 
 ### 3.2 Endpoint authorization by route group
 
@@ -231,7 +235,7 @@ For the full list of routes with per-endpoint role requirements, see **document 
 
 ### 3.4 Audit traceability
 
-Every security-relevant action is written to `audit_log` by `audit.service.record()` with: `at` (UTC timestamp), `event_type`, `actor_type` (`patient` / `doctor` / `admin` / `system`), `actor_id`, `target_ref`, optional `reason`, and optional `meta` jsonb. The log is append-only; no update or delete path is exposed at any layer.
+Every security-relevant action is written to `audit_log` by `audit.service.record()` with: `at` (UTC timestamp), `event_type`, `actor_type` (`patient` / `doctor` / `admin` / `system`), `actor_id`, `target_ref`, optional `reason`, and optional `meta` jsonb. The log is append-only; no update or delete path is exposed at any layer. A `superadmin`'s actions are recorded as `actor_type='admin'` by deliberate coercion — `superadmin` is not a distinct `AuditActorType` value (§3.1; ADR-47).
 
 The admin can query the log via the filtered API backing A5 (filters: appointment ID, user ID/email, event type, actor type, date range). No write or delete API for audit entries is exposed.
 
@@ -275,3 +279,4 @@ No WCAG conformance target or accessibility acceptance criteria is set for v1. T
 | 2026-06-14 | §4.2: noted the public/unauthenticated `/legal/terms`,`/legal/privacy` pages are built as banner-marked DRAFT pending legal review, and that the Privacy page cross-references this document's §2 data-handling policies (final copy = pre-launch gate; ADR-35) | Slice H · S4 (public surface — landing + legal) |
 | 2026-06-14 | A05: documented the Sentry error-tracking control — DSN-gated (`SENTRY_DSN`), `sendDefaultPii:false`, `beforeSend` scrubs request bodies/cookies/auth headers/user identity before egress + external error-egress posture; renamed the generic "error-tracking DSN" secret to `SENTRY_DSN` in the §A05 secrets list and the §A09 `captureException` note (ADR-36) | Slice H · S6 (launch foundation + hardening) |
 | 2026-06-28 | Manual-payment pivot sync: reclassified payment data as low-sensitivity free-text bank reference (§2.1); removed the PayFast webhook + Daily webhook signature-verification, refund-idempotency, and reconciliation controls (A04/A08), the PayFast adapter + IPN/mock-payment controls (A05), the `disputed` marker (§3.5) and the payfast webhook route (§3.2); re-scoped the payment rate-limit row and audit/alert coverage (A07/A09); dropped `PAYFAST_*` from the secrets list | Manual-payment pivot — as-built sync (ADR-43) |
+| 2026-07-05 | Added `superadmin` to the §3.1 RBAC role table (internal staff, elevated; this cycle a functional admin clone) + a §3.1 admission note (explicit per-route dual-listing, no central hierarchy; in-body admin checks also admit it; actions audited as `actor_type='admin'` by coercion, `AuditActorType` unchanged); enumerated superadmin in the A01 scoping list (§1); noted the audit coercion in §3.4 (ADR-47) | superadmin role |

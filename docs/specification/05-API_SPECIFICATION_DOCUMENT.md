@@ -4,8 +4,8 @@
 | ---------------- | ----------------------------- |
 | Document ID      | 05-API_SPECIFICATION_DOCUMENT |
 | Status           | Canonical                     |
-| Version          | 1.20                         |
-| Last updated     | 2026-07-02                    |
+| Version          | 1.21                         |
+| Last updated     | 2026-07-05                    |
 | Sources absorbed | `docs/engineering/API.md`     |
 | Related docs     | 02, 03, 04, 08, 14            |
 
@@ -37,7 +37,7 @@ This document is a faithful re-presentation of `docs/engineering/API.md`. It des
 
 **`mustChangePassword` gate:** When a doctor account is created by an admin (or has its password manually reset via `POST /api/doctors/:id/reset-password`), the flag `mustChangePassword` is set to `true`. The middleware blocks all non-auth routes for that session until `POST /api/auth/change-password` is called, which clears the flag (DA3). Blocked requests return `403 MUST_CHANGE_PASSWORD`.
 
-**Role-based access control (DA6):** Every authenticated route is guarded by the single `requireRole(...)` middleware. Roles are enforced server-side only — never re-checked in handler bodies, never only on the client. Valid roles are `patient`, `doctor`, `admin`, and `system` (worker/webhook, no session). The `GET /api/auth/me` bootstrap endpoint exposes the caller's role to the SPA for client-side UI guards (convenience only; it is not a security boundary).
+**Role-based access control (DA6):** Every authenticated route is guarded by the single `requireRole(...)` middleware. Roles are enforced server-side only — never re-checked in handler bodies, never only on the client. Valid roles are `patient`, `doctor`, `admin`, `superadmin`, and `system` (worker/webhook, no session). **`superadmin` is admitted on every `admin`-gated and admin-shared route via explicit per-route dual-listing** — each such `requireRole(...)` names both `admin` and `superadmin` (the middleware itself is unchanged: it is already variadic). There is **no central role hierarchy**; this cycle `superadmin` ⊇ `admin` (a functional admin clone) and is admitted nowhere else new — not on patient- or doctor-only routes (ADR-47). The `GET /api/auth/me` bootstrap endpoint exposes the caller's role to the SPA for client-side UI guards (convenience only; it is not a security boundary).
 
 **Enumeration safety (P2):** `POST /api/auth/forgot-password` and `POST /api/auth/login` return an identical shape for known and unknown accounts, so callers cannot determine whether an email address is registered.
 
@@ -114,7 +114,7 @@ Filtered admin queries (A5) add typed filter params documented per endpoint.
 
 ## 4. Endpoints
 
-**Role legend:** `public` · `patient` · `doctor` · `admin` · `system` (worker/webhook, no session). `#n` references = PRD §3.3 invariant numbers.
+**Role legend:** `public` · `patient` · `doctor` · `admin` · `system` (worker/webhook, no session). `#n` references = PRD §3.3 invariant numbers. **Every `admin` entry in the tables below also admits `superadmin`** via explicit per-route dual-listing (superadmin ⊇ admin this cycle; no hierarchy — see §1); the tables keep `admin` unqualified for readability.
 
 ---
 
@@ -336,3 +336,4 @@ The write is **state-guarded**: the update is an `updateMany WHERE id = :id AND 
 | 2026-06-28 | Manual-payment pivot (ADR-43): `/:id/pay` repurposed to submit a bank reference; `/:id` returns `paymentInstructions` for a pending appt; added admin `accept`/`reject`; removed PayFast/Daily/Resend webhooks, `verify-return`, `dispute`, and `record-refund`; rewrote the state-machine table to 3 states (`pending`/`confirmed`/`cancelled`); prescription gate → `confirmed` (no state change on issue); admin records/alerts/settings re-shaped (bank fields, `state=pending` review queue, `payment.submitted` alert); retired invariants #2/#7/#10; pruned obsolete 409/422 codes and the dev `/dev/worker/*` set to `notifications` only | Manual-payment pivot — API as-built sync |
 | 2026-06-30 | `/appointments/lock` validation now returns `ACTIVE_LOCK_EXISTS` (single-active-appointment cap) in place of `OVERLAP`; removed `OVERLAP` from and added `ACTIVE_LOCK_EXISTS` to the §3.2 `409` list (ADR-44) | Single-active-appointment limit |
 | 2026-07-02 | `GET /api/appointments` doctor scope now uses the same time-based Upcoming/Past split as the patient (was D2 calendar-day "today"); §6.1 D2 row relabeled upcoming+past (ADR-45) | Doctor Upcoming/Past bugfix |
+| 2026-07-05 | §1 RBAC: added `superadmin` to valid roles and recorded that it is admitted on every `admin`-gated/admin-shared route via explicit per-route dual-listing (superadmin ⊇ admin this cycle; no central hierarchy; ADR-47); §4 role legend notes every `admin` table entry also admits `superadmin` | superadmin role |
