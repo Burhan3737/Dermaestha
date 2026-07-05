@@ -31,6 +31,7 @@ enum Role {
   patient
   doctor
   admin
+  superadmin
 }
 
 enum DoctorStatus {

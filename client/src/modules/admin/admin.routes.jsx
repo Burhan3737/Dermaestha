@@ -19,20 +19,23 @@ export const ADMIN_LINKS = [
   { to: '/admin/settings', label: 'Settings' },
 ];
 
-const guard = (session, el) => (
-  <RoleRoute session={session} role="admin">
+// Each route declares its OWN allowed roles (no shared/implied tier). To segregate later —
+// e.g. make Settings superadmin-only, or admit a new role on one view — edit just that route's
+// `roles` array. Mirrors the server's explicit per-route dual-listing (requireRole).
+const guard = (session, roles, el) => (
+  <RoleRoute session={session} role={roles}>
     {el}
   </RoleRoute>
 );
 
 export const adminRoutes = (session) => [
-  { path: '/admin', element: guard(session, <Navigate to="/admin/doctors" replace />) },
-  { path: '/admin/doctors', element: guard(session, <AdminDoctors />) },
-  { path: '/admin/medicines', element: guard(session, <AdminMedicines />) },
-  { path: '/admin/review', element: guard(session, <AdminReview />) },
-  { path: '/admin/records', element: guard(session, <AdminRecords />) },
-  { path: '/admin/records/audit', element: guard(session, <AdminRecords />) },
-  { path: '/admin/records/:id', element: guard(session, <AdminRecordDetail />) },
-  { path: '/admin/alerts', element: guard(session, <AdminAlerts />) },
-  { path: '/admin/settings', element: guard(session, <AdminSettings />) },
+  { path: '/admin', element: guard(session, ['admin', 'superadmin'], <Navigate to="/admin/doctors" replace />) },
+  { path: '/admin/doctors', element: guard(session, ['admin', 'superadmin'], <AdminDoctors />) },
+  { path: '/admin/medicines', element: guard(session, ['admin', 'superadmin'], <AdminMedicines />) },
+  { path: '/admin/review', element: guard(session, ['admin', 'superadmin'], <AdminReview />) },
+  { path: '/admin/records', element: guard(session, ['admin', 'superadmin'], <AdminRecords />) },
+  { path: '/admin/records/audit', element: guard(session, ['admin', 'superadmin'], <AdminRecords />) },
+  { path: '/admin/records/:id', element: guard(session, ['admin', 'superadmin'], <AdminRecordDetail />) },
+  { path: '/admin/alerts', element: guard(session, ['admin', 'superadmin'], <AdminAlerts />) },
+  { path: '/admin/settings', element: guard(session, ['admin', 'superadmin'], <AdminSettings />) },
 ];

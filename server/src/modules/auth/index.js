@@ -66,7 +66,7 @@ authRouter.post(
 authRouter.post('/reset-password', validate(resetPasswordSchema), c.resetPassword);
 authRouter.post(
   '/change-password',
-  requireRole('patient', 'doctor', 'admin'),
+  requireRole('patient', 'doctor', 'admin', 'superadmin'),
   validate(changePasswordSchema),
   c.changePassword,
 );

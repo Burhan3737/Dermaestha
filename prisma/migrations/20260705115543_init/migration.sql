@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('patient', 'doctor', 'admin');
+CREATE TYPE "Role" AS ENUM ('patient', 'doctor', 'admin', 'superadmin');
 
 -- CreateEnum
 CREATE TYPE "DoctorStatus" AS ENUM ('pending', 'active');
@@ -262,15 +262,12 @@ ALTER TABLE "appointments" ADD CONSTRAINT "appointments_patient_user_id_fkey" FO
 -- AddForeignKey
 ALTER TABLE "notification_jobs" ADD CONSTRAINT "notification_jobs_appointment_id_fkey" FOREIGN KEY ("appointment_id") REFERENCES "appointments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKeynpx prisma migrate reset --force --skip-seed
+-- AddForeignKey
 ALTER TABLE "prescriptions" ADD CONSTRAINT "prescriptions_appointment_id_fkey" FOREIGN KEY ("appointment_id") REFERENCES "appointments"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "prescription_items" ADD CONSTRAINT "prescription_items_prescription_id_fkey" FOREIGN KEY ("prescription_id") REFERENCES "prescriptions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- NO-DOUBLE-BOOKING partial index (PRD §3.3 #1) — cannot be expressed in Prisma DSL (no WHERE on @@unique).
--- Hand-appended per docs/specification/04-DATABASE_DOCUMENT.md §4b. Releasing/terminal state (cancelled)
--- is excluded so a freed slot is immediately rebookable. A second insert for a held slot then fails at
--- WRITE time, not validation time.
 CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
   WHERE state IN ('pending', 'confirmed');

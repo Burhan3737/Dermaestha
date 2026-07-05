@@ -9,4 +9,4 @@ export const prescriptionsRouter = Router({ mergeParams: true });
 // POST /api/appointments/:id/prescriptions  (doctor-owner; immutable submit)
 prescriptionsRouter.post('/', requireRole('doctor'), validate(prescriptionCreateSchema), c.create);
 // GET /api/appointments/:id/prescriptions  (patient-owner / doctor-owner / admin)
-prescriptionsRouter.get('/', requireRole('patient', 'doctor', 'admin'), c.list);
+prescriptionsRouter.get('/', requireRole('patient', 'doctor', 'admin', 'superadmin'), c.list);

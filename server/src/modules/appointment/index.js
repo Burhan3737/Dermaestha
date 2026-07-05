@@ -18,7 +18,7 @@ export const appointmentsRouter = Router();
 appointmentsRouter.post('/lock', requireRole('patient'), validate(lockSchema), c.lock);
 appointmentsRouter.post('/:id/pay', requireRole('patient'), payLimiter, validate(payRefSchema), c.pay);
 appointmentsRouter.get('/', requireRole('patient', 'doctor'), c.list);
-appointmentsRouter.get('/:id', requireRole('patient', 'doctor', 'admin'), c.detail);
+appointmentsRouter.get('/:id', requireRole('patient', 'doctor', 'admin', 'superadmin'), c.detail);
 appointmentsRouter.post(
   '/:id/cancel',
   requireRole('patient', 'doctor'),

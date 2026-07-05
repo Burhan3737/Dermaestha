@@ -5,7 +5,7 @@ import { AppError } from '../../http/AppError.js';
 export async function list(req, res, next) {
   try {
     const includeInactive = req.query.includeInactive === 'true';
-    if (includeInactive && req.session.role !== 'admin') {
+    if (includeInactive && !['admin', 'superadmin'].includes(req.session.role)) {
       throw new AppError('FORBIDDEN', 'Not allowed.', 403);
     }
     res.json({ data: await medicineService.list({ search: req.query.search, includeInactive }) });

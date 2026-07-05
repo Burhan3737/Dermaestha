@@ -68,6 +68,20 @@ describe('auth.service', () => {
     );
   });
 
+  it('login coerces a superadmin actorType to admin in the audit write', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'sa1',
+      role: 'superadmin',
+      fullName: 'SA',
+      mustChangePassword: false,
+      passwordHash: 'hash:pw',
+    });
+    await auth.login({ email: 'sa@b.com', password: 'pw' });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'login', actorType: 'admin', actorId: 'sa1' }),
+    );
+  });
+
   it('login throws an identical generic 401 for unknown email and for wrong password (enumeration-safe)', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     const unknown = await auth.login({ email: 'x@b.com', password: 'pw' }).catch((e) => e);

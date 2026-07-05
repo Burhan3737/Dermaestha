@@ -27,4 +27,14 @@ describe('requireRole (DA6)', () => {
     requireRole('admin')(req, res, next);
     expect(getErr()).toMatchObject({ code: 'FORBIDDEN', status: 403 });
   });
+  it('passes a superadmin on a route that dual-lists admin + superadmin', () => {
+    const { req, res, next, getErr } = ctx({ userId: 'u1', role: 'superadmin' });
+    requireRole('admin', 'superadmin')(req, res, next);
+    expect(getErr()).toBeUndefined();
+  });
+  it('403 FORBIDDEN for superadmin on a doctor/patient-only route', () => {
+    const { req, res, next, getErr } = ctx({ userId: 'u1', role: 'superadmin' });
+    requireRole('patient', 'doctor')(req, res, next);
+    expect(getErr()).toMatchObject({ code: 'FORBIDDEN', status: 403 });
+  });
 });

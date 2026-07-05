@@ -11,8 +11,9 @@
 //   node --env-file=.env prisma/scripts/seed-baseline.js
 //
 // BASELINE (password for ALL accounts: Test123!)
-//   admin     baseline.admin@dermestha.test
-//   patient1  baseline.patient1@dermestha.test   (ToS-accepted)
+//   admin      baseline.admin@dermestha.test
+//   superadmin baseline.superadmin@dermestha.test  (functional admin clone)
+//   patient1   baseline.patient1@dermestha.test   (ToS-accepted)
 //   patient2  baseline.patient2@dermestha.test   (ToS-accepted)  ← slot-lock race partner
 //   doctor    baseline.doctor@dermestha.test     (active; weekly availability; pre-seeded appts)
 //   medicine  "Baseline Acne Cream" (active)
@@ -40,6 +41,7 @@ const prisma = new PrismaClient();
 const PASSWORD = 'Test123!';
 const EMAILS = {
   admin: 'baseline.admin@dermestha.test',
+  superadmin: 'baseline.superadmin@dermestha.test',
   patient1: 'baseline.patient1@dermestha.test',
   patient2: 'baseline.patient2@dermestha.test',
   doctor: 'baseline.doctor@dermestha.test',
@@ -91,6 +93,9 @@ async function main() {
 
   const admin = await prisma.user.create({
     data: { role: 'admin', email: EMAILS.admin, fullName: 'Baseline Admin', passwordHash },
+  });
+  const superadmin = await prisma.user.create({
+    data: { role: 'superadmin', email: EMAILS.superadmin, fullName: 'Baseline Superadmin', passwordHash },
   });
   const patient1 = await prisma.user.create({
     data: {
@@ -234,12 +239,14 @@ async function main() {
       {
         accounts: {
           admin: EMAILS.admin,
+          superadmin: EMAILS.superadmin,
           patient1: EMAILS.patient1,
           patient2: EMAILS.patient2,
           doctor: EMAILS.doctor,
         },
         ids: {
           adminId: admin.id,
+          superadminId: superadmin.id,
           patient1Id: patient1.id,
           patient2Id: patient2.id,
           doctorId: doctor.id,

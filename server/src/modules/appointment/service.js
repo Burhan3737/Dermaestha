@@ -106,7 +106,7 @@ export async function getForRole({ id, role, userId }) {
         a.doctor &&
         (await prisma.doctor.findUnique({ where: { userId }, select: { id: true } }))?.id ===
           a.doctorId) ||
-      role === 'admin');
+      ['admin', 'superadmin'].includes(role));
   if (!visible) throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
 
   const detail = {

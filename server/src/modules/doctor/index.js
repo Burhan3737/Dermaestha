@@ -58,16 +58,16 @@ doctorsRouter.get('/:id', c.getOne);
 // GET /api/doctors/:id/slots?date=YYYY-MM-DD  (public)
 doctorsRouter.get('/:id/slots', validateQuery(slotsQuerySchema), c.slots);
 // GET /api/doctors/:id/availability  (doctor-own / admin)
-doctorsRouter.get('/:id/availability', requireRole('doctor', 'admin'), c.getAvailability);
+doctorsRouter.get('/:id/availability', requireRole('doctor', 'admin', 'superadmin'), c.getAvailability);
 
 // ── Admin doctor management (F10, doc 05 §F02/F10) ─────────────────────────
-doctorsRouter.post('/', requireRole('admin'), adminWriteLimiter, validate(doctorCreateSchema), c.create);
-doctorsRouter.patch('/:id', requireRole('admin'), adminWriteLimiter, rejectImmutable, validate(doctorUpdateSchema), c.update);
-doctorsRouter.post('/:id/deactivate', requireRole('admin'), adminWriteLimiter, c.deactivate);
-doctorsRouter.post('/:id/reactivate', requireRole('admin'), adminWriteLimiter, c.reactivate);
-doctorsRouter.post('/:id/reset-password', requireRole('admin'), adminWriteLimiter, validate(adminPasswordResetSchema), c.resetPassword);
-doctorsRouter.post('/:id/photo', requireRole('admin'), adminWriteLimiter, photoUpload, c.photo);
-doctorsRouter.put('/:id/availability', requireRole('admin'), adminWriteLimiter, validate(availabilityReplaceSchema), c.adminReplaceAvailability);
+doctorsRouter.post('/', requireRole('admin', 'superadmin'), adminWriteLimiter, validate(doctorCreateSchema), c.create);
+doctorsRouter.patch('/:id', requireRole('admin', 'superadmin'), adminWriteLimiter, rejectImmutable, validate(doctorUpdateSchema), c.update);
+doctorsRouter.post('/:id/deactivate', requireRole('admin', 'superadmin'), adminWriteLimiter, c.deactivate);
+doctorsRouter.post('/:id/reactivate', requireRole('admin', 'superadmin'), adminWriteLimiter, c.reactivate);
+doctorsRouter.post('/:id/reset-password', requireRole('admin', 'superadmin'), adminWriteLimiter, validate(adminPasswordResetSchema), c.resetPassword);
+doctorsRouter.post('/:id/photo', requireRole('admin', 'superadmin'), adminWriteLimiter, photoUpload, c.photo);
+doctorsRouter.put('/:id/availability', requireRole('admin', 'superadmin'), adminWriteLimiter, validate(availabilityReplaceSchema), c.adminReplaceAvailability);
 
 export const availabilityRouter = Router();
 // PUT /api/availability  (doctor; replaces own weekly blocks)

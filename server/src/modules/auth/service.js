@@ -49,7 +49,7 @@ export async function login({ email, password }) {
   if (!ok) throw new AppError('UNAUTHENTICATED', 'Invalid email or password.', 401);
   await audit.record({
     eventType: 'login',
-    actorType: user.role,
+    actorType: user.role === 'superadmin' ? 'admin' : user.role,
     actorId: user.id,
     targetRef: user.id,
   });
@@ -96,7 +96,7 @@ export async function resetPassword({ token, newPassword }) {
   });
   await audit.record({
     eventType: 'password_change',
-    actorType: user.role,
+    actorType: user.role === 'superadmin' ? 'admin' : user.role,
     actorId: user.id,
     targetRef: user.id,
     reason: 'reset',
@@ -115,7 +115,7 @@ export async function changePassword(userId, { currentPassword, newPassword }) {
   });
   await audit.record({
     eventType: 'password_change',
-    actorType: user.role,
+    actorType: user.role === 'superadmin' ? 'admin' : user.role,
     actorId: user.id,
     targetRef: user.id,
   });

@@ -9,7 +9,7 @@ export async function list(req, res, next) {
     // includeInactive (A-01) is admin-only; the public listing path is unchanged.
     // req.body contains the parsed query (the route does req.body = req.query before calling here).
     if (req.body.includeInactive === 'true') {
-      if (req.session?.role !== 'admin') throw new AppError('FORBIDDEN', 'Not allowed.', 403);
+      if (!['admin', 'superadmin'].includes(req.session?.role)) throw new AppError('FORBIDDEN', 'Not allowed.', 403);
       return res.json({ data: await adminService.listAllDoctors() });
     }
     res.json(await doctorService.listActiveDoctors(req.body /* parsed query, see route */));

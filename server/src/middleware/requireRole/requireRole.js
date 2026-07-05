@@ -4,7 +4,7 @@ import { AppError } from '../../http/AppError.js';
 /**
  * The single server-side authorization boundary (DA6). Never re-checked in handler bodies,
  * never enforced only on the client.
- * @param {...('patient'|'doctor'|'admin')} allowed
+ * @param {...('patient'|'doctor'|'admin'|'superadmin')} allowed
  */
 export function requireRole(...allowed) {
   return (req, _res, next) => {

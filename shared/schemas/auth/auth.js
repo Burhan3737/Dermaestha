@@ -13,7 +13,7 @@ export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),
   // Accepted per doc 05 but NOT authoritative; the stored role decides (enumeration-safety).
-  role: z.enum(['patient', 'doctor', 'admin']).optional(),
+  role: z.enum(['patient', 'doctor', 'admin', 'superadmin']).optional(),
 });
 
 export const forgotPasswordSchema = z.object({

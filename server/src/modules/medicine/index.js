@@ -21,13 +21,13 @@ export const medicinesRouter = Router();
 // GET /api/medicines?search=  (doctor/admin: builder dropdown source)
 medicinesRouter.get(
   '/',
-  requireRole('doctor', 'admin'),
+  requireRole('doctor', 'admin', 'superadmin'),
   validateQuery(medicineSearchQuerySchema),
   c.list,
 );
 
 export const adminMedicinesRouter = Router();
 // POST /api/admin/medicines  (admin; A-02 UI lands in Slice G)
-adminMedicinesRouter.post('/', requireRole('admin'), validate(medicineCreateSchema), c.create);
+adminMedicinesRouter.post('/', requireRole('admin', 'superadmin'), validate(medicineCreateSchema), c.create);
 // PATCH /api/admin/medicines/:id  (admin; edit + deactivate)
-adminMedicinesRouter.patch('/:id', requireRole('admin'), validate(medicineUpdateSchema), c.update);
+adminMedicinesRouter.patch('/:id', requireRole('admin', 'superadmin'), validate(medicineUpdateSchema), c.update);

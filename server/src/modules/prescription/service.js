@@ -123,7 +123,7 @@ export async function listByAppointment({ appointmentId, role, userId }) {
       (role === 'doctor' &&
         (await prisma.doctor.findUnique({ where: { userId }, select: { id: true } }))?.id ===
           appt.doctorId) ||
-      role === 'admin');
+      ['admin', 'superadmin'].includes(role));
   if (!visible) throw new AppError('NOT_FOUND', 'Appointment not found.', 404);
   return prisma.prescription.findMany({
     where: { appointmentId },

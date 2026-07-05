@@ -25,18 +25,18 @@ const adminWriteLimiter = makeRateLimiter({
 
 export const adminRouter = Router();
 // GET /api/admin/alerts  (A-03 feed, F12.01)
-adminRouter.get('/alerts', requireRole('admin'), c.alerts);
+adminRouter.get('/alerts', requireRole('admin', 'superadmin'), c.alerts);
 // GET /api/admin/records  (A-04 unified records, F13.01)
-adminRouter.get('/records', requireRole('admin'), validateQuery(recordsQuerySchema), c.records);
+adminRouter.get('/records', requireRole('admin', 'superadmin'), validateQuery(recordsQuerySchema), c.records);
 // GET /api/admin/records/:id  (A-04 detail: history + prescriptions + email jobs, F13.02)
-adminRouter.get('/records/:id', requireRole('admin'), c.recordDetail);
+adminRouter.get('/records/:id', requireRole('admin', 'superadmin'), c.recordDetail);
 // GET /api/admin/audit  (A-04 audit tab, F13.01)
-adminRouter.get('/audit', requireRole('admin'), validateQuery(auditQuerySchema), c.auditEntries);
+adminRouter.get('/audit', requireRole('admin', 'superadmin'), validateQuery(auditQuerySchema), c.auditEntries);
 // POST /api/admin/emails/:jobId/resend  (F12.02; :jobId = notification_jobs.id)
-adminRouter.post('/emails/:jobId/resend', requireRole('admin'), adminWriteLimiter, c.resendEmail);
+adminRouter.post('/emails/:jobId/resend', requireRole('admin', 'superadmin'), adminWriteLimiter, c.resendEmail);
 // GET/PUT /api/admin/settings  (A-05, F14; lead-time floor 30 enforced by the DTO)
-adminRouter.get('/settings', requireRole('admin'), c.getSettings);
-adminRouter.put('/settings', requireRole('admin'), adminWriteLimiter, validate(settingsUpdateSchema), c.putSettings);
+adminRouter.get('/settings', requireRole('admin', 'superadmin'), c.getSettings);
+adminRouter.put('/settings', requireRole('admin', 'superadmin'), adminWriteLimiter, validate(settingsUpdateSchema), c.putSettings);
 // POST /api/admin/appointments/:id/accept|reject  (manual-payment review → confirm/cancel)
-adminRouter.post('/appointments/:id/accept', requireRole('admin'), adminWriteLimiter, c.acceptAppointment);
-adminRouter.post('/appointments/:id/reject', requireRole('admin'), adminWriteLimiter, c.rejectAppointment);
+adminRouter.post('/appointments/:id/accept', requireRole('admin', 'superadmin'), adminWriteLimiter, c.acceptAppointment);
+adminRouter.post('/appointments/:id/reject', requireRole('admin', 'superadmin'), adminWriteLimiter, c.rejectAppointment);
