@@ -56,6 +56,12 @@ enum AuditActorType {
   system
 }
 
+enum PatchStatus {
+  running
+  success
+  failed
+}
+
 enum NotificationType {
   booking_confirmation
   reminder_24h
@@ -279,6 +285,30 @@ model AuditLog {
   @@index([at])
   @@index([targetRef])
   @@map("audit_log")
+}
+
+/// Append-only history of every patch run (one row per execution). Written only by the patch
+/// service. The Patches view reads this for per-patch status + history. See
+/// docs/superpowers/specs/2026-07-05-patches-module-design.md §3.
+model PatchExecution {
+  id         String      @id @default(cuid())
+  /// The patch file's declared id, e.g. "001-example-noop" (NOT a file path).
+  patchId    String      @map("patch_id")
+  /// sha256 of the file contents at run time (drift detection vs. a later edited redeploy).
+  checksum   String
+  status     PatchStatus @default(running)
+  /// The superadmin User.id who ran it (plain string, no FK — durable like AuditLog.actorId).
+  executedBy String      @map("executed_by")
+  /// Failure message when status=failed (null otherwise).
+  error      String?
+  /// Success payload returned by up(tx), e.g. { rowsAffected } (null on failure).
+  result     Json?
+  startedAt  DateTime    @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime?   @map("finished_at") @db.Timestamptz(6)
+
+  @@index([patchId])
+  @@index([startedAt])
+  @@map("patch_executions")
 }
 
 /// KPI telemetry (PRD §1 #1/#3). `networkType` supports the 3G-success KPI.
