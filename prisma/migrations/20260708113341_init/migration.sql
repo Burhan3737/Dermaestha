@@ -11,6 +11,9 @@ CREATE TYPE "AppointmentState" AS ENUM ('pending', 'confirmed', 'cancelled');
 CREATE TYPE "AuditActorType" AS ENUM ('patient', 'doctor', 'admin', 'system');
 
 -- CreateEnum
+CREATE TYPE "PatchStatus" AS ENUM ('running', 'success', 'failed');
+
+-- CreateEnum
 CREATE TYPE "NotificationType" AS ENUM ('booking_confirmation', 'reminder_24h', 'reminder_1h', 'prescription_ready', 'payment_submitted_admin', 'payment_not_received', 'cancellation');
 
 -- CreateEnum
@@ -158,6 +161,21 @@ CREATE TABLE "audit_log" (
 );
 
 -- CreateTable
+CREATE TABLE "patch_executions" (
+    "id" TEXT NOT NULL,
+    "patch_id" TEXT NOT NULL,
+    "checksum" TEXT NOT NULL,
+    "status" "PatchStatus" NOT NULL DEFAULT 'running',
+    "executed_by" TEXT NOT NULL,
+    "error" TEXT,
+    "result" JSONB,
+    "started_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finished_at" TIMESTAMPTZ(6),
+
+    CONSTRAINT "patch_executions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "analytics_events" (
     "id" TEXT NOT NULL,
     "at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -239,6 +257,12 @@ CREATE INDEX "audit_log_at_idx" ON "audit_log"("at");
 CREATE INDEX "audit_log_target_ref_idx" ON "audit_log"("target_ref");
 
 -- CreateIndex
+CREATE INDEX "patch_executions_patch_id_idx" ON "patch_executions"("patch_id");
+
+-- CreateIndex
+CREATE INDEX "patch_executions_started_at_idx" ON "patch_executions"("started_at");
+
+-- CreateIndex
 CREATE INDEX "analytics_events_type_idx" ON "analytics_events"("type");
 
 -- CreateIndex
@@ -269,5 +293,12 @@ ALTER TABLE "prescriptions" ADD CONSTRAINT "prescriptions_appointment_id_fkey" F
 ALTER TABLE "prescription_items" ADD CONSTRAINT "prescription_items_prescription_id_fkey" FOREIGN KEY ("prescription_id") REFERENCES "prescriptions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- NO-DOUBLE-BOOKING partial index (PRD §3.3 #1) — cannot be expressed in Prisma DSL (no WHERE on @@unique).
+-- The releasing/terminal state (cancelled) is excluded so a freed slot rebooks. See docs/specification/04-DATABASE_DOCUMENT.md §4b.
 CREATE UNIQUE INDEX uniq_active_slot ON appointments (doctor_id, slot_start)
   WHERE state IN ('pending', 'confirmed');
+
+-- Enforce at most ONE in-flight run per patch, atomically at the DB (not the app's check-then-insert).
+-- A patch_executions row leaves this partial index the moment it finalizes (status success|failed),
+-- freeing the patch to run again. Prisma's DSL cannot express a partial (WHERE) index, so it is
+-- hand-added here — same pattern as uniq_active_slot in the baseline migration.
+CREATE UNIQUE INDEX "uniq_running_patch" ON "patch_executions" ("patch_id") WHERE status = 'running';
