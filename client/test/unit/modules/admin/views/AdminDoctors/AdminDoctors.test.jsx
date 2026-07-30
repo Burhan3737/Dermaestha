@@ -3,6 +3,10 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
+vi.mock('#src/context/session/session.jsx', () => ({
+  useSession: () => ({ session: { role: 'admin' } }),
+}));
+
 vi.mock('#src/lib/apiClient/apiClient.js', () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), upload: vi.fn() },
 }));
