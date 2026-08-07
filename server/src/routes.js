@@ -9,6 +9,7 @@ import { medicinesRouter, adminMedicinesRouter } from './modules/medicine/index.
 import { adminRouter } from './modules/admin/index.js';
 import { analyticsRouter } from './modules/analytics/index.js';
 import { prescriptionsRouter } from './modules/prescription/index.js';
+import { patchRouter } from './modules/patch/index.js';
 import { healthRouter } from './health/index.js';
 import { devWorkersRouter } from './dev/devWorkers.js';
 
@@ -27,6 +28,7 @@ export function registerRoutes(app) {
   app.use('/api/appointments/:id/prescriptions', prescriptionsRouter);
   app.use('/api/appointments', appointmentsRouter);
   app.use('/api/analytics', analyticsRouter); // POST /api/analytics/events (public)
+  app.use('/api/patches', patchRouter);
   app.use('/api', healthRouter);
   // Unknown /api path → JSON 404 envelope (never the SPA HTML).
   app.use('/api', (_req, _res, next) => next(new AppError('NOT_FOUND', 'Not found.', 404)));
