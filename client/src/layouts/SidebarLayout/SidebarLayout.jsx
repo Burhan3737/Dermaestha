@@ -1,6 +1,7 @@
 // @ts-check
 import { NavLink } from 'react-router-dom';
 import { api } from '../../lib/apiClient/apiClient.js';
+import { useSession } from '../../context/session/session.jsx';
 
 export const DOCTOR_LINKS = [
   // Single appointments section (Today/History live as in-page tabs on the page, ADR-42).
@@ -18,6 +19,10 @@ export function SidebarLayout({ links = DOCTOR_LINKS, children }) {
     }
   }
 
+  const { session } = useSession();
+  const role = session?.role;
+  const visibleLinks = links.filter((l) => !l.roles || (role && l.roles.includes(role)));
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <nav className="sidebar" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -25,7 +30,7 @@ export function SidebarLayout({ links = DOCTOR_LINKS, children }) {
           <span className="brand__mark" />
           <span className="brand__word">Dermestha</span>
         </div>
-        {links.map((l) => (
+        {visibleLinks.map((l) => (
           <NavLink key={l.to} to={l.to} end={l.end} className="sidebar__link">
             {l.label}
           </NavLink>
