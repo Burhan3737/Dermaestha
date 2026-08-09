@@ -17,6 +17,7 @@ export const ADMIN_LINKS = [
   { to: '/admin/records', label: 'Records & audit' },
   { to: '/admin/alerts', label: 'System health' },
   { to: '/admin/settings', label: 'Settings' },
+  { to: '/admin/patches', label: 'Patches', roles: ['superadmin'] },
 ];
 
 // Each route declares its OWN allowed roles (no shared/implied tier). To segregate later —
